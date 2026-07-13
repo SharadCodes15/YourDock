@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>macOS Top Menu Bar</title>
+  <style>
+    /* CSS Reset */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      color: #1d1d1f;
+      overflow: hidden;
+      background: transparent;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Menu Bar Shell */
+    .menu-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 28px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 0 12px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+      transition: background 0.2s ease;
+    }
+
+    /* Group Sections */
+    .menu-left, .menu-right {
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+
+    /* Menu Items */
+    .menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 22px;
+      padding: 0 10px;
+      margin: 0 1px;
+      border-radius: 4px;
+      cursor: default;
+      color: #1d1d1f;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      position: relative;
+    }
+
+    .menu-item:hover {
+      background-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .menu-item.active {
+      background-color: rgba(0, 0, 0, 0.12);
+    }
+
+    .apple-item {
+      padding: 0 8px;
+    }
+
+    .active-app-item {
+      font-weight: 700;
+      padding-left: 6px;
+      padding-right: 8px;
+    }
+    
+    .active-app-item:hover {
+      background-color: transparent; /* macOS active app name doesn't hover-highlight */
+    }
+
+    /* Right Icons Spacer */
+    .status-icon {
+      padding: 0 6px;
+    }
+
+    .clock-item {
+      padding: 0 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Dropdown Menus */
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 25px;
+      left: 0;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.45);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      border-radius: 6px;
+      min-width: 190px;
+      padding: 5px 0;
+      z-index: 10000;
+      animation: menuFadeIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .dropdown-menu.right-align {
+      left: auto;
+      right: 0;
+    }
+
+    .menu-item.active .dropdown-menu {
+      display: block;
+    }
+
+    @keyframes menuFadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dropdown Elements */
+    .dropdown-item {
+      padding: 4px 18px 4px 14px;
+      margin: 0 5px;
+      border-radius: 4px;
+      color: #1d1d1f;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      white-space: nowrap;
+      transition: background-color 0.1s, color 0.1s;
+    }
+
+    .dropdown-item:hover {
+      background: linear-gradient(135deg, #007aff, #005ecb);
+      color: white;
+    }
+
+    .dropdown-item:hover .shortcut {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .dropdown-item:hover .device-status {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .dropdown-item.no-hover {
+      background: transparent !important;
+      color: #1d1d1f !important;
+      cursor: default;
+    }
+
+    .dropdown-item.selected {
+      font-weight: 500;
+    }
+
+    .dropdown-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: #86868b;
+      padding: 4px 14px;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background: rgba(0, 0, 0, 0.08);
+      margin: 5px 6px;
+    }
+
+    .shortcut {
+      font-size: 11px;
+      color: #86868b;
+      margin-left: 20px;
+    }
+
+    .checkmark {
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .device-status {
+      font-size: 11px;
+      color: #86868b;
+      margin-left: 15px;
+    }
+
+    /* Switch Styling inside dropdowns */
+    .dropdown-item-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 14px;
+      margin: 0 5px;
+    }
+
+    /* Spotlight Search Bar */
+    .spotlight-container {
+      display: flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 4px;
+      transition: background-color 0.15s ease;
+    }
+
+    .spotlight-container:hover {
+      background-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .spotlight-container.expanded-input {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .spotlight-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+    }
+
+    .spotlight-input {
+      width: 0;
+      opacity: 0;
+      border: none;
+      background: transparent;
+      color: #1d1d1f;
+      font-size: 12px;
+      outline: none;
+      transition: width 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.25s ease;
+      padding: 0;
+    }
+
+    .spotlight-container.expanded-input .spotlight-input {
+      width: 140px;
+      opacity: 1;
+      padding: 0 4px 0 6px;
+    }
+
+    /* Volume Slider inside Dropdown */
+    .dropdown-slider-container {
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .vol-slider {
+      flex-grow: 1;
+      -webkit-appearance: none;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(0, 0, 0, 0.06);
+      outline: none;
+      overflow: hidden;
+    }
+
+    .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      cursor: pointer;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    /* Switch Component */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(120, 120, 128, 0.2);
+      transition: .2s;
+      border-radius: 9px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    input:checked + .slider {
+      background-color: #007aff;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(14px);
+    }
+
+    /* Control Center Grid Styles */
+    .cc-dropdown {
+      background: rgba(255, 255, 255, 0.72) !important;
+      border-radius: 14px !important;
+    }
+
+    .cc-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .cc-box {
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .cc-box-wide {
+      grid-column: span 2;
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .cc-network {
+      gap: 8px;
+    }
+
+    .cc-net-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: default;
+    }
+
+    .cc-net-icon {
+      width: 26px;
+      height: 26px;
+      background: rgba(0, 0, 0, 0.05);
+      color: #1d1d1f;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s;
+    }
+
+    .cc-net-icon.active {
+      background: #007aff;
+      color: white;
+    }
+
+    .cc-net-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1d1d1f;
+      line-height: 1.2;
+    }
+
+    .cc-net-desc {
+      font-size: 9px;
+      color: #666;
+    }
+
+    .cc-focus {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: default;
+    }
+
+    .cc-focus-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1d1d1f;
+      transition: all 0.25s;
+    }
+
+    .cc-focus-icon.active {
+      background: #5856d6;
+      color: white;
+    }
+
+    .cc-focus-title {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .cc-focus-desc {
+      font-size: 9px;
+      color: #666;
+    }
+
+    .cc-kbd, .cc-mirror {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: default;
+      padding: 14px 6px;
+      gap: 8px;
+    }
+
+    .cc-kbd-icon, .cc-mirror-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1d1d1f;
+    }
+
+    .cc-kbd-text, .cc-mirror-text {
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #1d1d1f;
+    }
+
+    .cc-slider-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cc-slider-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+
+    .cc-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cc-slider-icon {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #555;
+    }
+
+    .cc-slider {
+      flex-grow: 1;
+      -webkit-appearance: none;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(0, 0, 0, 0.06);
+      outline: none;
+      overflow: hidden;
+    }
+
+    .cc-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      cursor: pointer;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .cc-now-playing {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+    }
+
+    .cc-np-art {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #ff2d55, #ff9500);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 2px 6px rgba(255, 45, 85, 0.3);
+    }
+
+    .cc-np-info {
+      flex-grow: 1;
+    }
+
+    .cc-np-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1d1d1f;
+    }
+
+    .cc-np-artist {
+      font-size: 9px;
+      color: #666;
+    }
+
+    .cc-np-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .cc-np-btn {
+      background: none;
+      border: none;
+      font-size: 12px;
+      cursor: default;
+      outline: none;
+      opacity: 0.8;
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    .cc-np-btn:hover {
+      background: rgba(0,0,0,0.05);
+      opacity: 1;
+    }
+
+    /* Calendar Widget styles */
+    .calendar-widget {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1d1d1f;
+      margin-top: 6px;
+    }
+
+    .cal-month-year {
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .cal-days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+
+    .cal-day-header {
+      font-size: 10px;
+      font-weight: 600;
+      color: #86868b;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cal-day-empty {
+      height: 22px;
+    }
+
+    .cal-day-number {
+      font-size: 11px;
+      height: 22px;
+      width: 22px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+    }
+
+    .cal-day-number.today {
+      background: #007aff;
+      color: white;
+      font-weight: 600;
+    }
+
+    .battery-container {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .battery-icon {
+      vertical-align: middle;
+      color: #1d1d1f;
+    }
+  </style>
+</head>
+<body>
+  <div class="menu-bar" id="menu-bar">
+    <!-- Left Section: Apple, Active App, menus -->
+    <div class="menu-left">
+      <!-- Apple Menu -->
+      <div class="menu-item apple-item interactive" id="menu-apple">
+        <svg width="14" height="14" viewBox="0 0 170 170" style="margin-top: -1px;">
+          <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.37.13-9.13-1.9-14.28-6.07-3.47-2.9-7.38-7.69-11.75-14.38-5.82-8.88-10.37-18.79-13.65-29.7C8.1 104.3 6.43 93.38 6.43 83.12c0-14.5 3.73-26.6 11.18-36.31 7.46-9.7 16.73-14.6 27.81-14.7 5.26 0 10.74 1.45 16.44 4.36 5.7 2.91 10.07 4.36 13.12 4.36 2.68 0 6.94-1.39 12.78-4.18 5.83-2.79 11.23-4.13 16.2-4.02 15.32.33 26.96 5.86 34.93 16.58-12.29 7.48-18.35 17.51-18.19 30.1.18 10.05 3.97 18.52 11.39 25.43 7.42 6.9 16.14 10.59 26.17 11.06-2.45 7.15-5.91 14.8-10.4 22.95zM119.22 9.64c0 7.82-2.85 15.11-8.56 21.88-5.7 6.76-12.79 10.87-21.26 12.33-.22-1.79-.34-3.46-.34-5.03 0-7.37 2.91-14.64 8.72-21.8 5.81-7.15 13.08-11.45 21.8-12.89.56 2.12.7 3.96.7 5.51z" fill="currentColor"/>
+        </svg>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">About This Mac</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">System Preferences...</div>
+          <div class="dropdown-item">App Store... <span class="shortcut">1 update</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Sleep</div>
+          <div class="dropdown-item">Restart...</div>
+          <div class="dropdown-item">Shut Down...</div>
+        </div>
+      </div>
+
+      <!-- Active App Name -->
+      <div class="menu-item active-app-item" id="active-app-container">
+        <span id="active-app">Finder</span>
+      </div>
+
+      <!-- Standard Menus -->
+      <div class="menu-item interactive">
+        <span>File</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">New Window <span class="shortcut">⌘N</span></div>
+          <div class="dropdown-item">New Tab <span class="shortcut">⌘T</span></div>
+          <div class="dropdown-item">Open File... <span class="shortcut">⌘O</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Close Window <span class="shortcut">⌘W</span></div>
+        </div>
+      </div>
+      <div class="menu-item interactive">
+        <span>Edit</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">Undo <span class="shortcut">⌘Z</span></div>
+          <div class="dropdown-item">Redo <span class="shortcut">⇧⌘Z</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Cut <span class="shortcut">⌘X</span></div>
+          <div class="dropdown-item">Copy <span class="shortcut">⌘C</span></div>
+          <div class="dropdown-item">Paste <span class="shortcut">⌘V</span></div>
+          <div class="dropdown-item">Select All <span class="shortcut">⌘A</span></div>
+        </div>
+      </div>
+      <div class="menu-item interactive">
+        <span>View</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">As Icons <span class="shortcut">⌘1</span></div>
+          <div class="dropdown-item">As List <span class="shortcut">⌘2</span></div>
+          <div class="dropdown-item">As Columns <span class="shortcut">⌘3</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Show Sidebar <span class="shortcut">⌥⌘S</span></div>
+          <div class="dropdown-item">Enter Full Screen <span class="shortcut">⌃⌘F</span></div>
+        </div>
+      </div>
+      <div class="menu-item interactive">
+        <span>Go</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">Back <span class="shortcut">⌘[</span></div>
+          <div class="dropdown-item">Forward <span class="shortcut">⌘]</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Enclosing Folder <span class="shortcut">⌘↑</span></div>
+          <div class="dropdown-item">Recents <span class="shortcut">⇧⌘F</span></div>
+          <div class="dropdown-item">Documents <span class="shortcut">⇧⌘O</span></div>
+          <div class="dropdown-item">Downloads <span class="shortcut">⌥⌘L</span></div>
+          <div class="dropdown-item">Home <span class="shortcut">⇧⌘H</span></div>
+        </div>
+      </div>
+      <div class="menu-item interactive">
+        <span>Window</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">Minimize <span class="shortcut">⌘M</span></div>
+          <div class="dropdown-item">Zoom</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Bring All to Front</div>
+        </div>
+      </div>
+      <div class="menu-item interactive">
+        <span>Help</span>
+        <div class="dropdown-menu">
+          <div class="dropdown-item">Search</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">macOS Help</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Section: status icons, clock -->
+    <div class="menu-right">
+      <!-- Wi-Fi Status -->
+      <div class="menu-item status-icon interactive" id="menu-wifi">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="wifi-bar-icon">
+          <path d="M5 12.55a11 11 0 0 1 14 0" />
+          <path d="M8.22 15.75a7 7 0 0 1 7.56 0" />
+          <path d="M12 20h.01" />
+          <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+        </svg>
+        <div class="dropdown-menu right-align" style="width: 240px;">
+          <div class="dropdown-header">Wi-Fi Network</div>
+          <div class="dropdown-item-toggle">
+            <span style="font-weight: 600;">Wi-Fi</span>
+            <label class="switch">
+              <input type="checkbox" id="wifi-toggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header" id="wifi-list-header">Known Networks</div>
+          <div class="wifi-list" id="wifi-list">
+            <div class="dropdown-item selected wifi-network-item">HomeWiFi_5G <span class="checkmark">✓</span></div>
+            <div class="dropdown-item wifi-network-item">Office_Secure</div>
+            <div class="dropdown-item wifi-network-item">Guest_Access</div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Wi-Fi Settings...</div>
+        </div>
+      </div>
+
+      <!-- Bluetooth Status -->
+      <div class="menu-item status-icon interactive" id="menu-bluetooth">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m7 7 10 10-5 5V2l5 5L7 17"/>
+        </svg>
+        <div class="dropdown-menu right-align" style="width: 240px;">
+          <div class="dropdown-header">Bluetooth</div>
+          <div class="dropdown-item-toggle">
+            <span style="font-weight: 600;">Bluetooth</span>
+            <label class="switch">
+              <input type="checkbox" id="bt-toggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header" id="bt-list-header">Devices</div>
+          <div class="bt-list" id="bt-list">
+            <div class="dropdown-item">AirPods Pro <span class="device-status">Connected</span></div>
+            <div class="dropdown-item">Magic Keyboard <span class="device-status">Connected</span></div>
+            <div class="dropdown-item">Magic Trackpad <span class="device-status">Connected</span></div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Bluetooth Settings...</div>
+        </div>
+      </div>
+
+      <!-- Battery Status -->
+      <div class="menu-item status-icon interactive" id="menu-battery">
+        <div class="battery-container">
+          <span style="font-size: 12px; font-weight: 500;" id="battery-text">88%</span>
+          <svg class="battery-icon" viewBox="0 0 24 14" width="18" height="11">
+            <rect x="1" y="1" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="3.5" y="3.5" width="11" height="7" rx="0.5" fill="currentColor" id="battery-fill" />
+            <path d="M21 4.5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="dropdown-menu right-align" style="width: 240px;">
+          <div class="dropdown-header">Battery</div>
+          <div class="dropdown-item no-hover" style="font-weight: 600;">Power Source: Battery</div>
+          <div class="dropdown-item no-hover" style="color: #666; font-size: 12px;">Remaining: 88% (approx. 4h 12m)</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item" style="font-weight: 500;">Battery Health: Normal (95%)</div>
+          <div class="dropdown-item" id="battery-percent-toggle">Show Percentage <span class="checkmark">✓</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Battery Settings...</div>
+        </div>
+      </div>
+
+      <!-- Volume Status -->
+      <div class="menu-item status-icon interactive" id="menu-volume">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="volume-bar-icon">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <div class="dropdown-menu right-align" style="width: 230px;">
+          <div class="dropdown-header">Sound</div>
+          <div class="dropdown-slider-container">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #555;">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            </svg>
+            <input type="range" class="vol-slider" id="vol-slider" min="0" max="100" value="70" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #555;">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-header">Output Device</div>
+          <div class="dropdown-item selected">AirPods Pro <span class="checkmark">✓</span></div>
+          <div class="dropdown-item">Internal Speakers</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">Sound Settings...</div>
+        </div>
+      </div>
+
+      <!-- Spotlight (Magnifying Glass) -->
+      <div class="spotlight-container interactive" id="spotlight-container">
+        <div class="spotlight-btn" id="spotlight-btn-trigger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <input type="text" class="spotlight-input" id="spotlight-input" placeholder="Spotlight..." />
+      </div>
+
+      <!-- Control Center -->
+      <div class="menu-item status-icon interactive" id="menu-cc">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14"/>
+          <line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/>
+          <line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/>
+          <line x1="9" y1="8" x2="15" y2="8"/>
+          <line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        <!-- Big Sur style dropdown -->
+        <div class="dropdown-menu right-align cc-dropdown" style="width: 310px; padding: 12px;">
+          <div class="cc-grid">
+            
+            <!-- Wi-Fi / Bluetooth / AirDrop Group -->
+            <div class="cc-box cc-network">
+              <div class="cc-net-item" id="cc-wifi-toggle-item">
+                <div class="cc-net-icon active" id="cc-wifi-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12.55a11 11 0 0 1 14 0" />
+                    <path d="M12 20h.01" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="cc-net-title">Wi-Fi</div>
+                  <div class="cc-net-desc" id="cc-wifi-desc">HomeWiFi_5G</div>
+                </div>
+              </div>
+              
+              <div class="cc-net-item" id="cc-bt-toggle-item">
+                <div class="cc-net-icon active" id="cc-bt-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m7 7 10 10-5 5V2l5 5L7 17"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="cc-net-title">Bluetooth</div>
+                  <div class="cc-net-desc" id="cc-bt-desc">On</div>
+                </div>
+              </div>
+              
+              <div class="cc-net-item">
+                <div class="cc-net-icon active">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="m12 8-4 4h8Z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="cc-net-title">AirDrop</div>
+                  <div class="cc-net-desc">Contacts Only</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Focus / Do Not Disturb Block -->
+            <div class="cc-box cc-focus" id="cc-focus-toggle-item">
+              <div class="cc-focus-icon" id="cc-focus-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="cc-focus-title">Focus</div>
+                <div class="cc-focus-desc" id="cc-focus-desc">Off</div>
+              </div>
+            </div>
+
+            <!-- Keyboard Brightness -->
+            <div class="cc-box cc-kbd">
+              <div class="cc-kbd-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M7 16h10" />
+                </svg>
+              </div>
+              <div class="cc-kbd-text">Keyboard Brightness</div>
+            </div>
+
+            <!-- Screen Mirroring -->
+            <div class="cc-box cc-mirror">
+              <div class="cc-mirror-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/>
+                  <path d="m8 21 4-4 4 4"/>
+                </svg>
+              </div>
+              <div class="cc-mirror-text">Screen Mirroring</div>
+            </div>
+
+            <!-- Display Brightness Slider -->
+            <div class="cc-box-wide cc-slider-box">
+              <div class="cc-slider-title">Display</div>
+              <div class="cc-slider-row">
+                <div class="cc-slider-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                  </svg>
+                </div>
+                <input type="range" class="cc-slider" id="cc-brightness-slider" min="10" max="100" value="80" />
+              </div>
+            </div>
+
+            <!-- Sound Slider -->
+            <div class="cc-box-wide cc-slider-box">
+              <div class="cc-slider-title">Sound</div>
+              <div class="cc-slider-row">
+                <div class="cc-slider-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  </svg>
+                </div>
+                <input type="range" class="cc-slider" id="cc-sound-slider" min="0" max="100" value="70" />
+              </div>
+            </div>
+
+            <!-- Now Playing Card -->
+            <div class="cc-box-wide cc-now-playing">
+              <div class="cc-np-art">🎵</div>
+              <div class="cc-np-info">
+                <div class="cc-np-title" style="letter-spacing: -0.1px;">Stairway to Heaven</div>
+                <div class="cc-np-artist">Led Zeppelin</div>
+              </div>
+              <div class="cc-np-controls">
+                <button class="cc-np-btn">⏮</button>
+                <button class="cc-np-btn" id="cc-play-pause-btn">⏸</button>
+                <button class="cc-np-btn">⏭</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Clock (and Calendar dropdown) -->
+      <div class="menu-item clock-item interactive" id="menu-clock">
+        <span id="clock-text">Mon Jul 13   9:13 PM</span>
+        <div class="dropdown-menu right-align" style="width: 250px; padding: 12px;">
+          <div class="calendar-widget">
+            <div class="cal-month-year" id="cal-month-year">July 2026</div>
+            <div class="cal-days-grid" id="cal-days-grid">
+              <!-- Calendar dynamically generated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    let activeDropdown = null;
+    let isSpotlightExpanded = false;
+
+    // Track active interactions to toggle mouse ignore state
+    // Normal state is pass-through except when mouse is hovering over interactive elements.
+    // Dropdown open state is full capture (ignore = false) so that clicks anywhere close the dropdown.
+    function checkMouseIgnore(e) {
+      if (activeDropdown) {
+        // If a dropdown is active, the entire window is capturing clicks
+        window.electronAPI.setIgnoreMouse(false);
+        return;
+      }
+
+      // Check if mouse is hovering over any interactive items
+      const target = e ? e.target : null;
+      const isOverInteractive = target && (
+        target.closest('.interactive') !== null ||
+        target.closest('.dropdown-menu') !== null
+      );
+
+      window.electronAPI.setIgnoreMouse(!isOverInteractive);
+    }
+
+    // Window Mouse Move handler
+    window.addEventListener('mousemove', (e) => {
+      checkMouseIgnore(e);
+    });
+
+    // Reset ignore state on mouse leave so that mouse doesn't get "stuck" capturing when moving fast
+    document.addEventListener('mouseleave', () => {
+      if (!activeDropdown) {
+        window.electronAPI.setIgnoreMouse(true);
+      }
+    });
+
+    // Dropdown Logic
+    function openDropdown(menuItem) {
+      closeAllDropdowns();
+      
+      menuItem.classList.add('active');
+      activeDropdown = menuItem;
+
+      // Lock mouse ignore to false so the transparent backdrop can capture click-outs
+      window.electronAPI.setIgnoreMouse(false);
+
+      // Determine required window size
+      let heightNeeded = 360; // Standard size for most menus
+      if (menuItem.id === 'menu-cc') {
+        heightNeeded = 430; // Control Center is taller
+      } else if (menuItem.id === 'menu-clock') {
+        heightNeeded = 260; // Calendar is shorter
+      }
+
+      // Inform Main Process to resize the window so dropdown is visible
+      window.electronAPI.setIgnoreMouse(false); // Double check it is false
+      ipcRendererSend('set-window-height', heightNeeded);
+    }
+
+    function closeAllDropdowns() {
+      if (activeDropdown) {
+        activeDropdown.classList.remove('active');
+        activeDropdown = null;
+      }
+      // Set window size back to menu bar height (28px)
+      ipcRendererSend('set-window-height', 28);
+      
+      // Let standard hover checks determine ignoring
+      window.electronAPI.setIgnoreMouse(true);
+    }
+
+    // Helper for direct IPC since preload script exposes electronAPI
+    function ipcRendererSend(channel, data) {
+      // We can use standard ipcRenderer via preload, wait we exposed ipcRenderer methods,
+      // let's check what we exposed in preload.js:
+      // contextBridge.exposeInMainWorld('electronAPI', {
+      //   onActiveAppChanged: (callback) => ipcRenderer.on('active-app-changed', (_event, value) => callback(value)),
+      //   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore)
+      // });
+      // Oops! We need a way to send window height. Let's make sure we handle it!
+      // Wait, we forgot to expose `setWindowHeight` in preload.js!
+      // Let's modify main.js or preload.js to handle this.
+      // Ah! We can easily edit preload.js to expose `setWindowHeight` and modify main.js to receive it.
+      // Or we can just call it via our exposed electronAPI once we edit preload.js!
+      // Let's call `window.electronAPI.setWindowHeight(data)` in our JS, and we will update preload.js!
+      if (window.electronAPI && window.electronAPI.setWindowHeight) {
+        window.electronAPI.setWindowHeight(data);
+      }
+    }
+
+    // Menu Item click triggers
+    const menuItems = document.querySelectorAll('.menu-item.interactive');
+    menuItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeDropdown === item) {
+          closeAllDropdowns();
+        } else {
+          openDropdown(item);
+        }
+      });
+
+      // Hover-switching dropdowns when one is already active
+      item.addEventListener('mouseenter', () => {
+        if (activeDropdown && activeDropdown !== item) {
+          openDropdown(item);
+        }
+      });
+    });
+
+    // Close on clicking the backdrop/outside
+    document.addEventListener('click', (e) => {
+      if (activeDropdown && !e.target.closest('.menu-item')) {
+        closeAllDropdowns();
+      }
+    });
+
+    // Clock Logic
+    function updateClock() {
+      const now = new Date();
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      const day = days[now.getDay()];
+      const month = months[now.getMonth()];
+      const date = now.getDate();
+      
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      
+      const dateStr = `${day} ${month} ${date}`;
+      const timeStr = `${hours}:${minutes} ${ampm}`;
+      
+      document.getElementById('clock-text').textContent = `${dateStr}   ${timeStr}`;
+    }
+
+    // Initialize clock and poll every 30s
+    updateClock();
+    setInterval(updateClock, 30000);
+
+    // Active App updates from IPC
+    window.electronAPI.onActiveAppChanged((appName) => {
+      // Strip file extension if active-win returns executable name like "Notepad.exe"
+      let cleanName = appName;
+      if (appName.endsWith('.exe')) {
+        cleanName = appName.slice(0, -4);
+      }
+      // Capitalize first letter if it is lowercase
+      if (cleanName.length > 0) {
+        cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      }
+      
+      document.getElementById('active-app').textContent = cleanName;
+    });
+
+    // Calendar Generator
+    function generateCalendar() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      document.getElementById('cal-month-year').textContent = `${monthNames[month]} ${year}`;
+      
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      const grid = document.getElementById('cal-days-grid');
+      grid.innerHTML = '';
+      
+      // Day headers
+      const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      dayNames.forEach(d => {
+        const el = document.createElement('div');
+        el.className = 'cal-day-header';
+        el.textContent = d;
+        grid.appendChild(el);
+      });
+      
+      // Padding
+      for (let i = 0; i < firstDay; i++) {
+        const el = document.createElement('div');
+        el.className = 'cal-day-empty';
+        grid.appendChild(el);
+      }
+      
+      // Month days
+      for (let d = 1; d <= daysInMonth; d++) {
+        const el = document.createElement('div');
+        el.className = 'cal-day-number';
+        if (d === now.getDate()) {
+          el.classList.add('today');
+        }
+        el.textContent = d;
+        grid.appendChild(el);
+      }
+    }
+    generateCalendar();
+
+    // Spotlight Input Toggle
+    const spotlightContainer = document.getElementById('spotlight-container');
+    const spotlightTrigger = document.getElementById('spotlight-btn-trigger');
+    const spotlightInput = document.getElementById('spotlight-input');
+
+    spotlightTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isSpotlightExpanded = !isSpotlightExpanded;
+      if (isSpotlightExpanded) {
+        spotlightContainer.classList.add('expanded-input');
+        spotlightInput.focus();
+        window.electronAPI.setIgnoreMouse(false);
+      } else {
+        spotlightContainer.classList.remove('expanded-input');
+        spotlightInput.value = '';
+        spotlightInput.blur();
+        checkMouseIgnore();
+      }
+    });
+
+    // Close Spotlight on outside click
+    document.addEventListener('click', (e) => {
+      if (isSpotlightExpanded && !e.target.closest('#spotlight-container')) {
+        isSpotlightExpanded = false;
+        spotlightContainer.classList.remove('expanded-input');
+        spotlightInput.value = '';
+        spotlightInput.blur();
+        checkMouseIgnore();
+      }
+    });
+
+    // Synchronize Volume/Sound Sliders
+    const volSlider = document.getElementById('vol-slider');
+    const ccSoundSlider = document.getElementById('cc-sound-slider');
+
+    function updateVolumeIcon(val) {
+      const volumeBarIcon = document.getElementById('volume-bar-icon');
+      if (val == 0) {
+        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>`;
+      } else if (val < 50) {
+        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>`;
+      } else {
+        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`;
+      }
+    }
+
+    volSlider.addEventListener('input', (e) => {
+      const val = e.target.value;
+      ccSoundSlider.value = val;
+      updateVolumeIcon(val);
+    });
+
+    ccSoundSlider.addEventListener('input', (e) => {
+      const val = e.target.value;
+      volSlider.value = val;
+      updateVolumeIcon(val);
+    });
+
+    // WiFi toggles
+    const wifiToggle = document.getElementById('wifi-toggle');
+    const ccWifiIcon = document.getElementById('cc-wifi-icon');
+    const ccWifiDesc = document.getElementById('cc-wifi-desc');
+    const wifiList = document.getElementById('wifi-list');
+    const wifiListHeader = document.getElementById('wifi-list-header');
+    const wifiBarIcon = document.getElementById('wifi-bar-icon');
+
+    wifiToggle.addEventListener('change', () => {
+      const on = wifiToggle.checked;
+      if (on) {
+        ccWifiIcon.classList.add('active');
+        ccWifiDesc.textContent = 'HomeWiFi_5G';
+        wifiList.style.display = 'block';
+        wifiListHeader.style.display = 'block';
+        wifiBarIcon.style.opacity = '1';
+      } else {
+        ccWifiIcon.classList.remove('active');
+        ccWifiDesc.textContent = 'Off';
+        wifiList.style.display = 'none';
+        wifiListHeader.style.display = 'none';
+        wifiBarIcon.style.opacity = '0.4';
+      }
+    });
+
+    // Control Center Wi-Fi click toggles too
+    document.getElementById('cc-wifi-toggle-item').addEventListener('click', (e) => {
+      wifiToggle.checked = !wifiToggle.checked;
+      wifiToggle.dispatchEvent(new Event('change'));
+    });
+
+    // Bluetooth toggles
+    const btToggle = document.getElementById('bt-toggle');
+    const ccBtIcon = document.getElementById('cc-bt-icon');
+    const ccBtDesc = document.getElementById('cc-bt-desc');
+    const btList = document.getElementById('bt-list');
+    const btListHeader = document.getElementById('bt-list-header');
+
+    btToggle.addEventListener('change', () => {
+      const on = btToggle.checked;
+      if (on) {
+        ccBtIcon.classList.add('active');
+        ccBtDesc.textContent = 'On';
+        btList.style.display = 'block';
+        btListHeader.style.display = 'block';
+      } else {
+        ccBtIcon.classList.remove('active');
+        ccBtDesc.textContent = 'Off';
+        btList.style.display = 'none';
+        btListHeader.style.display = 'none';
+      }
+    });
+
+    // CC Bluetooth click toggle
+    document.getElementById('cc-bt-toggle-item').addEventListener('click', () => {
+      btToggle.checked = !btToggle.checked;
+      btToggle.dispatchEvent(new Event('change'));
+    });
+
+    // Focus / DND toggle in Control Center
+    const ccFocusToggle = document.getElementById('cc-focus-toggle-item');
+    const ccFocusIcon = document.getElementById('cc-focus-icon');
+    const ccFocusDesc = document.getElementById('cc-focus-desc');
+    let focusActive = false;
+
+    ccFocusToggle.addEventListener('click', () => {
+      focusActive = !focusActive;
+      if (focusActive) {
+        ccFocusIcon.classList.add('active');
+        ccFocusDesc.textContent = 'On';
+      } else {
+        ccFocusIcon.classList.remove('active');
+        ccFocusDesc.textContent = 'Off';
+      }
+    });
+
+    // Play/Pause Control Center interaction
+    const ccPlayPauseBtn = document.getElementById('cc-play-pause-btn');
+    let isPlaying = true;
+    ccPlayPauseBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      ccPlayPauseBtn.textContent = isPlaying ? '⏸' : '▶';
+    });
+
+    // Battery Percent Show/Hide Toggle
+    const batteryPercentToggle = document.getElementById('battery-percent-toggle');
+    const batteryText = document.getElementById('battery-text');
+    let showPercent = true;
+
+    batteryPercentToggle.addEventListener('click', () => {
+      showPercent = !showPercent;
+      if (showPercent) {
+        batteryText.style.display = 'inline';
+        batteryPercentToggle.querySelector('.checkmark').style.visibility = 'visible';
+      } else {
+        batteryText.style.display = 'none';
+        batteryPercentToggle.querySelector('.checkmark').style.visibility = 'hidden';
+      }
+    });
+  </script>
+</body>
+</html>

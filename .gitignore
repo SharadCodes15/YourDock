@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Electron build outputs
+dist/
+out/
+release/
+*.exe
+*.dmg
+*.zip
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+.directory
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.sublime-workspace
+.vs/
+.vscode-test/
+.history/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+.cache/
+
+# OS-specific cache
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride

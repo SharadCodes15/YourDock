@@ -1,0 +1,17 @@
+{
+  "name": "macos-top-menu-bar",
+  "version": "1.0.0",
+  "description": "macOS Big Sur-style Top Menu Bar in Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "active-win": "^8.0.2"
+  },
+  "devDependencies": {
+    "electron": "^31.1.0"
+  },
+  "author": "",
+  "license": "ISC"
+}

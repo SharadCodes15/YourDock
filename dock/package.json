@@ -1,0 +1,14 @@
+{
+  "name": "macos-dock",
+  "version": "1.0.0",
+  "description": "macOS Big Sur-style Dock in Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.1.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
