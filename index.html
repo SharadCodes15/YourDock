@@ -40,7 +40,26 @@
       left: 0;
       z-index: 9999;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-      transition: background 0.2s ease;
+      transition: all 0.25s ease-out;
+    }
+
+    .menu-bar.collapsed {
+      width: 180px;
+      left: calc(50% - 90px);
+      transform: translateY(-22px);
+      border-radius: 0 0 12px 12px;
+      background: rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: none;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      padding: 0;
+    }
+
+    .menu-bar.collapsed .menu-left,
+    .menu-bar.collapsed .menu-right {
+      opacity: 0;
+      pointer-events: none;
     }
 
     /* Group Sections */
@@ -48,6 +67,7 @@
       display: flex;
       align-items: center;
       height: 100%;
+      transition: opacity 0.2s ease-out;
     }
 
     /* Menu Items */
@@ -1348,6 +1368,16 @@
       } else {
         batteryText.style.display = 'none';
         batteryPercentToggle.querySelector('.checkmark').style.visibility = 'hidden';
+      }
+    });
+
+    // Listen for collapse state changes (Dynamic Island notch mode)
+    window.electronAPI.onSetCollapseState((collapsed) => {
+      const menuBar = document.getElementById('menu-bar');
+      if (collapsed) {
+        menuBar.classList.add('collapsed');
+      } else {
+        menuBar.classList.remove('collapsed');
       }
     });
   </script>

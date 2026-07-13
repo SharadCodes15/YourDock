@@ -8,6 +8,12 @@ let dockWin;
 let config = {};
 const configPath = path.join(__dirname, 'dock', 'config.json');
 
+// Auto-hide configuration and state variables (Dynamic Island pill mode)
+let menuBarState = 'collapsed'; // Starts collapsed (notch pill mode) by default
+let cursorPollInterval = null;
+let consecutiveHotspotPolls = 0;
+let leaveTimeout = null;
+
 // Read dock config file or write default if missing
 function loadConfig() {
   try {
@@ -60,6 +66,91 @@ function ensureIconsFolder() {
   }
 }
 
+// Cursor polling for reveal when collapsed (Dynamic Island mode)
+function startCursorPolling() {
+  if (cursorPollInterval) return;
+  consecutiveHotspotPolls = 0;
+
+  cursorPollInterval = setInterval(() => {
+    if (!menuBarWin) return;
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const displayBounds = primaryDisplay.bounds;
+    const cursorPoint = screen.getCursorScreenPoint();
+
+    const screenWidth = displayBounds.width;
+    const centerX = displayBounds.x + Math.round(screenWidth / 2);
+
+    if (menuBarState === 'collapsed') {
+      // 1. Hotspot Expand Detection (Center 200px, Y <= 8px from top edge of screen)
+      const inHotspot = (
+        cursorPoint.x >= centerX - 100 &&
+        cursorPoint.x <= centerX + 100 &&
+        cursorPoint.y >= displayBounds.y &&
+        cursorPoint.y <= displayBounds.y + 8
+      );
+
+      if (inHotspot) {
+        consecutiveHotspotPolls++;
+        if (consecutiveHotspotPolls >= 2) {
+          menuBarState = 'expanded';
+          consecutiveHotspotPolls = 0;
+          if (leaveTimeout) {
+            clearTimeout(leaveTimeout);
+            leaveTimeout = null;
+          }
+          menuBarWin.webContents.send('set-collapse-state', false); // Expand visually
+        }
+      } else {
+        consecutiveHotspotPolls = 0;
+      }
+    } else {
+      // 2. Leave-Bounds Detection (check full menu bar bounds)
+      const menuBarBounds = menuBarWin.getBounds();
+      const isWithinMenuBar = (
+        cursorPoint.x >= displayBounds.x &&
+        cursorPoint.x <= displayBounds.x + displayBounds.width &&
+        cursorPoint.y >= displayBounds.y &&
+        cursorPoint.y <= displayBounds.y + menuBarBounds.height
+      );
+
+      if (!isWithinMenuBar) {
+        if (!leaveTimeout) {
+          leaveTimeout = setTimeout(() => {
+            // Double check cursor after 400ms debounce
+            const checkCursor = screen.getCursorScreenPoint();
+            const checkBounds = menuBarWin.getBounds();
+            const stillOutside = !(
+              checkCursor.x >= displayBounds.x &&
+              checkCursor.x <= displayBounds.x + displayBounds.width &&
+              checkCursor.y >= displayBounds.y &&
+              checkCursor.y <= displayBounds.y + checkBounds.height
+            );
+
+            if (stillOutside) {
+              menuBarState = 'collapsed';
+              menuBarWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+            }
+            leaveTimeout = null;
+          }, 400);
+        }
+      } else {
+        if (leaveTimeout) {
+          clearTimeout(leaveTimeout);
+          leaveTimeout = null;
+        }
+      }
+    }
+  }, 120);
+}
+
+function stopCursorPolling() {
+  if (cursorPollInterval) {
+    clearInterval(cursorPollInterval);
+    cursorPollInterval = null;
+  }
+}
+
 // Create macOS Top Menu Bar Window
 let activeAppInterval;
 function createMenuBarWindow() {
@@ -97,6 +188,13 @@ function createMenuBarWindow() {
   menuBarWin.setIgnoreMouseEvents(true, { forward: true });
 
   menuBarWin.loadFile('index.html');
+
+  // Set initial state to collapsed when loaded
+  menuBarWin.webContents.on('did-finish-load', () => {
+    if (menuBarState === 'collapsed') {
+      menuBarWin.webContents.send('set-collapse-state', true);
+    }
+  });
 
   // Polling active window name at max 1 check/second
   let lastAppName = '';
@@ -358,6 +456,7 @@ if (!isPrimaryInstance) {
     ensureIconsFolder();
     createMenuBarWindow();
     createDockWindow();
+    startCursorPolling(); // Start continuous hover polling
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -367,6 +466,10 @@ if (!isPrimaryInstance) {
     });
   });
 }
+
+app.on('before-quit', () => {
+  stopCursorPolling();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
