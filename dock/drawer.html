@@ -212,6 +212,42 @@
       background: #ffffff;
       transform: scale(1.2);
     }
+
+    /* Add App Button Tile */
+    .add-app-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 90px;
+      height: 110px;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .add-app-tile:hover {
+      transform: scale(1.08);
+    }
+
+    .add-app-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px dashed rgba(255, 255, 255, 0.25);
+      margin-bottom: 8px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .add-app-tile:hover .add-app-icon {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.45);
+    }
   </style>
 </head>
 <body>
@@ -285,14 +321,20 @@
       currentPageIndex = 0;
       pagesTrack.style.transform = `translateX(0)`;
 
-      const totalPages = Math.max(1, Math.ceil(filteredApps.length / itemsPerPage));
+      // Include the "+" add-app tile only when not searching
+      const isSearching = searchInput.value.trim() !== '';
+      const totalItems = filteredApps.length + (isSearching ? 0 : 1); // +1 for add tile
+      const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
       for (let p = 0; p < totalPages; p++) {
         const pageGrid = document.createElement('div');
         pageGrid.className = 'page-grid';
 
-        const pageItems = filteredApps.slice(p * itemsPerPage, (p + 1) * itemsPerPage);
-        pageItems.forEach(app => {
+        const startIdx = p * itemsPerPage;
+        const endIdx = Math.min(startIdx + itemsPerPage, filteredApps.length);
+        const pageApps = filteredApps.slice(startIdx, endIdx);
+
+        pageApps.forEach(app => {
           const item = document.createElement('div');
           item.className = 'app-item';
           item.addEventListener('click', (e) => {
@@ -323,6 +365,31 @@
 
           pageGrid.appendChild(item);
         });
+
+        // Append "+" add-app tile at the end of the last page (when not searching)
+        if (!isSearching && p === totalPages - 1 && pageApps.length < itemsPerPage) {
+          const addTile = document.createElement('div');
+          addTile.className = 'add-app-tile';
+          addTile.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const result = await window.drawerAPI.selectCustomApp();
+            if (result && result.added) {
+              await loadApps();
+            }
+          });
+
+          const addIcon = document.createElement('div');
+          addIcon.className = 'add-app-icon';
+          addIcon.textContent = '+';
+          addTile.appendChild(addIcon);
+
+          const addLabel = document.createElement('div');
+          addLabel.className = 'app-label';
+          addLabel.textContent = 'Add App';
+          addTile.appendChild(addLabel);
+
+          pageGrid.appendChild(addTile);
+        }
 
         pagesTrack.appendChild(pageGrid);
 

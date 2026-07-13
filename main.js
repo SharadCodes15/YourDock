@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { exec } = require('node:child_process');
@@ -53,6 +53,182 @@ let isDrawerOpen = false;
 let cachedScreenshot = null;
 let lastCaptureTime = 0;
 const appsJsonPath = path.join(__dirname, 'dock', 'apps.json');
+
+// Blacklist keywords — any .lnk whose filename or target path contains these (case-insensitive) is skipped
+const APP_BLACKLIST = [
+  'uninstall', 'remove', 'readme', 'help', 'changelog', 'release notes',
+  'setup', 'install', 'updater', 'update', 'uninst', 'license', 'eula',
+  'documentation', 'manual', 'website', 'web site', 'support', 'about',
+  'repair', 'diagnostic', 'troubleshoot', 'debug', 'crash', 'report',
+  'configuration', 'config tool', 'command prompt', 'powershell',
+  'accessibility', 'narrator', 'magnify', 'osk', 'on-screen keyboard',
+  'compatibility', 'migration', 'administrative tools'
+];
+
+/**
+ * Scan Windows Start Menu .lnk files using PowerShell + WScript.Shell COM.
+ * Writes a temp .ps1 script to avoid inline escaping issues.
+ * Returns a Promise that resolves to an array of { id, name, icon, exec }.
+ */
+function scanStartMenuApps() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve([]);
+      return;
+    }
+
+    // Both Start Menu dirs
+    const dirs = [
+      path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+      path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
+    ].filter(d => fs.existsSync(d));
+
+    if (dirs.length === 0) {
+      resolve([]);
+      return;
+    }
+
+    // Write a temp PowerShell script
+    const tempScriptPath = path.join(app.getPath('temp'), 'scan_startmenu.ps1');
+    const dirsArray = dirs.map(d => `"${d}"`).join(',');
+    const psScript = `
+$shell = New-Object -ComObject WScript.Shell
+$results = @()
+$dirs = @(${dirsArray})
+foreach ($dir in $dirs) {
+  Get-ChildItem -Path $dir -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+      $shortcut = $shell.CreateShortcut($_.FullName)
+      $obj = New-Object PSObject -Property @{
+        name = $_.BaseName
+        target = $shortcut.TargetPath
+      }
+      $results += $obj
+    } catch {}
+  }
+}
+if ($results.Count -eq 0) {
+  Write-Output "[]"
+} elseif ($results.Count -eq 1) {
+  Write-Output ("[" + ($results | ConvertTo-Json -Compress) + "]")
+} else {
+  $results | ConvertTo-Json -Compress
+}
+`;
+
+    try {
+      fs.writeFileSync(tempScriptPath, psScript, 'utf8');
+    } catch (e) {
+      console.error('Failed to write temp PowerShell script:', e);
+      resolve([]);
+      return;
+    }
+
+    exec(
+      `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
+      { maxBuffer: 1024 * 1024 * 5, timeout: 30000 },
+      (err, stdout, stderr) => {
+        // Clean up temp script
+        try { fs.unlinkSync(tempScriptPath); } catch (e) {}
+
+        if (err) {
+          console.error('Start Menu scan error:', err.message);
+          if (stderr) console.error('PowerShell stderr:', stderr);
+          resolve([]);
+          return;
+        }
+
+        const output = (stdout || '').trim();
+        if (!output || output === '[]') {
+          console.log('Start Menu scan: no shortcuts found.');
+          resolve([]);
+          return;
+        }
+
+        try {
+          let parsed = JSON.parse(output);
+          if (!Array.isArray(parsed)) parsed = [parsed];
+
+          const seenExePaths = new Set();
+          const apps = [];
+
+          for (const entry of parsed) {
+            if (!entry || !entry.name || !entry.target) continue;
+
+            const nameLower = entry.name.toLowerCase();
+            const targetLower = (entry.target || '').toLowerCase();
+
+            // Blacklist filter
+            const isBlacklisted = APP_BLACKLIST.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
+            if (isBlacklisted) continue;
+
+            // Must have a real executable target (skip URLs, empty targets, folders)
+            if (!entry.target || (!targetLower.endsWith('.exe') && !targetLower.endsWith('.msc') && !targetLower.endsWith('.cmd') && !targetLower.endsWith('.bat'))) continue;
+
+            // De-duplicate by target exe path (case-insensitive)
+            const dedupeKey = targetLower.replace(/\\/g, '/');
+            if (seenExePaths.has(dedupeKey)) continue;
+            seenExePaths.add(dedupeKey);
+
+            const id = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '') || `app_${apps.length}`;
+
+            apps.push({
+              id: id,
+              name: entry.name,
+              icon: '',
+              exec: entry.target
+            });
+          }
+
+          // Sort alphabetically by name
+          apps.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+          console.log(`Start Menu scan: found ${apps.length} apps (after filtering).`);
+          resolve(apps);
+        } catch (parseErr) {
+          console.error('Failed to parse Start Menu scan output:', parseErr.message);
+          console.error('Raw output (first 500 chars):', output.substring(0, 500));
+          resolve([]);
+        }
+      }
+    );
+  });
+}
+
+/**
+ * On startup, scan Start Menu and populate apps.json.
+ * Preserves any manually added custom apps the user has stored.
+ */
+async function scanAndPopulateApps() {
+  const scannedApps = await scanStartMenuApps();
+
+  // Load existing apps.json to preserve custom entries
+  let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [] };
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      existingData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+    }
+  } catch (e) {}
+
+  // Preserve custom apps array
+  const customApps = existingData.custom || [];
+  const settingsBlock = existingData.settings || { useDesktopCapture: true };
+
+  // Write scanned + custom apps
+  const newData = {
+    settings: settingsBlock,
+    apps: scannedApps.length > 0 ? scannedApps : (existingData.apps || []),
+    custom: customApps
+  };
+
+  try {
+    fs.writeFileSync(appsJsonPath, JSON.stringify(newData, null, 2), 'utf8');
+    console.log(`apps.json populated with ${newData.apps.length} scanned apps and ${newData.custom.length} custom apps.`);
+  } catch (e) {
+    console.error('Failed to write apps.json:', e);
+  }
+}
+
 
 // Auto-hide configuration and state variables (Dynamic Island pill mode for Menu Bar)
 let menuBarState = 'collapsed'; // Starts collapsed by default
@@ -841,12 +1017,68 @@ ipcMain.handle('get-apps', () => {
   try {
     if (fs.existsSync(appsJsonPath)) {
       const raw = fs.readFileSync(appsJsonPath, 'utf8');
-      return JSON.parse(raw);
+      const data = JSON.parse(raw);
+      // Merge scanned apps + custom apps into a single apps array for the renderer
+      const scanned = data.apps || [];
+      const custom = data.custom || [];
+      return { settings: data.settings, apps: [...scanned, ...custom] };
     }
   } catch (err) {
     console.error('Failed to read apps.json:', err);
   }
   return { apps: [] };
+});
+
+ipcMain.handle('select-custom-app', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Select an Application',
+    filters: [
+      { name: 'Applications', extensions: ['exe', 'lnk'] },
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return { added: false };
+  }
+
+  const selectedPath = result.filePaths[0];
+  const displayName = path.basename(selectedPath, path.extname(selectedPath));
+  const id = displayName.toLowerCase().replace(/[^a-z0-9]/g, '') || `custom_${Date.now()}`;
+
+  // Read existing apps.json, append to custom array, write back
+  let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [] };
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      existingData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+    }
+  } catch (e) {}
+
+  const custom = existingData.custom || [];
+
+  // Check for duplicate in custom list
+  const alreadyExists = custom.some(a => a.exec.toLowerCase() === selectedPath.toLowerCase());
+  if (alreadyExists) {
+    return { added: false, reason: 'already exists' };
+  }
+
+  custom.push({
+    id: id,
+    name: displayName,
+    icon: '',
+    exec: selectedPath
+  });
+
+  existingData.custom = custom;
+  try {
+    fs.writeFileSync(appsJsonPath, JSON.stringify(existingData, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to write apps.json after custom add:', e);
+    return { added: false };
+  }
+
+  return { added: true, app: { id, name: displayName, icon: '', exec: selectedPath } };
 });
 
 ipcMain.on('toggle-drawer', () => {
@@ -868,7 +1100,8 @@ ipcMain.on('launch-app', (event, appId) => {
   if (!appConfig && fs.existsSync(appsJsonPath)) {
     try {
       const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
-      const found = appsData.apps.find(a => a.id === appId);
+      const allEntries = [...(appsData.apps || []), ...(appsData.custom || [])];
+      const found = allEntries.find(a => a.id === appId);
       if (found) {
         appConfig = {
           name: found.name,
@@ -951,7 +1184,9 @@ if (!isPrimaryInstance) {
     createMenuBarWindow();
     createDockWindow();
     createSettingsWindow();
-    createDrawerWindow();
+    scanAndPopulateApps().then(() => {
+      createDrawerWindow();
+    });
     registerGlobalShortcuts();
     startCursorPolling(); // Starts menu bar hover polling
     startDockCursorPolling(); // Starts dock hover polling
