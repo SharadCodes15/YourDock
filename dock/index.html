@@ -37,19 +37,34 @@
       border-radius: 20px;
       padding: 6px 10px;
       margin-bottom: 6px;
-      transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+      transition: transform 0.25s ease-out, background 0.25s ease-out, border-radius 0.25s ease-out, box-shadow 0.25s ease-out, padding 0.25s ease-out;
       transform-origin: bottom center;
     }
 
-    /* Auto-hide offscreen transform */
-    .dock-container.hidden-dock {
-      transform: translateY(72px);
+    .dock-container.collapsed {
+      width: 180px !important;
+      height: 28px !important;
+      margin-bottom: 0 !important;
+      transform: translateY(22px) !important; /* Tucks the bottom 22px off-screen, leaving 6px peeking */
+      border-radius: 12px 12px 0 0 !important;
+      background: rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      border: none !important;
+      box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2) !important;
+      padding: 0 !important;
+    }
+
+    .dock-container.collapsed .dock-items {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .dock-items {
       display: flex;
       align-items: flex-end;
       height: 100%;
+      transition: opacity 0.2s ease-out;
     }
 
     /* Pinned and Trash items wrapper */
@@ -229,7 +244,7 @@
     <div class="menu-item-custom" id="ctx-show">Show in Finder</div>
     <div class="menu-divider-custom"></div>
     <div class="menu-item-custom" id="ctx-autohide">
-      <span>Turn Auto-Hide On</span>
+      <span>Turn Hiding On</span>
       <span class="ctx-check" id="ctx-autohide-check">✓</span>
     </div>
     <div class="menu-divider-custom"></div>
@@ -246,6 +261,8 @@
     let autoHideTimeout = null;
     let selectedCtxAppId = null;
 
+
+
     // Magnification constants
     const R = 110; // Radius of influence
     const maxScale = 1.38;
@@ -257,7 +274,15 @@
       
       // Update checkmark in custom context menu
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
-      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Auto-Hide Off' : 'Turn Auto-Hide On';
+      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
+      
+      // Set initial collapsed class based on config to prevent race conditions
+      const container = document.getElementById('dock-container');
+      if (autoHide) {
+        container.classList.add('collapsed');
+      } else {
+        container.classList.remove('collapsed');
+      }
       
       renderDock();
     }
@@ -484,14 +509,7 @@
       checkMouseIgnore(e);
 
       if (autoHide) {
-        // Hovering over the window bounds slides up the dock
         isHovered = true;
-        handleAutoHide();
-        
-        if (autoHideTimeout) {
-          clearTimeout(autoHideTimeout);
-          autoHideTimeout = null;
-        }
       }
     });
 
@@ -501,13 +519,6 @@
       
       if (!selectedCtxAppId) {
         window.electronAPI.setIgnoreMouse(true);
-      }
-
-      if (autoHide) {
-        // Delayed slide-down when leaving the active screen edge
-        autoHideTimeout = setTimeout(() => {
-          handleAutoHide();
-        }, 800);
       }
     });
 
@@ -582,7 +593,7 @@
       window.electronAPI.saveAutoHide(autoHide);
       
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
-      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Auto-Hide Off' : 'Turn Auto-Hide On';
+      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
       
       handleAutoHide();
       closeContextMenu();
@@ -613,6 +624,18 @@
           item.classList.remove('active');
         }
       });
+    });
+
+    // Listen for collapse state changes (Dynamic Island notch mode)
+    window.electronAPI.onSetCollapseState((collapsed) => {
+      const container = document.getElementById('dock-container');
+      if (collapsed) {
+        container.classList.add('collapsed');
+      } else {
+        container.classList.remove('collapsed');
+      }
+      // Update dock width instantly to avoid clipping
+      updateDockWidth();
     });
 
     // Startup Init

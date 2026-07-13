@@ -9,5 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore),
   onProcessUpdate: (callback) => ipcRenderer.on('process-update', (_event, value) => callback(value)),
   quitApp: () => ipcRenderer.send('quit-app'),
-  showInFinder: (appId) => ipcRenderer.send('show-in-finder', appId)
+  showInFinder: (appId) => ipcRenderer.send('show-in-finder', appId),
+  setDockHover: (hover) => ipcRenderer.send('set-dock-hover', hover),
+  onSetCollapseState: (callback) => ipcRenderer.on('set-collapse-state', (_event, value) => callback(value))
 });

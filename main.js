@@ -8,11 +8,18 @@ let dockWin;
 let config = {};
 const configPath = path.join(__dirname, 'dock', 'config.json');
 
-// Auto-hide configuration and state variables (Dynamic Island pill mode)
-let menuBarState = 'collapsed'; // Starts collapsed (notch pill mode) by default
+// Auto-hide configuration and state variables (Dynamic Island pill mode for Menu Bar)
+let menuBarState = 'collapsed'; // Starts collapsed by default
 let cursorPollInterval = null;
 let consecutiveHotspotPolls = 0;
 let leaveTimeout = null;
+
+// Auto-hide configuration and state variables (Dynamic Island pill mode for Dock)
+let dockAutoHide = true; // Default true
+let dockState = 'collapsed'; // Starts collapsed by default
+let dockCursorPollInterval = null;
+let consecutiveDockHotspotPolls = 0;
+let dockLeaveTimeout = null;
 
 // Read dock config file or write default if missing
 function loadConfig() {
@@ -24,10 +31,12 @@ function loadConfig() {
       // Fallback defaults
       config = {
         pinned: ["finder", "launchpad", "safari", "messages", "mail", "maps", "photos", "facetime", "calendar", "notes", "reminders", "music", "appstore", "preferences"],
-        autoHide: false
+        autoHide: true // default true
       };
       fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     }
+    dockAutoHide = config.autoHide !== false; // default to true
+    dockState = dockAutoHide ? 'collapsed' : 'expanded'; // Set initial state correctly
   } catch (err) {
     console.error('Error loading config:', err);
   }
@@ -66,7 +75,7 @@ function ensureIconsFolder() {
   }
 }
 
-// Cursor polling for reveal when collapsed (Dynamic Island mode)
+// Cursor polling for reveal when collapsed (Dynamic Island mode for Menu Bar)
 function startCursorPolling() {
   if (cursorPollInterval) return;
   consecutiveHotspotPolls = 0;
@@ -148,6 +157,98 @@ function stopCursorPolling() {
   if (cursorPollInterval) {
     clearInterval(cursorPollInterval);
     cursorPollInterval = null;
+  }
+}
+
+// Cursor polling for reveal when Dock is collapsed (Dynamic Island mode for Dock)
+function startDockCursorPolling() {
+  if (dockCursorPollInterval) return;
+  consecutiveDockHotspotPolls = 0;
+
+  dockCursorPollInterval = setInterval(() => {
+    if (!dockWin) return;
+    if (!dockAutoHide) {
+      if (dockState !== 'expanded') {
+        dockState = 'expanded';
+        dockWin.webContents.send('set-collapse-state', false);
+      }
+      return;
+    }
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const displayBounds = primaryDisplay.bounds;
+    const cursorPoint = screen.getCursorScreenPoint();
+    const screenHeight = displayBounds.height;
+
+    if (dockState === 'collapsed') {
+      // 1. Hotspot Expand Detection (Center bottom ±100px wide, y >= bottom 15px of screen)
+      const screenWidth = displayBounds.width;
+      const centerX = displayBounds.x + Math.round(screenWidth / 2);
+      const inHotspot = (
+        cursorPoint.x >= centerX - 100 &&
+        cursorPoint.x <= centerX + 100 &&
+        cursorPoint.y >= displayBounds.y + screenHeight - 15
+      );
+
+      if (inHotspot) {
+        consecutiveDockHotspotPolls++;
+        // Debounce: require cursor in hotspot for 1 poll cycle (2 consecutive checks)
+        if (consecutiveDockHotspotPolls >= 2) {
+          dockState = 'expanded';
+          consecutiveDockHotspotPolls = 0;
+          if (dockLeaveTimeout) {
+            clearTimeout(dockLeaveTimeout);
+            dockLeaveTimeout = null;
+          }
+          dockWin.webContents.send('set-collapse-state', false); // Expand visually
+        }
+      } else {
+        consecutiveDockHotspotPolls = 0;
+      }
+    } else {
+      // 2. Leave-Bounds Collapse Detection
+      const dockBounds = dockWin.getBounds();
+      const isWithinDock = (
+        cursorPoint.x >= dockBounds.x &&
+        cursorPoint.x <= dockBounds.x + dockBounds.width &&
+        cursorPoint.y >= displayBounds.y + screenHeight - 85 &&
+        cursorPoint.y <= displayBounds.y + screenHeight
+      );
+
+      if (!isWithinDock) {
+        if (!dockLeaveTimeout) {
+          dockLeaveTimeout = setTimeout(() => {
+            // Double check cursor after 400ms debounce
+            const checkCursor = screen.getCursorScreenPoint();
+            const checkBounds = dockWin.getBounds();
+            const stillOutside = !(
+              checkCursor.x >= checkBounds.x &&
+              checkCursor.x <= checkBounds.x + checkBounds.width &&
+              checkCursor.y >= displayBounds.y + screenHeight - 85 &&
+              checkCursor.y <= displayBounds.y + screenHeight
+            );
+
+            if (stillOutside && dockAutoHide) {
+              dockState = 'collapsed';
+              dockWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+            }
+            dockLeaveTimeout = null;
+          }, 400);
+        }
+      } else {
+        if (dockLeaveTimeout) {
+          clearTimeout(dockLeaveTimeout);
+          dockLeaveTimeout = null;
+        }
+      }
+    }
+  }, 120);
+}
+
+function stopDockCursorPolling() {
+  if (dockCursorPollInterval) {
+    clearInterval(dockCursorPollInterval);
+    dockCursorPollInterval = null;
   }
 }
 
@@ -277,6 +378,16 @@ function createDockWindow() {
 
   dockWin.loadFile(path.join(__dirname, 'dock', 'index.html'));
 
+  // Set initial state to collapsed when loaded (if autoHide enabled)
+  dockWin.webContents.on('did-finish-load', () => {
+    if (dockAutoHide && dockState === 'collapsed') {
+      dockWin.webContents.send('set-collapse-state', true);
+    } else {
+      dockState = 'expanded';
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+  });
+
   // macOS Vibrancy
   if (process.platform === 'darwin') {
     dockWin.setVibrancy('hud');
@@ -357,6 +468,7 @@ ipcMain.on('set-dock-width', (event, dockWidth) => {
     const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
     const x = Math.round((screenWidth - dockWidth) / 2);
     const y = screenHeight - 85;
+    
     dockWin.setBounds({
       x: x,
       y: y,
@@ -383,6 +495,19 @@ ipcMain.on('save-auto-hide', (event, autoHide) => {
   fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8', (err) => {
     if (err) console.error(err);
   });
+  
+  dockAutoHide = autoHide;
+  if (!dockAutoHide) {
+    dockState = 'expanded';
+    if (dockWin) {
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+  } else {
+    dockState = 'collapsed';
+    if (dockWin) {
+      dockWin.webContents.send('set-collapse-state', true);
+    }
+  }
 });
 
 ipcMain.on('launch-app', (event, appId) => {
@@ -456,7 +581,8 @@ if (!isPrimaryInstance) {
     ensureIconsFolder();
     createMenuBarWindow();
     createDockWindow();
-    startCursorPolling(); // Start continuous hover polling
+    startCursorPolling(); // Starts menu bar hover polling
+    startDockCursorPolling(); // Starts dock hover polling
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -469,6 +595,7 @@ if (!isPrimaryInstance) {
 
 app.on('before-quit', () => {
   stopCursorPolling();
+  stopDockCursorPolling();
 });
 
 app.on('window-all-closed', () => {

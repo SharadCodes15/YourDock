@@ -15,7 +15,7 @@
     "appstore",
     "preferences"
   ],
-  "autoHide": false,
+  "autoHide": true,
   "apps": {
     "finder": {
       "name": "Finder",
