@@ -355,7 +355,13 @@
         
         // Hop bounce animation
         item.classList.add('bounce');
-        window.electronAPI.launchApp(appId);
+        if (appId === 'launchpad') {
+          if (window.electronAPI.toggleDrawer) {
+            window.electronAPI.toggleDrawer();
+          }
+        } else {
+          window.electronAPI.launchApp(appId);
+        }
       });
 
       item.addEventListener('animationend', (e) => {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { exec } = require('node:child_process');
@@ -46,6 +46,13 @@ function saveSettings() {
     console.error('Error saving settings:', err);
   }
 }
+
+// Application Drawer variables
+let drawerWin = null;
+let isDrawerOpen = false;
+let cachedScreenshot = null;
+let lastCaptureTime = 0;
+const appsJsonPath = path.join(__dirname, 'dock', 'apps.json');
 
 // Auto-hide configuration and state variables (Dynamic Island pill mode for Menu Bar)
 let menuBarState = 'collapsed'; // Starts collapsed by default
@@ -395,6 +402,109 @@ function applySettings() {
   menuBarState = autoHideEnabled ? 'collapsed' : 'expanded';
 }
 
+// Get desktop screenshot as data URL using desktopCapturer
+async function getScreenshotDataUrl() {
+  const now = Date.now();
+  if (cachedScreenshot && (now - lastCaptureTime < 5000)) {
+    return cachedScreenshot;
+  }
+
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.bounds;
+    
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: Math.round(width / 2),
+        height: Math.round(height / 2)
+      }
+    });
+
+    if (sources && sources.length > 0) {
+      cachedScreenshot = sources[0].thumbnail.toDataURL();
+      lastCaptureTime = now;
+      return cachedScreenshot;
+    }
+  } catch (err) {
+    console.error('Failed to capture desktop screenshot:', err);
+  }
+  return '';
+}
+
+// Create fullscreen Application Drawer window
+function createDrawerWindow() {
+  if (drawerWin) return;
+
+  drawerWin = new BrowserWindow({
+    fullscreen: true,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'dock', 'drawer-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  drawerWin.loadFile(path.join(__dirname, 'dock', 'drawer.html'));
+
+  drawerWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      closeDrawer();
+    }
+  });
+
+  drawerWin.on('closed', () => {
+    drawerWin = null;
+  });
+}
+
+async function openDrawer() {
+  if (!drawerWin) {
+    createDrawerWindow();
+  }
+
+  let screenshotUrl = '';
+  let useCapture = true;
+
+  if (fs.existsSync(appsJsonPath)) {
+    try {
+      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      if (appsData.settings && appsData.settings.useDesktopCapture === false) {
+        useCapture = false;
+      }
+    } catch (e) {}
+  }
+
+  if (useCapture) {
+    screenshotUrl = await getScreenshotDataUrl();
+  }
+
+  if (drawerWin) {
+    drawerWin.webContents.send('open-drawer', screenshotUrl);
+    drawerWin.show();
+    isDrawerOpen = true;
+  }
+}
+
+function closeDrawer() {
+  if (drawerWin) {
+    drawerWin.webContents.send('close-drawer');
+    // Hide drawer window after CSS fade/scale animation has ended (200ms ease)
+    setTimeout(() => {
+      if (!isDrawerOpen && drawerWin) {
+        drawerWin.hide();
+      }
+    }, 250);
+    isDrawerOpen = false;
+  }
+}
+
 // Create macOS Top Menu Bar Window
 let activeAppInterval;
 function createMenuBarWindow() {
@@ -726,9 +836,51 @@ ipcMain.handle('restore-defaults', () => {
   return settings;
 });
 
+// Application Drawer IPC Handlers
+ipcMain.handle('get-apps', () => {
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      const raw = fs.readFileSync(appsJsonPath, 'utf8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read apps.json:', err);
+  }
+  return { apps: [] };
+});
+
+ipcMain.on('toggle-drawer', () => {
+  if (isDrawerOpen) {
+    closeDrawer();
+  } else {
+    openDrawer();
+  }
+});
+
+ipcMain.on('hide-drawer', () => {
+  closeDrawer();
+});
+
 ipcMain.on('launch-app', (event, appId) => {
-  if (!config || !config.apps) return;
-  const appConfig = config.apps[appId];
+  let appConfig = config && config.apps ? config.apps[appId] : null;
+
+  // Fallback to apps.json if not in config
+  if (!appConfig && fs.existsSync(appsJsonPath)) {
+    try {
+      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const found = appsData.apps.find(a => a.id === appId);
+      if (found) {
+        appConfig = {
+          name: found.name,
+          win: found.exec,
+          mac: found.exec
+        };
+      }
+    } catch (e) {
+      console.error('Failed to parse apps.json:', e);
+    }
+  }
+
   if (!appConfig) return;
 
   const targetPath = process.platform === 'win32' ? appConfig.win : appConfig.mac;
@@ -799,6 +951,7 @@ if (!isPrimaryInstance) {
     createMenuBarWindow();
     createDockWindow();
     createSettingsWindow();
+    createDrawerWindow();
     registerGlobalShortcuts();
     startCursorPolling(); // Starts menu bar hover polling
     startDockCursorPolling(); // Starts dock hover polling
@@ -825,3 +978,90 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+/*
+// UNCOMMENT AND CALL THIS TO REGENERATE apps.json BY SCANNING SYSTEM INSTALLED APPS
+function regenerateAppsJson() {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { exec } = require('node:child_process');
+
+  const appsList = [];
+
+  if (process.platform === 'win32') {
+    // Scan Windows Start Menu
+    const startMenuPath1 = 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs';
+    const startMenuPath2 = path.join(process.env.APPDATA, 'Microsoft\\Windows\\Start Menu\\Programs');
+    
+    const scanShortcutDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanShortcutDir(fullPath);
+        } else if (file.endsWith('.lnk')) {
+          const name = path.basename(file, '.lnk');
+          appsList.push({
+            id: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            name: name,
+            icon: '',
+            exec: fullPath
+          });
+        }
+      }
+    };
+    
+    scanShortcutDir(startMenuPath1);
+    scanShortcutDir(startMenuPath2);
+  } else if (process.platform === 'darwin') {
+    // Scan macOS Applications folder
+    const appDir = '/Applications';
+    if (fs.existsSync(appDir)) {
+      const files = fs.readdirSync(appDir);
+      for (const file of files) {
+        if (file.endsWith('.app')) {
+          const name = path.basename(file, '.app');
+          appsList.push({
+            id: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            name: name,
+            icon: `/Applications/${file}/Contents/Resources/AppIcon.icns`,
+            exec: `/Applications/${file}`
+          });
+        }
+      }
+    }
+  } else {
+    // Scan Linux desktop files
+    const desktopDir = '/usr/share/applications';
+    if (fs.existsSync(desktopDir)) {
+      const files = fs.readdirSync(desktopDir);
+      for (const file of files) {
+        if (file.endsWith('.desktop')) {
+          const name = path.basename(file, '.desktop');
+          appsList.push({
+            id: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            name: name,
+            icon: '',
+            exec: name
+          });
+        }
+      }
+    }
+  }
+
+  const output = {
+    settings: { useDesktopCapture: true },
+    apps: appsList
+  };
+
+  fs.writeFileSync(
+    path.join(__dirname, 'dock', 'apps.json'),
+    JSON.stringify(output, null, 2),
+    'utf8'
+  );
+  console.log(`Successfully generated apps.json with ${appsList.length} applications!`);
+}
+// regenerateAppsJson();
+*/

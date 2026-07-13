@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.send('quit-app'),
   showInFinder: (appId) => ipcRenderer.send('show-in-finder', appId),
   setDockHover: (hover) => ipcRenderer.send('set-dock-hover', hover),
-  onSetCollapseState: (callback) => ipcRenderer.on('set-collapse-state', (_event, value) => callback(value))
+  onSetCollapseState: (callback) => ipcRenderer.on('set-collapse-state', (_event, value) => callback(value)),
+  toggleDrawer: () => ipcRenderer.send('toggle-drawer')
 });

@@ -1,0 +1,139 @@
+{
+  "settings": {
+    "useDesktopCapture": true
+  },
+  "apps": [
+    {
+      "id": "appstore",
+      "name": "App Store",
+      "icon": "",
+      "exec": "https://www.apple.com/app-store/"
+    },
+    {
+      "id": "safari",
+      "name": "Safari",
+      "icon": "",
+      "exec": "https://www.apple.com/safari/"
+    },
+    {
+      "id": "mail",
+      "name": "Mail",
+      "icon": "",
+      "exec": "mailto:"
+    },
+    {
+      "id": "contacts",
+      "name": "Contacts",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "calendar",
+      "name": "Calendar",
+      "icon": "",
+      "exec": "outlookcal:"
+    },
+    {
+      "id": "reminders",
+      "name": "Reminders",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "icon": "",
+      "exec": "notepad.exe"
+    },
+    {
+      "id": "facetime",
+      "name": "FaceTime",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "messages",
+      "name": "Messages",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "maps",
+      "name": "Maps",
+      "icon": "",
+      "exec": "https://maps.google.com"
+    },
+    {
+      "id": "photos",
+      "name": "Photos",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "music",
+      "name": "Music",
+      "icon": "",
+      "exec": "spotify:"
+    },
+    {
+      "id": "calculator",
+      "name": "Calculator",
+      "icon": "",
+      "exec": "calc.exe"
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "icon": "",
+      "exec": "control.exe"
+    },
+    {
+      "id": "podcasts",
+      "name": "Podcasts",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "icon": "",
+      "exec": "https://weather.com"
+    },
+    {
+      "id": "books",
+      "name": "Books",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "stocks",
+      "name": "Stocks",
+      "icon": "",
+      "exec": "https://finance.yahoo.com"
+    },
+    {
+      "id": "voicememos",
+      "name": "Voice Memos",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "keynote",
+      "name": "Keynote",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "pages",
+      "name": "Pages",
+      "icon": "",
+      "exec": ""
+    },
+    {
+      "id": "numbers",
+      "name": "Numbers",
+      "icon": "",
+      "exec": ""
+    }
+  ]
+}

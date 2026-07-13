@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Drawer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      outline: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      background: transparent;
+      color: #ffffff;
+    }
+
+    /* Screen-wide Container */
+    #drawer-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      opacity: 0;
+      transform: scale(0.96);
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    #drawer-container.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Desktop screenshot backdrop */
+    .backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-size: cover;
+      background-position: center;
+      filter: blur(40px) saturate(1.2);
+      transform: scale(1.1); /* Prevent blur edge vignette */
+      z-index: -2;
+      background-color: #1e1e1e; /* fallback */
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: -1;
+    }
+
+    /* Search Bar */
+    .search-wrapper {
+      margin-top: 50px;
+      width: 400px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .search-bar {
+      width: 100%;
+      height: 36px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 0 16px 0 38px;
+      color: #ffffff;
+      font-size: 14px;
+      text-align: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .search-bar:focus {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.35);
+      text-align: left;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      color: rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+    }
+
+    /* Grid Paginator Viewport */
+    .viewport {
+      flex: 1;
+      width: 100vw;
+      margin-top: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Slideable track containing pages */
+    .pages-track {
+      display: flex;
+      height: 100%;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Grid Page */
+    .page-grid {
+      width: 100vw;
+      height: 100%;
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      padding: 40px 100px 60px 100px;
+      justify-items: center;
+      align-items: center;
+    }
+
+    /* App Item */
+    .app-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 90px;
+      height: 110px;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .app-item:hover {
+      transform: scale(1.08);
+    }
+
+    .app-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      object-fit: cover;
+      margin-bottom: 8px;
+    }
+
+    /* Fallback Icon Gradient Styling */
+    .app-icon-fallback {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 700;
+      color: white;
+      text-transform: uppercase;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      margin-bottom: 8px;
+    }
+
+    .app-label {
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #ffffff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+
+    /* Dots Indicators */
+    .dots-container {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .dot:hover {
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .dot.active {
+      background: #ffffff;
+      transform: scale(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="drawer-container">
+    <div class="backdrop" id="drawer-backdrop"></div>
+    <div class="overlay"></div>
+
+    <!-- Search input -->
+    <div class="search-wrapper">
+      <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" class="search-bar" id="search-input" placeholder="Search" autocomplete="off">
+    </div>
+
+    <!-- Viewport mapping pages track -->
+    <div class="viewport" id="viewport">
+      <div class="pages-track" id="pages-track"></div>
+    </div>
+
+    <!-- Page dots -->
+    <div class="dots-container" id="dots-container"></div>
+  </div>
+
+  <script>
+    let allApps = [];
+    let filteredApps = [];
+    let currentPageIndex = 0;
+    const itemsPerPage = 35; // 7 columns x 5 rows
+
+    // Beautiful default gradients based on starting letters or app ids
+    const gradients = [
+      'linear-gradient(135deg, #38bdf8, #0284c7)', // blue
+      'linear-gradient(135deg, #4ade80, #16a34a)', // green
+      'linear-gradient(135deg, #f59e0b, #d97706)', // amber
+      'linear-gradient(135deg, #f43f5e, #dc2626)', // rose
+      'linear-gradient(135deg, #a78bfa, #7c3aed)', // purple
+      'linear-gradient(135deg, #fb7185, #e11d48)', // pink
+      'linear-gradient(135deg, #fb923c, #ea580c)', // orange
+      'linear-gradient(135deg, #2dd4bf, #0d9488)', // teal
+      'linear-gradient(135deg, #60a5fa, #2563eb)'  // indigo
+    ];
+
+    function getGradientForApp(appId) {
+      let code = 0;
+      for (let i = 0; i < appId.length; i++) {
+        code += appId.charCodeAt(i);
+      }
+      return gradients[code % gradients.length];
+    }
+
+    // Capture DOM nodes
+    const container = document.getElementById('drawer-container');
+    const backdrop = document.getElementById('drawer-backdrop');
+    const searchInput = document.getElementById('search-input');
+    const pagesTrack = document.getElementById('pages-track');
+    const dotsContainer = document.getElementById('dots-container');
+
+    // Fetch and populate apps list
+    async function loadApps() {
+      const data = await window.drawerAPI.getApps();
+      allApps = data.apps || [];
+      filteredApps = [...allApps];
+      renderPages();
+    }
+
+    // Render Paginated App Grid
+    function renderPages() {
+      pagesTrack.innerHTML = '';
+      dotsContainer.innerHTML = '';
+      currentPageIndex = 0;
+      pagesTrack.style.transform = `translateX(0)`;
+
+      const totalPages = Math.max(1, Math.ceil(filteredApps.length / itemsPerPage));
+
+      for (let p = 0; p < totalPages; p++) {
+        const pageGrid = document.createElement('div');
+        pageGrid.className = 'page-grid';
+
+        const pageItems = filteredApps.slice(p * itemsPerPage, (p + 1) * itemsPerPage);
+        pageItems.forEach(app => {
+          const item = document.createElement('div');
+          item.className = 'app-item';
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.drawerAPI.launchApp(app.id);
+            closeDrawer();
+          });
+
+          // Check if custom icon exists
+          if (app.icon) {
+            const img = document.createElement('img');
+            img.className = 'app-icon';
+            img.src = app.icon;
+            img.alt = app.name;
+            // Fallback if image fails to load
+            img.onerror = () => {
+              img.replaceWith(createFallbackIcon(app));
+            };
+            item.appendChild(img);
+          } else {
+            item.appendChild(createFallbackIcon(app));
+          }
+
+          const label = document.createElement('div');
+          label.className = 'app-label';
+          label.textContent = app.name;
+          item.appendChild(label);
+
+          pageGrid.appendChild(item);
+        });
+
+        pagesTrack.appendChild(pageGrid);
+
+        // Render Page Dot
+        if (totalPages > 1) {
+          const dot = document.createElement('div');
+          dot.className = `dot ${p === 0 ? 'active' : ''}`;
+          dot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            scrollToPage(p);
+          });
+          dotsContainer.appendChild(dot);
+        }
+      }
+    }
+
+    function createFallbackIcon(app) {
+      const fallback = document.createElement('div');
+      fallback.className = 'app-icon-fallback';
+      fallback.style.background = getGradientForApp(app.id);
+      fallback.textContent = app.name ? app.name.charAt(0) : '?';
+      return fallback;
+    }
+
+    function scrollToPage(index) {
+      currentPageIndex = index;
+      pagesTrack.style.transform = `translateX(-${index * 100}vw)`;
+      
+      const dots = dotsContainer.querySelectorAll('.dot');
+      dots.forEach((dot, idx) => {
+        if (idx === index) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+    }
+
+    function nextPage() {
+      const totalPages = Math.ceil(filteredApps.length / itemsPerPage);
+      if (currentPageIndex < totalPages - 1) {
+        scrollToPage(currentPageIndex + 1);
+      }
+    }
+
+    function prevPage() {
+      if (currentPageIndex > 0) {
+        scrollToPage(currentPageIndex - 1);
+      }
+    }
+
+    // Search input handler with 100ms debounce
+    let searchDebounceTimeout = null;
+    searchInput.addEventListener('input', (e) => {
+      if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
+      
+      searchDebounceTimeout = setTimeout(() => {
+        const query = e.target.value.toLowerCase().trim();
+        if (query === '') {
+          filteredApps = [...allApps];
+        } else {
+          filteredApps = allApps.filter(app => app.name.toLowerCase().includes(query));
+        }
+        renderPages();
+      }, 100);
+    });
+
+    searchInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Close on Escape or click on empty space
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDrawer();
+      } else if (e.key === 'ArrowRight') {
+        nextPage();
+      } else if (e.key === 'ArrowLeft') {
+        prevPage();
+      }
+    });
+
+    container.addEventListener('click', () => {
+      closeDrawer();
+    });
+
+    // Mouse scroll horizontal gesture (wheel deltaX)
+    let scrollAccumulator = 0;
+    window.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaX) > 15) {
+        scrollAccumulator += e.deltaX;
+        if (Math.abs(scrollAccumulator) > 120) {
+          if (scrollAccumulator > 0) {
+            nextPage();
+          } else {
+            prevPage();
+          }
+          scrollAccumulator = 0;
+        }
+      }
+    });
+
+    function closeDrawer() {
+      container.classList.remove('show');
+      window.drawerAPI.hideDrawer();
+    }
+
+    // IPC open/close events
+    window.drawerAPI.onOpenDrawer((screenshotUrl) => {
+      // Clear search input and reset page indices
+      searchInput.value = '';
+      filteredApps = [...allApps];
+      renderPages();
+
+      if (screenshotUrl) {
+        backdrop.style.backgroundImage = `url("${screenshotUrl}")`;
+      } else {
+        backdrop.style.backgroundImage = 'none';
+        backdrop.style.background = 'linear-gradient(135deg, #1e1e1e 0%, #111111 100%)';
+      }
+
+      container.classList.add('show');
+      searchInput.focus();
+    });
+
+    window.drawerAPI.onCloseDrawer(() => {
+      container.classList.remove('show');
+    });
+
+    // Initial load
+    loadApps();
+  </script>
+</body>
+</html>
