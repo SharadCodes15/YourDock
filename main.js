@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { exec } = require('node:child_process');
@@ -7,6 +7,45 @@ let menuBarWin;
 let dockWin;
 let config = {};
 const configPath = path.join(__dirname, 'dock', 'config.json');
+
+// Settings management
+let settings = {};
+const settingsPath = path.join(__dirname, 'settings.json');
+let settingsWin = null;
+
+function loadSettings() {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const raw = fs.readFileSync(settingsPath, 'utf8');
+      settings = JSON.parse(raw);
+    } else {
+      // Default settings.json
+      settings = {
+        general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true },
+        appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
+        hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
+        menuItems: {
+          visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, settings: true, clock: true },
+          order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'settings', 'clock']
+        },
+        shortcuts: { toggleMenuBar: '', openSettings: '' }
+      };
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    }
+  } catch (err) {
+    console.error('Error loading settings:', err);
+  }
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    if (menuBarWin) menuBarWin.webContents.send('settings-changed', settings);
+    if (settingsWin) settingsWin.webContents.send('settings-changed', settings);
+  } catch (err) {
+    console.error('Error saving settings:', err);
+  }
+}
 
 // Auto-hide configuration and state variables (Dynamic Island pill mode for Menu Bar)
 let menuBarState = 'collapsed'; // Starts collapsed by default
@@ -83,6 +122,15 @@ function startCursorPolling() {
   cursorPollInterval = setInterval(() => {
     if (!menuBarWin) return;
 
+    // Check if auto-hide is enabled globally
+    if (!settings.hiding || !settings.hiding.enabled) {
+      if (menuBarState !== 'expanded') {
+        menuBarState = 'expanded';
+        menuBarWin.webContents.send('set-collapse-state', false);
+      }
+      return;
+    }
+
     const primaryDisplay = screen.getPrimaryDisplay();
     const displayBounds = primaryDisplay.bounds;
     const cursorPoint = screen.getCursorScreenPoint();
@@ -91,10 +139,11 @@ function startCursorPolling() {
     const centerX = displayBounds.x + Math.round(screenWidth / 2);
 
     if (menuBarState === 'collapsed') {
-      // 1. Hotspot Expand Detection (Center 200px, Y <= 8px from top edge of screen)
+      // 1. Hotspot Expand Detection
+      const sens = settings.hiding.sensitivity || 100;
       const inHotspot = (
-        cursorPoint.x >= centerX - 100 &&
-        cursorPoint.x <= centerX + 100 &&
+        cursorPoint.x >= centerX - Math.round(sens / 2) &&
+        cursorPoint.x <= centerX + Math.round(sens / 2) &&
         cursorPoint.y >= displayBounds.y &&
         cursorPoint.y <= displayBounds.y + 8
       );
@@ -125,8 +174,9 @@ function startCursorPolling() {
 
       if (!isWithinMenuBar) {
         if (!leaveTimeout) {
+          const delay = settings.hiding.delay !== undefined ? settings.hiding.delay : 400;
           leaveTimeout = setTimeout(() => {
-            // Double check cursor after 400ms debounce
+            // Double check cursor after configured delay
             const checkCursor = screen.getCursorScreenPoint();
             const checkBounds = menuBarWin.getBounds();
             const stillOutside = !(
@@ -141,7 +191,7 @@ function startCursorPolling() {
               menuBarWin.webContents.send('set-collapse-state', true); // Collapse back to pill
             }
             leaveTimeout = null;
-          }, 400);
+          }, delay);
         }
       } else {
         if (leaveTimeout) {
@@ -252,6 +302,99 @@ function stopDockCursorPolling() {
   }
 }
 
+// Register Global Shortcuts
+function registerGlobalShortcuts() {
+  globalShortcut.unregisterAll();
+
+  if (settings.shortcuts && settings.shortcuts.toggleMenuBar) {
+    try {
+      globalShortcut.register(settings.shortcuts.toggleMenuBar, () => {
+        if (menuBarWin) {
+          if (menuBarWin.isVisible()) menuBarWin.hide();
+          else menuBarWin.show();
+        }
+      });
+    } catch (err) {
+      console.error('Failed to register toggleMenuBar shortcut:', err);
+    }
+  }
+
+  if (settings.shortcuts && settings.shortcuts.openSettings) {
+    try {
+      globalShortcut.register(settings.shortcuts.openSettings, () => {
+        showSettingsWindow();
+      });
+    } catch (err) {
+      console.error('Failed to register openSettings shortcut:', err);
+    }
+  }
+}
+
+// Create Settings Window
+function createSettingsWindow() {
+  if (settingsWin) return;
+
+  settingsWin = new BrowserWindow({
+    width: 480,
+    height: 600,
+    frame: true,
+    resizable: false,
+    alwaysOnTop: false,
+    show: false,
+    title: 'Menu Bar Settings',
+    webPreferences: {
+      preload: path.join(__dirname, 'settings-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  settingsWin.loadFile(path.join(__dirname, 'settings.html'));
+
+  // Intercept close to hide window instead of destroying
+  settingsWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      settingsWin.hide();
+    }
+  });
+
+  settingsWin.on('closed', () => {
+    settingsWin = null;
+  });
+}
+
+function showSettingsWindow() {
+  if (!settingsWin) {
+    createSettingsWindow();
+  }
+  settingsWin.center();
+  settingsWin.show();
+}
+
+// Apply settings state to system (e.g. skipTaskbar, opacity, launchAtLogin, etc.)
+function applySettings() {
+  if (!menuBarWin) return;
+
+  // 1. Show in Dock / Taskbar (skipTaskbar)
+  const skipDock = settings.general && settings.general.showInDock === false;
+  menuBarWin.setSkipTaskbar(skipDock);
+
+  // 2. Launch at Login
+  const launch = settings.general && settings.general.launchAtLogin;
+  app.setLoginItemSettings({
+    openAtLogin: launch
+  });
+
+  // 3. Opacity
+  const opacityVal = (settings.appearance && settings.appearance.opacity) || 0.85;
+  menuBarWin.setOpacity(opacityVal);
+
+  // 4. Auto-Hide behavior
+  const autoHideEnabled = settings.hiding && settings.hiding.enabled;
+  menuBarState = autoHideEnabled ? 'collapsed' : 'expanded';
+}
+
 // Create macOS Top Menu Bar Window
 let activeAppInterval;
 function createMenuBarWindow() {
@@ -292,6 +435,7 @@ function createMenuBarWindow() {
 
   // Set initial state to collapsed when loaded
   menuBarWin.webContents.on('did-finish-load', () => {
+    applySettings();
     if (menuBarState === 'collapsed') {
       menuBarWin.webContents.send('set-collapse-state', true);
     }
@@ -510,6 +654,78 @@ ipcMain.on('save-auto-hide', (event, autoHide) => {
   }
 });
 
+// Settings IPC Handlers
+ipcMain.on('open-settings', () => {
+  showSettingsWindow();
+});
+
+ipcMain.handle('get-settings', () => {
+  return settings;
+});
+
+ipcMain.on('save-settings', (event, newSettings) => {
+  settings = newSettings;
+  saveSettings();
+  applySettings();
+});
+
+ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
+  if (!shortcut) {
+    settings.shortcuts[type] = '';
+    saveSettings();
+    registerGlobalShortcuts();
+    return { success: true };
+  }
+
+  try {
+    const isRegistered = globalShortcut.isRegistered(shortcut);
+    if (isRegistered) {
+      return { success: false, error: 'Shortcut already in use by another app.' };
+    }
+
+    // Attempt temporary register
+    const success = globalShortcut.register(shortcut, () => {
+      if (type === 'toggleMenuBar') {
+        if (menuBarWin) {
+          if (menuBarWin.isVisible()) menuBarWin.hide();
+          else menuBarWin.show();
+        }
+      } else if (type === 'openSettings') {
+        showSettingsWindow();
+      }
+    });
+
+    if (success) {
+      globalShortcut.unregister(shortcut);
+      settings.shortcuts[type] = shortcut;
+      saveSettings();
+      registerGlobalShortcuts();
+      return { success: true };
+    } else {
+      return { success: false, error: 'Could not register shortcut.' };
+    }
+  } catch (err) {
+    return { success: false, error: `Invalid shortcut format: ${err.message}` };
+  }
+});
+
+ipcMain.handle('restore-defaults', () => {
+  settings = {
+    general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true },
+    appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
+    hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
+    menuItems: {
+      visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, settings: true, clock: true },
+      order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'settings', 'clock']
+    },
+    shortcuts: { toggleMenuBar: '', openSettings: '' }
+  };
+  saveSettings();
+  applySettings();
+  registerGlobalShortcuts();
+  return settings;
+});
+
 ipcMain.on('launch-app', (event, appId) => {
   if (!config || !config.apps) return;
   const appConfig = config.apps[appId];
@@ -578,12 +794,15 @@ if (!isPrimaryInstance) {
 
   app.whenReady().then(() => {
     loadConfig();
+    loadSettings();
     ensureIconsFolder();
     createMenuBarWindow();
     createDockWindow();
+    createSettingsWindow();
+    registerGlobalShortcuts();
     startCursorPolling(); // Starts menu bar hover polling
     startDockCursorPolling(); // Starts dock hover polling
-
+ 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createMenuBarWindow();
@@ -593,9 +812,12 @@ if (!isPrimaryInstance) {
   });
 }
 
+app.isQuitting = false;
 app.on('before-quit', () => {
+  app.isQuitting = true;
   stopCursorPolling();
   stopDockCursorPolling();
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

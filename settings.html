@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu Bar Settings</title>
+  <style>
+    :root {
+      --bg-color: #f6f6f6;
+      --sidebar-bg: #ececec;
+      --sidebar-border: #d2d2d2;
+      --text-color: #333333;
+      --text-muted: #666666;
+      --panel-bg: #ffffff;
+      --accent-color: #007aff;
+      --hover-bg: rgba(0, 0, 0, 0.05);
+      --selected-bg: rgba(0, 0, 0, 0.1);
+      --border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1e1e1e;
+        --sidebar-bg: #2d2d2d;
+        --sidebar-border: #181818;
+        --text-color: #dddddd;
+        --text-muted: #999999;
+        --panel-bg: #252526;
+        --accent-color: #007aff;
+        --hover-bg: rgba(255, 255, 255, 0.08);
+        --selected-bg: rgba(255, 255, 255, 0.15);
+        --border-color: rgba(255, 255, 255, 0.1);
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* Sidebar Layout */
+    .sidebar {
+      width: 140px;
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+      display: flex;
+      flex-direction: column;
+      padding-top: 15px;
+      overflow-y: auto;
+    }
+
+    .sidebar-item {
+      padding: 8px 12px;
+      margin: 2px 8px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: default;
+      transition: background-color 0.15s;
+      font-weight: 500;
+    }
+
+    .sidebar-item:hover {
+      background-color: var(--hover-bg);
+    }
+
+    .sidebar-item.active {
+      background-color: var(--selected-bg);
+      color: var(--text-color);
+    }
+
+    .sidebar-item svg {
+      width: 16px;
+      height: 16px;
+      color: var(--accent-color);
+    }
+
+    /* Content Area Layout */
+    .content-area {
+      flex: 1;
+      background-color: var(--panel-bg);
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      display: none;
+      height: 100%;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    /* Setting elements */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 15px 0 10px 0;
+      letter-spacing: 0.3px;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-label {
+      font-weight: 500;
+    }
+
+    .setting-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Controls */
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type="checkbox"], input[type="radio"] {
+      cursor: pointer;
+      accent-color: var(--accent-color);
+    }
+
+    input[type="text"], select {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      outline: none;
+      font-size: 12px;
+      width: 140px;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-color);
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slider-container input[type="range"] {
+      width: 120px;
+      accent-color: var(--accent-color);
+    }
+
+    .slider-value {
+      font-size: 11px;
+      width: 35px;
+      text-align: right;
+    }
+
+    /* Color Pickers Preset style */
+    .color-picker {
+      display: flex;
+      gap: 6px;
+    }
+
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      transition: transform 0.1s;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.15);
+    }
+
+    .color-swatch.active {
+      border-color: var(--text-color);
+      transform: scale(1.1);
+    }
+
+    /* Re-orderable Menu Items */
+    .menu-item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .menu-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background-color: var(--bg-color);
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .menu-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-item-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    button {
+      padding: 4px 10px;
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+      font-size: 11px;
+      transition: background-color 0.1s;
+    }
+
+    button:hover {
+      background-color: var(--hover-bg);
+    }
+
+    button.btn-primary {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+    }
+
+    button.btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    button.btn-danger {
+      color: #ff3b30;
+    }
+
+    /* Shortcuts key capture style */
+    .shortcut-wrapper {
+      display: flex;
+      gap: 6px;
+    }
+
+    .shortcut-input {
+      font-family: monospace !important;
+      text-align: center;
+    }
+
+    .shortcut-error {
+      color: #ff3b30;
+      font-size: 11px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    /* About style */
+    .about-info {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .about-logo {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .about-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .about-version {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .about-desc {
+      margin-top: 15px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      padding: 0 20px;
+    }
+
+    .disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Category Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-item active" data-panel="general">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      <span>General</span>
+    </div>
+    <div class="sidebar-item" data-panel="appearance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 14.7255 3.09032 17.1962 4.85857 19C5.3284 19.479 6 19.6896 6.5 19.3L8.5 17.8C8.8 17.5 9.2 17.8 9.5 18.2L10 20.5C10.1 21.3 10.8 22 11.6 22H12Z"/><circle cx="7.5" cy="10.5" r="1.5" fill="currentColor"/><circle cx="11.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="16.5" cy="9.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="14.5" r="1.5" fill="currentColor"/></svg>
+      <span>Appearance</span>
+    </div>
+    <div class="sidebar-item" data-panel="hiding">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Hiding</span>
+    </div>
+    <div class="sidebar-item" data-panel="menuitems">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>Menu Items</span>
+    </div>
+    <div class="sidebar-item" data-panel="shortcuts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" /><line x1="6" y1="8" x2="6.01" y2="8"/><line x1="10" y1="8" x2="10.01" y2="8"/><line x1="14" y1="8" x2="14.01" y2="8"/><line x1="18" y1="8" x2="18.01" y2="8"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/><line x1="14" y1="12" x2="14.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></svg>
+      <span>Shortcuts</span>
+    </div>
+    <div class="sidebar-item" data-panel="about">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span>About</span>
+    </div>
+  </div>
+
+  <!-- Content Right Panel -->
+  <div class="content-area">
+    
+    <!-- GENERAL PANEL -->
+    <div class="panel active" id="panel-general">
+      <h2>General</h2>
+      
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Launch at Login</div>
+          <div class="setting-desc">Open the application automatically when you log in.</div>
+        </div>
+        <input type="checkbox" id="gen-login">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show in Dock / Taskbar</div>
+          <div class="setting-desc">Display the application icon in the system dock.</div>
+        </div>
+        <input type="checkbox" id="gen-dock">
+      </div>
+
+      <div class="section-title">Clock & Date</div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Clock Format</div>
+          <div class="setting-desc">Display time in 12-hour (AM/PM) or 24-hour style.</div>
+        </div>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="gen-clock" id="gen-clock-12" value="12" checked>
+            <span>12-Hour</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="gen-clock" id="gen-clock-24" value="24">
+            <span>24-Hour</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Date</div>
+          <div class="setting-desc">Show the day and date next to the clock.</div>
+        </div>
+        <input type="checkbox" id="gen-date">
+      </div>
+    </div>
+
+    <!-- APPEARANCE PANEL -->
+    <div class="panel" id="panel-appearance">
+      <h2>Appearance</h2>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Theme</div>
+          <div class="setting-desc">Customize the appearance of the menu bar.</div>
+        </div>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="app-theme" id="app-theme-light" value="light">
+            <span>Light</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="app-theme" id="app-theme-dark" value="dark">
+            <span>Dark</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="app-theme" id="app-theme-auto" value="auto" checked>
+            <span>Auto</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Blur Intensity</div>
+          <div class="setting-desc">Set background blur intensity of the bar.</div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="app-blur" min="0" max="30" value="20">
+          <span class="slider-value" id="app-blur-val">20px</span>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Menu Bar Opacity</div>
+          <div class="setting-desc">Adjust the transparency of the menu bar.</div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="app-opacity" min="30" max="100" value="85">
+          <span class="slider-value" id="app-opacity-val">85%</span>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Accent Color</div>
+          <div class="setting-desc">Hover highlight color of menu items.</div>
+        </div>
+        <div class="color-picker">
+          <div class="color-swatch" style="background-color: #007aff;" data-color="#007aff"></div>
+          <div class="color-swatch" style="background-color: #5856d6;" data-color="#5856d6"></div>
+          <div class="color-swatch" style="background-color: #ff2d55;" data-color="#ff2d55"></div>
+          <div class="color-swatch" style="background-color: #ff3b30;" data-color="#ff3b30"></div>
+          <div class="color-swatch" style="background-color: #ff9500;" data-color="#ff9500"></div>
+          <div class="color-swatch" style="background-color: #34c759;" data-color="#34c759"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HIDING BEHAVIOR PANEL -->
+    <div class="panel" id="panel-hiding">
+      <h2>Hiding Behavior</h2>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable Auto-Hide</div>
+          <div class="setting-desc">Hide when windows are fullscreen/maximized.</div>
+        </div>
+        <input type="checkbox" id="hide-master">
+      </div>
+
+      <div id="hiding-options">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Behavior Mode</div>
+            <div class="setting-desc">How the menu bar hides visually.</div>
+          </div>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="hide-mode" id="hide-mode-hide" value="fully-hide">
+              <span>Fully Hide</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="hide-mode" id="hide-mode-island" value="collapsed" checked>
+              <span>Dynamic Island</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Hover Reveal Sensitivity</div>
+            <div class="setting-desc">Width of the reveal trigger zone.</div>
+          </div>
+          <select id="hide-sensitivity">
+            <option value="50">Narrow (50px)</option>
+            <option value="100" selected>Medium (100px)</option>
+            <option value="200">Wide (200px)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Reveal Delay</div>
+            <div class="setting-desc">Debounce delay required to reveal on hover.</div>
+          </div>
+          <select id="hide-delay">
+            <option value="0">Instant</option>
+            <option value="100">Short (100ms)</option>
+            <option value="400" selected>Normal (400ms)</option>
+          </select>
+        </div>
+
+        <div class="setting-row" id="row-pill-width">
+          <div>
+            <div class="setting-label">Dynamic Island Width</div>
+            <div class="setting-desc">Width of the collapsed pill notch.</div>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="hide-pill-width" min="120" max="240" value="180">
+            <span class="slider-value" id="hide-pill-width-val">180px</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <button id="hide-reset" class="btn-danger">Reset Hiding Defaults</button>
+      </div>
+    </div>
+
+    <!-- MENU ITEMS PANEL -->
+    <div class="panel" id="panel-menuitems">
+      <h2>Menu Items</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Configure visibility and ordering of right-aligned items.</p>
+      
+      <div class="menu-item-list" id="menu-item-list-container">
+        <!-- Rendered Dynamically -->
+      </div>
+    </div>
+
+    <!-- SHORTCUTS PANEL -->
+    <div class="panel" id="panel-shortcuts">
+      <h2>Shortcuts</h2>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Force-Toggle Menu Bar</div>
+          <div class="setting-desc">Global shortcut to force show/hide menu bar.</div>
+        </div>
+        <div class="shortcut-wrapper">
+          <input type="text" id="short-toggle" class="shortcut-input" placeholder="Click to record..." readonly>
+          <button id="short-toggle-clear">Clear</button>
+        </div>
+      </div>
+      <div class="shortcut-error" id="short-toggle-error">Conflict detected. Try another shortcut.</div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Open Settings Window</div>
+          <div class="setting-desc">Global shortcut to launch this panel directly.</div>
+        </div>
+        <div class="shortcut-wrapper">
+          <input type="text" id="short-settings" class="shortcut-input" placeholder="Click to record..." readonly>
+          <button id="short-settings-clear">Clear</button>
+        </div>
+      </div>
+      <div class="shortcut-error" id="short-settings-error">Conflict detected. Try another shortcut.</div>
+    </div>
+
+    <!-- ABOUT PANEL -->
+    <div class="panel" id="panel-about">
+      <h2>About</h2>
+      
+      <div class="about-info">
+        <div class="about-logo">⚙️</div>
+        <div class="about-title">macOS Top Menu Bar</div>
+        <div class="about-version" id="about-version-text">Version 1.0.0</div>
+        <div class="about-desc">
+          An integrated macOS-style top Menu Bar and bottom Dock container, built natively with Electron, HTML5, and vanilla CSS transitions.
+        </div>
+      </div>
+
+      <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px; display: flex; justify-content: center;">
+        <button id="about-reset-all" class="btn-danger" style="padding: 8px 16px; font-weight: 500;">Restore All Settings to Defaults</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentSettings = {};
+    let activeKeyCaptureId = null;
+
+    // Map keys to display names
+    const itemNames = {
+      wifi: 'Wi-Fi Status',
+      bluetooth: 'Bluetooth Status',
+      battery: 'Battery Status',
+      volume: 'Volume Status',
+      spotlight: 'Spotlight Search',
+      controlCenter: 'Control Center',
+      settings: 'Settings Gear',
+      clock: 'System Clock'
+    };
+
+    // Tab Switcher
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach(item => {
+      item.addEventListener('click', () => {
+        sidebarItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        const panelId = `panel-${item.getAttribute('data-panel')}`;
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+
+        // Stop shortcut record if switching tabs
+        stopShortcutCapture();
+      });
+    });
+
+    // Debounced settings save
+    let debounceSaveTimeout = null;
+    function triggerSave() {
+      if (debounceSaveTimeout) clearTimeout(debounceSaveTimeout);
+      debounceSaveTimeout = setTimeout(() => {
+        window.settingsAPI.saveSettings(currentSettings);
+      }, 150);
+    }
+
+    // Load Settings
+    async function loadSettings() {
+      currentSettings = await window.settingsAPI.getSettings();
+      
+      // General Bindings
+      document.getElementById('gen-login').checked = currentSettings.general.launchAtLogin;
+      document.getElementById('gen-dock').checked = currentSettings.general.showInDock;
+      document.getElementById('gen-clock-12').checked = currentSettings.general.clockFormat12h;
+      document.getElementById('gen-clock-24').checked = !currentSettings.general.clockFormat12h;
+      document.getElementById('gen-date').checked = currentSettings.general.showDate;
+
+      // Appearance Bindings
+      const themeVal = currentSettings.appearance.theme;
+      document.getElementById(`app-theme-${themeVal}`).checked = true;
+      document.getElementById('app-blur').value = currentSettings.appearance.blurIntensity;
+      document.getElementById('app-blur-val').textContent = `${currentSettings.appearance.blurIntensity}px`;
+      document.getElementById('app-opacity').value = Math.round(currentSettings.appearance.opacity * 100);
+      document.getElementById('app-opacity-val').textContent = `${Math.round(currentSettings.appearance.opacity * 100)}%`;
+
+      // Select active accent colorSwatch
+      const colorPresets = document.querySelectorAll('.color-swatch');
+      colorPresets.forEach(swatch => {
+        if (swatch.getAttribute('data-color') === currentSettings.appearance.accentColor) {
+          swatch.classList.add('active');
+        } else {
+          swatch.classList.remove('active');
+        }
+      });
+
+      // Hiding Bindings
+      document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
+      
+      const hideModeVal = currentSettings.hiding.mode;
+      document.getElementById(`hide-mode-${hideModeVal === 'collapsed' ? 'island' : 'hide'}`).checked = true;
+      
+      document.getElementById('hide-sensitivity').value = currentSettings.hiding.sensitivity;
+      document.getElementById('hide-delay').value = currentSettings.hiding.delay;
+      document.getElementById('hide-pill-width').value = currentSettings.hiding.pillWidth;
+      document.getElementById('hide-pill-width-val').textContent = `${currentSettings.hiding.pillWidth}px`;
+
+      toggleHidingSubOptions(currentSettings.hiding.enabled);
+      togglePillWidthSlider(hideModeVal === 'collapsed');
+
+      // Menu Items Binding
+      renderMenuItemsList();
+
+      // Shortcuts Binding
+      document.getElementById('short-toggle').value = currentSettings.shortcuts.toggleMenuBar || '';
+      document.getElementById('short-settings').value = currentSettings.shortcuts.openSettings || '';
+    }
+
+    // Toggle grey-out for hiding sub options
+    function toggleHidingSubOptions(enabled) {
+      const optionsDiv = document.getElementById('hiding-options');
+      if (enabled) {
+        optionsDiv.classList.remove('disabled');
+      } else {
+        optionsDiv.classList.add('disabled');
+      }
+    }
+
+    function togglePillWidthSlider(isIsland) {
+      const row = document.getElementById('row-pill-width');
+      if (isIsland) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    }
+
+    // General Event Handlers
+    document.getElementById('gen-login').addEventListener('change', (e) => {
+      currentSettings.general.launchAtLogin = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-dock').addEventListener('change', (e) => {
+      currentSettings.general.showInDock = e.target.checked;
+      triggerSave();
+    });
+
+    document.querySelectorAll('input[name="gen-clock"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentSettings.general.clockFormat12h = (e.target.value === '12');
+        triggerSave();
+      });
+    });
+
+    document.getElementById('gen-date').addEventListener('change', (e) => {
+      currentSettings.general.showDate = e.target.checked;
+      triggerSave();
+    });
+
+    // Appearance Event Handlers
+    document.querySelectorAll('input[name="app-theme"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentSettings.appearance.theme = e.target.value;
+        triggerSave();
+      });
+    });
+
+    const blurSlider = document.getElementById('app-blur');
+    blurSlider.addEventListener('input', (e) => {
+      document.getElementById('app-blur-val').textContent = `${e.target.value}px`;
+      currentSettings.appearance.blurIntensity = parseInt(e.target.value);
+      triggerSave();
+    });
+
+    const opacitySlider = document.getElementById('app-opacity');
+    opacitySlider.addEventListener('input', (e) => {
+      document.getElementById('app-opacity-val').textContent = `${e.target.value}%`;
+      currentSettings.appearance.opacity = parseFloat(e.target.value) / 100;
+      triggerSave();
+    });
+
+    const colorPresets = document.querySelectorAll('.color-swatch');
+    colorPresets.forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        colorPresets.forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        currentSettings.appearance.accentColor = swatch.getAttribute('data-color');
+        triggerSave();
+      });
+    });
+
+    // Hiding Event Handlers
+    document.getElementById('hide-master').addEventListener('change', (e) => {
+      currentSettings.hiding.enabled = e.target.checked;
+      toggleHidingSubOptions(e.target.checked);
+      triggerSave();
+    });
+
+    document.querySelectorAll('input[name="hide-mode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const val = e.target.value;
+        currentSettings.hiding.mode = val;
+        togglePillWidthSlider(val === 'collapsed');
+        triggerSave();
+      });
+    });
+
+    document.getElementById('hide-sensitivity').addEventListener('change', (e) => {
+      currentSettings.hiding.sensitivity = parseInt(e.target.value);
+      triggerSave();
+    });
+
+    document.getElementById('hide-delay').addEventListener('change', (e) => {
+      currentSettings.hiding.delay = parseInt(e.target.value);
+      triggerSave();
+    });
+
+    const pillWidthSlider = document.getElementById('hide-pill-width');
+    pillWidthSlider.addEventListener('input', (e) => {
+      document.getElementById('hide-pill-width-val').textContent = `${e.target.value}px`;
+      currentSettings.hiding.pillWidth = parseInt(e.target.value);
+      triggerSave();
+    });
+
+    document.getElementById('hide-reset').addEventListener('click', () => {
+      currentSettings.hiding = {
+        enabled: true,
+        mode: "collapsed",
+        sensitivity: 100,
+        delay: 400,
+        pillWidth: 180
+      };
+      
+      document.getElementById('hide-master').checked = true;
+      document.getElementById('hide-mode-island').checked = true;
+      document.getElementById('hide-sensitivity').value = 100;
+      document.getElementById('hide-delay').value = 400;
+      document.getElementById('hide-pill-width').value = 180;
+      document.getElementById('hide-pill-width-val').textContent = "180px";
+      
+      toggleHidingSubOptions(true);
+      togglePillWidthSlider(true);
+      triggerSave();
+    });
+
+    // Menu Items Event Handlers & Layout
+    function renderMenuItemsList() {
+      const container = document.getElementById('menu-item-list-container');
+      container.innerHTML = '';
+
+      const order = currentSettings.menuItems.order;
+      const visible = currentSettings.menuItems.visible;
+
+      order.forEach((key, index) => {
+        const row = document.createElement('div');
+        row.className = 'menu-item-row';
+
+        const left = document.createElement('div');
+        left.className = 'menu-item-left';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = visible[key] !== false;
+        checkbox.addEventListener('change', (e) => {
+          currentSettings.menuItems.visible[key] = e.target.checked;
+          triggerSave();
+        });
+
+        const span = document.createElement('span');
+        span.textContent = itemNames[key] || key;
+
+        left.appendChild(checkbox);
+        left.appendChild(span);
+
+        const actions = document.createElement('div');
+        actions.className = 'menu-item-actions';
+
+        const upBtn = document.createElement('button');
+        upBtn.innerHTML = '▲';
+        upBtn.disabled = index === 0;
+        upBtn.addEventListener('click', () => {
+          moveItem(index, index - 1);
+        });
+
+        const downBtn = document.createElement('button');
+        downBtn.innerHTML = '▼';
+        downBtn.disabled = index === order.length - 1;
+        downBtn.addEventListener('click', () => {
+          moveItem(index, index + 1);
+        });
+
+        actions.appendChild(upBtn);
+        actions.appendChild(downBtn);
+
+        row.appendChild(left);
+        row.appendChild(actions);
+        container.appendChild(row);
+      });
+    }
+
+    function moveItem(fromIndex, toIndex) {
+      const order = currentSettings.menuItems.order;
+      const temp = order[fromIndex];
+      order[fromIndex] = order[toIndex];
+      order[toIndex] = temp;
+
+      currentSettings.menuItems.order = order;
+      renderMenuItemsList();
+      triggerSave();
+    }
+
+    // Shortcuts Key Capturing
+    const toggleInput = document.getElementById('short-toggle');
+    const settingsInput = document.getElementById('short-settings');
+
+    toggleInput.addEventListener('click', () => startShortcutCapture('short-toggle', 'toggleMenuBar'));
+    settingsInput.addEventListener('click', () => startShortcutCapture('short-settings', 'openSettings'));
+
+    document.getElementById('short-toggle-clear').addEventListener('click', () => clearShortcut('short-toggle', 'toggleMenuBar'));
+    document.getElementById('short-settings-clear').addEventListener('click', () => clearShortcut('short-settings', 'openSettings'));
+
+    function startShortcutCapture(inputId, settingKey) {
+      stopShortcutCapture();
+
+      activeKeyCaptureId = { inputId, settingKey };
+      const input = document.getElementById(inputId);
+      input.value = 'Recording... Press keys';
+      input.style.borderColor = 'var(--accent-color)';
+      
+      document.getElementById(`${inputId}-error`).style.display = 'none';
+      window.addEventListener('keydown', captureKeys);
+    }
+
+    function stopShortcutCapture() {
+      if (activeKeyCaptureId) {
+        const input = document.getElementById(activeKeyCaptureId.inputId);
+        input.style.borderColor = '';
+        if (input.value === 'Recording... Press keys') {
+          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+        }
+        window.removeEventListener('keydown', captureKeys);
+        activeKeyCaptureId = null;
+      }
+    }
+
+    async function captureKeys(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const keys = [];
+      if (e.ctrlKey) keys.push('Ctrl');
+      if (e.metaKey) keys.push('Super'); // Maps to Command on Mac, Win key on Windows
+      if (e.altKey) keys.push('Alt');
+      if (e.shiftKey) keys.push('Shift');
+
+      const key = e.key;
+      const isModifier = ['Control', 'Meta', 'Alt', 'Shift'].includes(key);
+
+      if (!isModifier) {
+        let electronKey = key;
+        if (key === ' ') electronKey = 'Space';
+        else if (key === 'ArrowUp') electronKey = 'Up';
+        else if (key === 'ArrowDown') electronKey = 'Down';
+        else if (key === 'ArrowLeft') electronKey = 'Left';
+        else if (key === 'ArrowRight') electronKey = 'Right';
+        else if (key.length === 1) electronKey = key.toUpperCase();
+
+        keys.push(electronKey);
+        const shortcutStr = keys.join('+');
+
+        const input = document.getElementById(activeKeyCaptureId.inputId);
+        input.value = shortcutStr;
+
+        // Verify/register shortcut with main process
+        const res = await window.settingsAPI.registerShortcut(activeKeyCaptureId.settingKey, shortcutStr);
+        const errorLabel = document.getElementById(`${activeKeyCaptureId.inputId}-error`);
+
+        if (res.success) {
+          currentSettings.shortcuts[activeKeyCaptureId.settingKey] = shortcutStr;
+          errorLabel.style.display = 'none';
+        } else {
+          errorLabel.textContent = res.error || 'Conflict detected.';
+          errorLabel.style.display = 'block';
+          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+        }
+
+        stopShortcutCapture();
+      }
+    }
+
+    async function clearShortcut(inputId, settingKey) {
+      stopShortcutCapture();
+      document.getElementById(`${inputId}-error`).style.display = 'none';
+      const input = document.getElementById(inputId);
+      input.value = '';
+
+      // Clear in main
+      await window.settingsAPI.registerShortcut(settingKey, '');
+      currentSettings.shortcuts[settingKey] = '';
+    }
+
+    // Reset All settings
+    document.getElementById('about-reset-all').addEventListener('click', async () => {
+      const confirm = window.confirm("Are you sure you want to restore all settings to defaults?");
+      if (confirm) {
+        await window.settingsAPI.restoreDefaults();
+        loadSettings();
+      }
+    });
+
+    // Listen for updates from main process (e.g. if config resets)
+    window.settingsAPI.onSettingsChanged(() => {
+      loadSettings();
+    });
+
+    // Init
+    loadSettings();
+  </script>
+</body>
+</html>

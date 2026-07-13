@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>macOS Top Menu Bar</title>
   <style>
+    :root {
+      --accent-color: #007aff;
+      --accent-color-translucent: rgba(0, 122, 255, 0.15);
+    }
+
     /* CSS Reset */
     * {
       margin: 0;
@@ -44,8 +49,8 @@
     }
 
     .menu-bar.collapsed {
-      width: 180px;
-      left: calc(50% - 90px);
+      width: var(--pill-width, 180px);
+      left: calc(50% - var(--pill-width, 180px) / 2);
       transform: translateY(-22px);
       border-radius: 0 0 12px 12px;
       background: rgba(0, 0, 0, 0.6) !important;
@@ -86,7 +91,7 @@
     }
 
     .menu-item:hover {
-      background-color: rgba(0, 0, 0, 0.08);
+      background-color: var(--accent-color-translucent);
     }
 
     .menu-item.active {
@@ -165,7 +170,7 @@
     }
 
     .dropdown-item:hover {
-      background: linear-gradient(135deg, #007aff, #005ecb);
+      background: var(--accent-color) !important;
       color: white;
     }
 
@@ -644,6 +649,107 @@
       vertical-align: middle;
       color: #1d1d1f;
     }
+
+    /* Dark Theme Styles */
+    body.dark-theme {
+      color: #dfdfe0;
+    }
+    body.dark-theme .menu-bar {
+      background: rgba(30, 30, 30, 0.65);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+    body.dark-theme .menu-item {
+      color: #dfdfe0;
+    }
+    body.dark-theme .menu-item:hover {
+      background-color: var(--accent-color-translucent);
+    }
+    body.dark-theme .dropdown-menu {
+      background: rgba(30, 30, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    body.dark-theme .dropdown-item {
+      color: #dfdfe0;
+    }
+    body.dark-theme .dropdown-item.no-hover {
+      color: #dfdfe0 !important;
+      background: transparent !important;
+    }
+    body.dark-theme .dropdown-divider {
+      background-color: rgba(255, 255, 255, 0.15);
+    }
+    body.dark-theme .dropdown-header {
+      color: #8e8e93;
+    }
+    body.dark-theme .battery-icon {
+      color: #dfdfe0;
+    }
+    body.dark-theme .cc-dropdown {
+      background: rgba(30, 30, 30, 0.72) !important;
+    }
+    body.dark-theme .cc-box,
+    body.dark-theme .cc-box-wide {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    body.dark-theme .cc-net-icon,
+    body.dark-theme .cc-focus-icon {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+    body.dark-theme .cc-net-icon.active {
+      background: #007aff;
+      color: white;
+    }
+    body.dark-theme .cc-focus-icon.active {
+      background: #5856d6;
+      color: white;
+    }
+    body.dark-theme .cc-net-title,
+    body.dark-theme .cc-focus-title,
+    body.dark-theme .cc-np-title,
+    body.dark-theme .cc-slider-title {
+      color: #ffffff;
+    }
+    body.dark-theme .cc-net-desc,
+    body.dark-theme .cc-np-artist,
+    body.dark-theme .cc-focus-desc,
+    body.dark-theme .cc-slider-icon {
+      color: #aaaaaa;
+    }
+    body.dark-theme .cc-np-btn {
+      color: #ffffff;
+    }
+    body.dark-theme .cc-np-btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    body.dark-theme .cal-day-number {
+      color: #aaaaaa;
+    }
+    body.dark-theme .cal-day-number.current-month {
+      color: #ffffff;
+    }
+    body.dark-theme .cal-day-number.today {
+      background: #007aff;
+      color: white;
+    }
+
+    /* Fully Hide Mode Styles */
+    body.mode-fully-hide .menu-bar.collapsed {
+      width: 100% !important;
+      left: 0 !important;
+      transform: translateY(-28px) !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      border: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
   </style>
 </head>
 <body>
@@ -656,7 +762,8 @@
           <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.37.13-9.13-1.9-14.28-6.07-3.47-2.9-7.38-7.69-11.75-14.38-5.82-8.88-10.37-18.79-13.65-29.7C8.1 104.3 6.43 93.38 6.43 83.12c0-14.5 3.73-26.6 11.18-36.31 7.46-9.7 16.73-14.6 27.81-14.7 5.26 0 10.74 1.45 16.44 4.36 5.7 2.91 10.07 4.36 13.12 4.36 2.68 0 6.94-1.39 12.78-4.18 5.83-2.79 11.23-4.13 16.2-4.02 15.32.33 26.96 5.86 34.93 16.58-12.29 7.48-18.35 17.51-18.19 30.1.18 10.05 3.97 18.52 11.39 25.43 7.42 6.9 16.14 10.59 26.17 11.06-2.45 7.15-5.91 14.8-10.4 22.95zM119.22 9.64c0 7.82-2.85 15.11-8.56 21.88-5.7 6.76-12.79 10.87-21.26 12.33-.22-1.79-.34-3.46-.34-5.03 0-7.37 2.91-14.64 8.72-21.8 5.81-7.15 13.08-11.45 21.8-12.89.56 2.12.7 3.96.7 5.51z" fill="currentColor"/>
         </svg>
         <div class="dropdown-menu">
-          <div class="dropdown-item">About This Mac</div>
+          <div class="dropdown-item" id="apple-about">About This Mac</div>
+          <div class="dropdown-item" id="apple-settings">Menu Bar Settings...</div>
           <div class="dropdown-divider"></div>
           <div class="dropdown-item">System Preferences...</div>
           <div class="dropdown-item">App Store... <span class="shortcut">1 update</span></div>
@@ -995,6 +1102,14 @@
         </div>
       </div>
 
+      <!-- Settings Gear -->
+      <div class="menu-item status-icon interactive" id="menu-settings" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+
       <!-- Clock (and Calendar dropdown) -->
       <div class="menu-item clock-item interactive" id="menu-clock">
         <span id="clock-text">Mon Jul 13   9:13 PM</span>
@@ -1104,6 +1219,15 @@
     // Menu Item click triggers
     const menuItems = document.querySelectorAll('.menu-item.interactive');
     menuItems.forEach(item => {
+      if (item.id === 'menu-settings') {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllDropdowns();
+          window.electronAPI.openSettings();
+        });
+        return; // Don't bind dropdown hover events to settings icon
+      }
+
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         if (activeDropdown === item) {
@@ -1128,27 +1252,156 @@
       }
     });
 
+    let currentSettings = null;
+
     // Clock Logic
     function updateClock() {
       const now = new Date();
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       
-      const day = days[now.getDay()];
-      const month = months[now.getMonth()];
-      const date = now.getDate();
+      // Date formatting
+      let dateStr = '';
+      if (!currentSettings || currentSettings.general.showDate) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const day = days[now.getDay()];
+        const month = months[now.getMonth()];
+        const date = now.getDate();
+        dateStr = `${day} ${month} ${date}   `;
+      }
       
+      // Time formatting
       let hours = now.getHours();
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
+      let timeStr = '';
       
-      const dateStr = `${day} ${month} ${date}`;
-      const timeStr = `${hours}:${minutes} ${ampm}`;
+      const format12 = !currentSettings || currentSettings.general.clockFormat12h;
+      if (format12) {
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        timeStr = `${hours}:${minutes} ${ampm}`;
+      } else {
+        timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+      }
       
-      document.getElementById('clock-text').textContent = `${dateStr}   ${timeStr}`;
+      document.getElementById('clock-text').textContent = `${dateStr}${timeStr}`;
     }
+
+    const darkThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    function handleSystemThemeChange(e) {
+      if (currentSettings && currentSettings.appearance.theme === 'auto') {
+        if (e.matches) {
+          document.body.classList.add('dark-theme');
+        } else {
+          document.body.classList.remove('dark-theme');
+        }
+      }
+    }
+    darkThemeMediaQuery.addListener(handleSystemThemeChange);
+
+    function applySettings(settings) {
+      currentSettings = settings;
+
+      // 1. Theme
+      if (settings.appearance.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else if (settings.appearance.theme === 'light') {
+        document.body.classList.remove('dark-theme');
+      } else if (settings.appearance.theme === 'auto') {
+        if (darkThemeMediaQuery.matches) {
+          document.body.classList.add('dark-theme');
+        } else {
+          document.body.classList.remove('dark-theme');
+        }
+      }
+
+      // 2. Opacity
+      const bar = document.querySelector('.menu-bar');
+      bar.style.opacity = settings.appearance.opacity;
+
+      // 3. Blur
+      bar.style.backdropFilter = `blur(${settings.appearance.blurIntensity}px)`;
+      bar.style.webkitBackdropFilter = `blur(${settings.appearance.blurIntensity}px)`;
+
+      // 4. Accent Color
+      applyAccentColor(settings.appearance.accentColor);
+
+      // 5. Clock and Date updates
+      updateClock();
+
+      // 6. Menu Items ordering and visibility
+      applyMenuItemsSettings(settings.menuItems);
+
+      // 7. Hiding Mode class and Pill Width variables
+      if (settings.hiding.mode === 'fully-hide') {
+        document.body.classList.add('mode-fully-hide');
+      } else {
+        document.body.classList.remove('mode-fully-hide');
+      }
+      document.documentElement.style.setProperty('--pill-width', `${settings.hiding.pillWidth || 180}px`);
+    }
+
+    function applyAccentColor(color) {
+      document.documentElement.style.setProperty('--accent-color', color);
+      let r = 0, g = 122, b = 255;
+      if (color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    function applyMenuItemsSettings(menuItemsSettings) {
+      const menuRight = document.querySelector('.menu-right');
+      const order = menuItemsSettings.order || ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'settings', 'clock'];
+      const visible = menuItemsSettings.visible || {};
+
+      const idMap = {
+        wifi: 'menu-wifi',
+        bluetooth: 'menu-bluetooth',
+        battery: 'menu-battery',
+        volume: 'menu-volume',
+        spotlight: 'spotlight-container',
+        controlCenter: 'menu-cc',
+        settings: 'menu-settings',
+        clock: 'menu-clock'
+      };
+
+      order.forEach(key => {
+        const id = idMap[key];
+        const el = document.getElementById(id);
+        if (el) {
+          menuRight.appendChild(el);
+          const isVisible = visible[key] !== false;
+          el.style.display = isVisible ? '' : 'none';
+        }
+      });
+    }
+
+    // Settings changed listener
+    window.electronAPI.onSettingsChanged((settings) => {
+      applySettings(settings);
+    });
+
+    // Load initial settings on startup
+    window.electronAPI.getSettings().then(settings => {
+      applySettings(settings);
+    });
+
+    // Apple Settings click
+    document.getElementById('apple-settings').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      window.electronAPI.openSettings();
+    });
 
     // Initialize clock and poll every 30s
     updateClock();

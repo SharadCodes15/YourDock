@@ -1,0 +1,47 @@
+{
+  "general": {
+    "launchAtLogin": false,
+    "showInDock": true,
+    "clockFormat12h": true,
+    "showDate": true
+  },
+  "appearance": {
+    "theme": "auto",
+    "blurIntensity": 20,
+    "opacity": 0.85,
+    "accentColor": "#007aff"
+  },
+  "hiding": {
+    "enabled": true,
+    "mode": "collapsed",
+    "sensitivity": 100,
+    "delay": 400,
+    "pillWidth": 180
+  },
+  "menuItems": {
+    "visible": {
+      "wifi": true,
+      "bluetooth": true,
+      "battery": true,
+      "volume": true,
+      "spotlight": true,
+      "controlCenter": true,
+      "settings": true,
+      "clock": true
+    },
+    "order": [
+      "wifi",
+      "bluetooth",
+      "battery",
+      "volume",
+      "spotlight",
+      "controlCenter",
+      "settings",
+      "clock"
+    ]
+  },
+  "shortcuts": {
+    "toggleMenuBar": "",
+    "openSettings": ""
+  }
+}
