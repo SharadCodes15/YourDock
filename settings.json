@@ -6,14 +6,14 @@
     "showDate": true
   },
   "appearance": {
-    "theme": "auto",
-    "blurIntensity": 20,
-    "opacity": 0.85,
+    "theme": "light",
+    "blurIntensity": 12,
+    "opacity": 1,
     "accentColor": "#007aff"
   },
   "hiding": {
-    "enabled": true,
-    "mode": "collapsed",
+    "enabled": false,
+    "mode": "fully-hide",
     "sensitivity": 100,
     "delay": 400,
     "pillWidth": 180

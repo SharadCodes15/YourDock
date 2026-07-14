@@ -106,7 +106,7 @@
     /* Grid Paginator Viewport */
     .viewport {
       flex: 1;
-      width: 100vw;
+      width: calc(100vw - 64px);
       margin-top: 20px;
       overflow: hidden;
       position: relative;
@@ -121,7 +121,7 @@
 
     /* Grid Page */
     .page-grid {
-      width: 100vw;
+      width: calc(100vw - 64px);
       height: 100%;
       flex-shrink: 0;
       display: grid;
@@ -248,6 +248,171 @@
       background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.45);
     }
+
+    /* Favorites Sidebar */
+    .favorites-sidebar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 64px;
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 50px 0 20px 0;
+      gap: 8px;
+      z-index: 20;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .favorites-sidebar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .fav-item {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      user-drag: none;
+      -webkit-user-drag: none;
+    }
+    .fav-item:hover {
+      transform: scale(1.08);
+    }
+    .fav-item:active {
+      transform: scale(0.95);
+    }
+    .fav-item.dragging {
+      opacity: 0.4;
+    }
+
+    .fav-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .fav-icon-fallback {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: white;
+      text-transform: uppercase;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    /* Main Content Area */
+    #main-content {
+      position: absolute;
+      left: 64px;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    /* Refresh Button */
+    .refresh-btn {
+      position: absolute;
+      top: 50px;
+      right: 50px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      z-index: 100;
+    }
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      transform: scale(1.05);
+    }
+    .refresh-btn:active {
+      transform: scale(0.95);
+    }
+    .refresh-btn svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.4s ease;
+    }
+    .refresh-btn.spinning svg {
+      transform: rotate(360deg);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Custom Context Menu */
+    .context-menu {
+      position: absolute;
+      background: rgba(30, 30, 30, 0.85);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 5px 0;
+      min-width: 160px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: none;
+    }
+    .context-menu-item {
+      padding: 8px 14px;
+      color: #ffffff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .context-menu-item:hover {
+      background: #007aff;
+    }
   </style>
 </head>
 <body>
@@ -255,21 +420,42 @@
     <div class="backdrop" id="drawer-backdrop"></div>
     <div class="overlay"></div>
 
-    <!-- Search input -->
-    <div class="search-wrapper">
-      <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    <!-- Favorites Sidebar -->
+    <div class="favorites-sidebar" id="favorites-sidebar"></div>
+
+    <!-- Main Drawer Content -->
+    <div id="main-content">
+      <!-- Search input -->
+      <div class="search-wrapper">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" class="search-bar" id="search-input" placeholder="Search" autocomplete="off">
+      </div>
+
+      <!-- Viewport mapping pages track -->
+      <div class="viewport" id="viewport">
+        <div class="pages-track" id="pages-track"></div>
+      </div>
+
+      <!-- Page dots -->
+      <div class="dots-container" id="dots-container"></div>
+    </div>
+
+    <!-- Refresh Button -->
+    <div class="refresh-btn" id="refresh-btn" title="Refresh Apps (Ctrl+R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
       </svg>
-      <input type="text" class="search-bar" id="search-input" placeholder="Search" autocomplete="off">
     </div>
 
-    <!-- Viewport mapping pages track -->
-    <div class="viewport" id="viewport">
-      <div class="pages-track" id="pages-track"></div>
-    </div>
+    <!-- Toast Notification -->
+    <div class="toast" id="toast-notify">Refreshing apps...</div>
 
-    <!-- Page dots -->
-    <div class="dots-container" id="dots-container"></div>
+    <!-- Context Menu -->
+    <div class="context-menu" id="context-menu">
+      <div class="context-menu-item" id="menu-toggle-fav">Add to Favorites</div>
+    </div>
   </div>
 
   <script>
@@ -292,6 +478,7 @@
     ];
 
     function getGradientForApp(appId) {
+      if (!appId) return gradients[0];
       let code = 0;
       for (let i = 0; i < appId.length; i++) {
         code += appId.charCodeAt(i);
@@ -305,13 +492,128 @@
     const searchInput = document.getElementById('search-input');
     const pagesTrack = document.getElementById('pages-track');
     const dotsContainer = document.getElementById('dots-container');
+    const sidebar = document.getElementById('favorites-sidebar');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const toast = document.getElementById('toast-notify');
+    const contextMenu = document.getElementById('context-menu');
+    const menuToggleFav = document.getElementById('menu-toggle-fav');
+
+    let favoritesList = [];
+
+    let contextTargetApp = null;
+    let draggedItem = null;
+    let draggedIndex = null;
 
     // Fetch and populate apps list
     async function loadApps() {
       const data = await window.drawerAPI.getApps();
       allApps = data.apps || [];
+      favoritesList = data.favorites || [];
       filteredApps = [...allApps];
       renderPages();
+      renderFavorites();
+    }
+
+    // Render Favorites Sidebar
+    function renderFavorites() {
+      sidebar.innerHTML = '';
+      if (!favoritesList || favoritesList.length === 0) return;
+
+      favoritesList.forEach((exePath, idx) => {
+        const app = allApps.find(a => a.exec === exePath);
+        if (!app) return;
+
+        const item = document.createElement('div');
+        item.className = 'fav-item';
+        item.setAttribute('draggable', 'true');
+        item.setAttribute('data-index', idx);
+        item.setAttribute('data-path', exePath);
+        item.title = app.name;
+
+        // Click to launch
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.drawerAPI.launchApp(app.id);
+          closeDrawer();
+        });
+
+        // Context menu to remove
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showContextMenu(e, app);
+        });
+
+        let iconElem;
+        const iconSrc = app.iconPath || app.icon;
+        if (iconSrc) {
+          iconElem = document.createElement('img');
+          iconElem.className = 'fav-icon';
+          iconElem.src = iconSrc;
+          iconElem.onerror = () => {
+            iconElem.replaceWith(createFavFallbackIcon(app));
+          };
+        } else {
+          iconElem = createFavFallbackIcon(app);
+        }
+
+        item.appendChild(iconElem);
+        sidebar.appendChild(item);
+      });
+
+      initDragAndDrop();
+    }
+
+    function createFavFallbackIcon(app) {
+      const fallback = document.createElement('div');
+      fallback.className = 'fav-icon-fallback';
+      fallback.style.background = getGradientForApp(app.id);
+      fallback.textContent = app.name ? app.name.charAt(0) : '?';
+      return fallback;
+    }
+
+    // Drag and Drop Vertical Reordering for Favorites Sidebar
+    function initDragAndDrop() {
+      const favItems = sidebar.querySelectorAll('.fav-item');
+      favItems.forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+          draggedItem = item;
+          draggedIndex = parseInt(item.getAttribute('data-index'));
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          draggedItem = null;
+          draggedIndex = null;
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          return false;
+        });
+
+        item.addEventListener('dragenter', (e) => {
+          e.preventDefault();
+        });
+
+        item.addEventListener('drop', async (e) => {
+          e.stopPropagation();
+          const targetIndex = parseInt(item.getAttribute('data-index'));
+          if (draggedIndex !== null && draggedIndex !== targetIndex) {
+            const favs = [...favoritesList];
+            const [moved] = favs.splice(draggedIndex, 1);
+            favs.splice(targetIndex, 0, moved);
+            
+            const success = await window.drawerAPI.saveFavorites(favs);
+            if (success) {
+              favoritesList = favs;
+              renderFavorites();
+            }
+          }
+        });
+      });
     }
 
     // Render Paginated App Grid
@@ -343,11 +645,19 @@
             closeDrawer();
           });
 
+          // Right-click to show context menu
+          item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showContextMenu(e, app);
+          });
+
           // Check if custom icon exists
-          if (app.icon) {
+          const iconSrc = app.iconPath || app.icon;
+          if (iconSrc) {
             const img = document.createElement('img');
             img.className = 'app-icon';
-            img.src = app.icon;
+            img.src = iconSrc;
             img.alt = app.name;
             // Fallback if image fails to load
             img.onerror = () => {
@@ -416,7 +726,8 @@
 
     function scrollToPage(index) {
       currentPageIndex = index;
-      pagesTrack.style.transform = `translateX(-${index * 100}vw)`;
+      const width = document.getElementById('viewport').clientWidth;
+      pagesTrack.style.transform = `translateX(-${index * width}px)`;
       
       const dots = dotsContainer.querySelectorAll('.dot');
       dots.forEach((dot, idx) => {
@@ -461,7 +772,7 @@
       e.stopPropagation();
     });
 
-    // Close on Escape or click on empty space
+    // Close on Escape or click on empty space, or Ctrl+R rescan
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeDrawer();
@@ -469,6 +780,9 @@
         nextPage();
       } else if (e.key === 'ArrowLeft') {
         prevPage();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        triggerRefresh();
       }
     });
 
@@ -492,6 +806,79 @@
       }
     });
 
+    // Context Menu Logic
+    function showContextMenu(e, app) {
+      contextTargetApp = app;
+      const isFav = favoritesList.includes(app.exec);
+      menuToggleFav.textContent = isFav ? 'Remove from Favorites' : 'Add to Favorites';
+      
+      contextMenu.style.left = `${e.clientX}px`;
+      contextMenu.style.top = `${e.clientY}px`;
+      contextMenu.style.display = 'block';
+    }
+
+    window.addEventListener('click', () => {
+      contextMenu.style.display = 'none';
+    });
+
+    menuToggleFav.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      contextMenu.style.display = 'none';
+      if (!contextTargetApp) return;
+
+      const isFav = favoritesList.includes(contextTargetApp.exec);
+      let newFavs = [...favoritesList];
+      if (isFav) {
+        newFavs = newFavs.filter(p => p !== contextTargetApp.exec);
+      } else {
+        newFavs.push(contextTargetApp.exec);
+      }
+
+      const success = await window.drawerAPI.saveFavorites(newFavs);
+      if (success) {
+        favoritesList = newFavs;
+        renderFavorites();
+      }
+    });
+
+    // App Rescan / Refresh Button
+    async function triggerRefresh() {
+      if (refreshBtn.classList.contains('spinning')) return;
+      
+      refreshBtn.classList.add('spinning');
+      showToast('Refreshing apps...');
+      
+      try {
+        const res = await window.drawerAPI.refreshApps();
+        if (res && res.success) {
+          showToast('Apps refreshed successfully!');
+          await loadApps();
+        } else {
+          showToast('Failed to refresh apps.');
+        }
+      } catch (err) {
+        console.error('Refresh error:', err);
+        showToast('Error refreshing apps.');
+      } finally {
+        setTimeout(() => {
+          refreshBtn.classList.remove('spinning');
+        }, 1000);
+      }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    refreshBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerRefresh();
+    });
+
     function closeDrawer() {
       container.classList.remove('show');
       window.drawerAPI.hideDrawer();
@@ -503,6 +890,7 @@
       searchInput.value = '';
       filteredApps = [...allApps];
       renderPages();
+      renderFavorites();
 
       if (screenshotUrl) {
         backdrop.style.backgroundImage = `url("${screenshotUrl}")`;
@@ -517,6 +905,11 @@
 
     window.drawerAPI.onCloseDrawer(() => {
       container.classList.remove('show');
+    });
+
+    // Listen for live updates
+    window.drawerAPI.onAppsUpdated(async () => {
+      await loadApps();
     });
 
     // Initial load

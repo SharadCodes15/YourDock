@@ -1,7 +1,8 @@
 const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { exec } = require('node:child_process');
+const { exec, execFile } = require('node:child_process');
+const crypto = require('crypto');
 
 let menuBarWin;
 let dockWin;
@@ -12,6 +13,9 @@ const configPath = path.join(__dirname, 'dock', 'config.json');
 let settings = {};
 const settingsPath = path.join(__dirname, 'settings.json');
 let settingsWin = null;
+
+// Cache dynamically loaded modules
+let activeWinModule = null;
 
 function loadSettings() {
   try {
@@ -93,21 +97,21 @@ function scanStartMenuApps() {
     const dirsArray = dirs.map(d => `"${d}"`).join(',');
     const psScript = `
 $shell = New-Object -ComObject WScript.Shell
-$results = @()
 $dirs = @(${dirsArray})
-foreach ($dir in $dirs) {
+$results = foreach ($dir in $dirs) {
   Get-ChildItem -Path $dir -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {
     try {
       $shortcut = $shell.CreateShortcut($_.FullName)
-      $obj = New-Object PSObject -Property @{
-        name = $_.BaseName
-        target = $shortcut.TargetPath
+      if ($shortcut.TargetPath) {
+        [PSCustomObject]@{
+          name = $_.BaseName
+          target = $shortcut.TargetPath
+        }
       }
-      $results += $obj
     } catch {}
   }
 }
-if ($results.Count -eq 0) {
+if (-not $results) {
   Write-Output "[]"
 } elseif ($results.Count -eq 1) {
   Write-Output ("[" + ($results | ConvertTo-Json -Compress) + "]")
@@ -195,35 +199,114 @@ if ($results.Count -eq 0) {
   });
 }
 
+function getIconCachePath(exePath, extension = '.png') {
+  const hash = crypto.createHash('md5').update(exePath.toLowerCase()).digest('hex');
+  return path.join(__dirname, 'dock', 'icons-cache', `${hash}${extension}`);
+}
+
 /**
  * On startup, scan Start Menu and populate apps.json.
- * Preserves any manually added custom apps the user has stored.
+ * Preserves any manually added custom apps, favorites, and manual icon overrides.
  */
 async function scanAndPopulateApps() {
   const scannedApps = await scanStartMenuApps();
 
-  // Load existing apps.json to preserve custom entries
-  let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [] };
+  // Load existing apps.json to preserve custom entries and favorites
+  let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [], favorites: [] };
   try {
     if (fs.existsSync(appsJsonPath)) {
       existingData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
     }
   } catch (e) {}
 
-  // Preserve custom apps array
+  // Migrate old structure if needed
   const customApps = existingData.custom || [];
+  const favorites = existingData.favorites || [];
   const settingsBlock = existingData.settings || { useDesktopCapture: true };
 
-  // Write scanned + custom apps
+  // Map existing apps by lowercase exec path for easy merge lookup
+  const existingAppsMap = new Map();
+  if (existingData.apps) {
+    existingData.apps.forEach(app => {
+      if (app && app.exec) {
+        existingAppsMap.set(app.exec.toLowerCase(), app);
+      }
+    });
+  }
+  if (existingData.custom) {
+    existingData.custom.forEach(app => {
+      if (app && app.exec) {
+        existingAppsMap.set(app.exec.toLowerCase(), app);
+      }
+    });
+  }
+
+  // Ensure icons cache folder exists
+  ensureIconsFolder();
+
+  // Merge logic: preserve manual overrides and prepare for parallel icon extraction
+  const appsToProcess = [];
+  for (const scannedApp of scannedApps) {
+    const existing = existingAppsMap.get(scannedApp.exec.toLowerCase());
+    if (existing) {
+      if (existing.iconSource === 'manual') {
+        scannedApp.iconPath = existing.iconPath;
+        scannedApp.iconSource = 'manual';
+      } else {
+        scannedApp.iconPath = existing.iconPath || '';
+        scannedApp.iconSource = existing.iconSource || 'extracted';
+      }
+    } else {
+      scannedApp.iconPath = '';
+      scannedApp.iconSource = 'scan';
+    }
+    appsToProcess.push(scannedApp);
+  }
+
+  // Helper to extract a single app's icon asynchronously
+  const extractIcon = async (scannedApp) => {
+    if (scannedApp.iconSource !== 'manual' && !scannedApp.iconPath && fs.existsSync(scannedApp.exec)) {
+      try {
+        const nativeImg = await app.getFileIcon(scannedApp.exec, { size: 'large' });
+        const cachePath = getIconCachePath(scannedApp.exec, '.png');
+        fs.writeFileSync(cachePath, nativeImg.toPNG());
+        scannedApp.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+        scannedApp.iconSource = 'extracted';
+      } catch (err) {
+        console.error(`Failed to auto-extract icon for ${scannedApp.name}:`, err.message);
+        scannedApp.iconSource = 'scan';
+        scannedApp.iconPath = '';
+      }
+    }
+    return scannedApp;
+  };
+
+  // Run icon extraction in parallel batches of 5
+  const mergedApps = [];
+  const batchSize = 5;
+  for (let i = 0; i < appsToProcess.length; i += batchSize) {
+    const batch = appsToProcess.slice(i, i + batchSize);
+    const processedBatch = await Promise.all(batch.map(app => extractIcon(app)));
+    mergedApps.push(...processedBatch);
+  }
+
+  // Ensure custom apps also have default schema fields
+  customApps.forEach(app => {
+    if (!app.iconSource) {
+      app.iconSource = app.iconPath ? 'extracted' : 'scan';
+    }
+  });
+
   const newData = {
     settings: settingsBlock,
-    apps: scannedApps.length > 0 ? scannedApps : (existingData.apps || []),
-    custom: customApps
+    apps: mergedApps.length > 0 ? mergedApps : (existingData.apps || []),
+    custom: customApps,
+    favorites: favorites
   };
 
   try {
     fs.writeFileSync(appsJsonPath, JSON.stringify(newData, null, 2), 'utf8');
-    console.log(`apps.json populated with ${newData.apps.length} scanned apps and ${newData.custom.length} custom apps.`);
+    console.log(`apps.json populated with ${newData.apps.length} scanned apps, ${newData.custom.length} custom apps, and ${newData.favorites.length} favorites.`);
   } catch (e) {
     console.error('Failed to write apps.json:', e);
   }
@@ -269,6 +352,10 @@ function ensureIconsFolder() {
   const iconsDir = path.join(__dirname, 'dock', 'icons');
   if (!fs.existsSync(iconsDir)) {
     fs.mkdirSync(iconsDir, { recursive: true });
+  }
+  const iconsCacheDir = path.join(__dirname, 'dock', 'icons-cache');
+  if (!fs.existsSync(iconsCacheDir)) {
+    fs.mkdirSync(iconsCacheDir, { recursive: true });
   }
   
   const svgTemplates = {
@@ -404,6 +491,7 @@ function startDockCursorPolling() {
       if (dockState !== 'expanded') {
         dockState = 'expanded';
         dockWin.webContents.send('set-collapse-state', false);
+        startProcessPolling();
       }
       return;
     }
@@ -434,6 +522,7 @@ function startDockCursorPolling() {
             dockLeaveTimeout = null;
           }
           dockWin.webContents.send('set-collapse-state', false); // Expand visually
+          startProcessPolling();
         }
       } else {
         consecutiveDockHotspotPolls = 0;
@@ -464,6 +553,7 @@ function startDockCursorPolling() {
             if (stillOutside && dockAutoHide) {
               dockState = 'collapsed';
               dockWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+              stopProcessPolling();
             }
             dockLeaveTimeout = null;
           }, 400);
@@ -592,8 +682,8 @@ async function getScreenshotDataUrl() {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: {
-        width: Math.round(width / 2),
-        height: Math.round(height / 2)
+        width: Math.round(width / 8),
+        height: Math.round(height / 8)
       }
     });
 
@@ -732,8 +822,10 @@ function createMenuBarWindow() {
   if (activeAppInterval) clearInterval(activeAppInterval);
   activeAppInterval = setInterval(async () => {
     try {
-      const activeWin = await import('active-win');
-      const activeWindow = await activeWin.activeWindow();
+      if (!activeWinModule) {
+        activeWinModule = await import('active-win');
+      }
+      const activeWindow = await activeWinModule.activeWindow();
       if (activeWindow && activeWindow.owner) {
         const appName = activeWindow.owner.name;
         if (appName && appName !== lastAppName) {
@@ -773,7 +865,21 @@ function createMenuBarWindow() {
 }
 
 // Create macOS Dock Window
-let pollInterval;
+let pollInterval = null;
+
+function startProcessPolling() {
+  if (pollInterval) return;
+  pollProcesses();
+  pollInterval = setInterval(pollProcesses, 8000);
+}
+
+function stopProcessPolling() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
 function createDockWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
@@ -812,9 +918,11 @@ function createDockWindow() {
   dockWin.webContents.on('did-finish-load', () => {
     if (dockAutoHide && dockState === 'collapsed') {
       dockWin.webContents.send('set-collapse-state', true);
+      stopProcessPolling();
     } else {
       dockState = 'expanded';
       dockWin.webContents.send('set-collapse-state', false);
+      startProcessPolling();
     }
   });
 
@@ -828,44 +936,56 @@ function createDockWindow() {
 
   dockWin.on('closed', () => {
     dockWin = null;
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
-    }
+    stopProcessPolling();
   });
-
-  // Start polling system tasks for dots indicators (every 4s)
-  pollProcesses();
-  if (pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(pollProcesses, 4000);
 }
 
 // Poll OS processes to find which mapped apps are running for the Dock
 function pollProcesses() {
-  const cmd = process.platform === 'win32'
-    ? 'tasklist /NH /FO CSV'
-    : 'ps -ax -o comm';
+  if (process.platform === 'win32') {
+    execFile('tasklist.exe', ['/NH', '/FO', 'CSV'], { maxBuffer: 1024 * 1024 * 2 }, (err, stdout) => {
+      if (err || !stdout) return;
 
-  exec(cmd, (err, stdout) => {
-    if (err || !stdout) return;
+      const output = stdout.toLowerCase();
+      const runningAppIds = [];
 
-    const output = stdout.toLowerCase();
-    const runningAppIds = [];
-
-    if (config && config.apps) {
-      for (const [appId, appConfig] of Object.entries(config.apps)) {
-        if (!appConfig.process) continue;
-        const procName = appConfig.process.toLowerCase();
-        if (output.includes(procName)) {
-          runningAppIds.push(appId);
+      if (config && config.apps) {
+        for (const [appId, appConfig] of Object.entries(config.apps)) {
+          if (!appConfig.process) continue;
+          const procName = appConfig.process.toLowerCase();
+          if (output.includes(procName)) {
+            runningAppIds.push(appId);
+          }
         }
       }
-    }
 
-    if (dockWin) {
-      dockWin.webContents.send('process-update', runningAppIds);
-    }
-  });
+      if (dockWin) {
+        dockWin.webContents.send('process-update', runningAppIds);
+      }
+    });
+  } else {
+    const cmd = 'ps -ax -o comm';
+    exec(cmd, (err, stdout) => {
+      if (err || !stdout) return;
+
+      const output = stdout.toLowerCase();
+      const runningAppIds = [];
+
+      if (config && config.apps) {
+        for (const [appId, appConfig] of Object.entries(config.apps)) {
+          if (!appConfig.process) continue;
+          const procName = appConfig.process.toLowerCase();
+          if (output.includes(procName)) {
+            runningAppIds.push(appId);
+          }
+        }
+      }
+
+      if (dockWin) {
+        dockWin.webContents.send('process-update', runningAppIds);
+      }
+    });
+  }
 }
 
 // IPC Receivers and Handlers
@@ -932,11 +1052,13 @@ ipcMain.on('save-auto-hide', (event, autoHide) => {
     if (dockWin) {
       dockWin.webContents.send('set-collapse-state', false);
     }
+    startProcessPolling();
   } else {
     dockState = 'collapsed';
     if (dockWin) {
       dockWin.webContents.send('set-collapse-state', true);
     }
+    stopProcessPolling();
   }
 });
 
@@ -1013,6 +1135,15 @@ ipcMain.handle('restore-defaults', () => {
 });
 
 // Application Drawer IPC Handlers
+function notifyAppsUpdated() {
+  if (drawerWin && !drawerWin.isDestroyed()) {
+    drawerWin.webContents.send('apps-updated');
+  }
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.webContents.send('apps-updated');
+  }
+}
+
 ipcMain.handle('get-apps', () => {
   try {
     if (fs.existsSync(appsJsonPath)) {
@@ -1021,13 +1152,124 @@ ipcMain.handle('get-apps', () => {
       // Merge scanned apps + custom apps into a single apps array for the renderer
       const scanned = data.apps || [];
       const custom = data.custom || [];
-      return { settings: data.settings, apps: [...scanned, ...custom] };
+      const favorites = data.favorites || [];
+      return { 
+        settings: data.settings, 
+        apps: [...scanned, ...custom],
+        favorites: favorites
+      };
     }
   } catch (err) {
     console.error('Failed to read apps.json:', err);
   }
-  return { apps: [] };
+  return { apps: [], favorites: [] };
 });
+
+ipcMain.handle('save-favorites', async (event, favorites) => {
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      data.favorites = favorites;
+      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      notifyAppsUpdated();
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to save favorites:', err);
+  }
+  return false;
+});
+
+ipcMain.handle('refresh-apps', async () => {
+  try {
+    await scanAndPopulateApps();
+    notifyAppsUpdated();
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to refresh apps:', err);
+    return { success: false };
+  }
+});
+
+ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Custom Icon',
+    filters: [
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'ico'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return { success: false };
+  }
+
+  const selectedPath = result.filePaths[0];
+  const ext = path.extname(selectedPath);
+  const cachePath = getIconCachePath(exePath, ext);
+
+  try {
+    fs.copyFileSync(selectedPath, cachePath);
+    
+    // Read and update apps.json
+    if (fs.existsSync(appsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      
+      const updateEntry = (appEntry) => {
+        if (appEntry.id === appId || appEntry.exec.toLowerCase() === exePath.toLowerCase()) {
+          appEntry.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+          appEntry.iconSource = 'manual';
+        }
+      };
+
+      if (data.apps) data.apps.forEach(updateEntry);
+      if (data.custom) data.custom.forEach(updateEntry);
+
+      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      
+      notifyAppsUpdated();
+      return { success: true };
+    }
+  } catch (err) {
+    console.error('Failed to override app icon:', err);
+  }
+  return { success: false };
+});
+
+ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
+  try {
+    // Re-extract using Electron's app.getFileIcon
+    const nativeImg = await app.getFileIcon(exePath, { size: 'large' });
+    const cachePath = getIconCachePath(exePath, '.png');
+    
+    // Save extracted image as PNG
+    fs.writeFileSync(cachePath, nativeImg.toPNG());
+    
+    // Read and update apps.json
+    if (fs.existsSync(appsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      
+      const updateEntry = (appEntry) => {
+        if (appEntry.id === appId || appEntry.exec.toLowerCase() === exePath.toLowerCase()) {
+          appEntry.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+          appEntry.iconSource = 'extracted';
+        }
+      };
+
+      if (data.apps) data.apps.forEach(updateEntry);
+      if (data.custom) data.custom.forEach(updateEntry);
+
+      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      
+      notifyAppsUpdated();
+      return { success: true };
+    }
+  } catch (err) {
+    console.error('Failed to reset app icon:', err);
+  }
+  return { success: false };
+});
+
 
 ipcMain.handle('select-custom-app', async () => {
   const result = await dialog.showOpenDialog({
@@ -1184,13 +1426,20 @@ if (!isPrimaryInstance) {
     createMenuBarWindow();
     createDockWindow();
     createSettingsWindow();
-    scanAndPopulateApps().then(() => {
-      createDrawerWindow();
-    });
+    createDrawerWindow();
     registerGlobalShortcuts();
     startCursorPolling(); // Starts menu bar hover polling
     startDockCursorPolling(); // Starts dock hover polling
  
+    // Perform slow startup scanning in background after 3 seconds
+    setTimeout(() => {
+      scanAndPopulateApps().then(() => {
+        notifyAppsUpdated();
+      }).catch(err => {
+        console.error('Background app scan failed:', err);
+      });
+    }, 3000);
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createMenuBarWindow();
