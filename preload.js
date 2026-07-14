@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setVolume: (val) => ipcRenderer.send('set-volume', val),
   onVolumeSync: (callback) => ipcRenderer.on('volume-sync', (_event, val) => callback(val)),
   toggleWifi: (on) => ipcRenderer.invoke('toggle-wifi', on),
-  toggleBluetooth: (on) => ipcRenderer.invoke('toggle-bluetooth', on)
+  toggleBluetooth: (on) => ipcRenderer.invoke('toggle-bluetooth', on),
+  toggleSpotlight: () => ipcRenderer.send('toggle-spotlight')
 });

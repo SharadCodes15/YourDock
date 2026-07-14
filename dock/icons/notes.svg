@@ -1,1 +1,22 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g10" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#eab308"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g10)"/><rect width="100" height="18" fill="#ca8a04" rx="22" clip-path="polygon(0 0, 100 0, 100 18, 0 18)"/><path d="M0,13 L100,13" stroke="#ca8a04" stroke-width="8"/><line x1="20" y1="38" x2="80" y2="38" stroke="#71717a" stroke-width="2.5"/><line x1="20" y1="54" x2="80" y2="54" stroke="#71717a" stroke-width="2.5"/><line x1="20" y1="70" x2="80" y2="70" stroke="#71717a" stroke-width="2.5"/></svg>
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="padBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#fef9c3" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#padBg)" filter="url(#shadow)"/>
+  <path d="M 0,22 C 0,9.9 9.9,0 22,0 L 78,0 C 90.1,0 100,9.9 100,22 L 100,28 L 0,28 Z" fill="#78350f" />
+  <path d="M 24,0 L 24,100" stroke="#fca5a5" stroke-width="1.5"/>
+  <path d="M 0,42 L 100,42 M 0,54 L 100,54 M 0,66 L 100,66 M 0,78 L 100,78 M 0,90 L 100,90" stroke="#93c5fd" stroke-width="1"/>
+  <g transform="translate(45, 45) rotate(-45)">
+    <rect x="-4" y="-35" width="8" height="60" rx="2" fill="#fbbf24" stroke="#d97706" stroke-width="1"/>
+    <path d="M -4,25 L 0,35 L 4,25 Z" fill="#fde047" />
+    <path d="M -1.5,31 L 0,35 L 1.5,31 Z" fill="#1e293b" />
+    <rect x="-4" y="-39" width="8" height="5" fill="#f472b6" />
+    <rect x="-4" y="-36" width="8" height="2" fill="#94a3b8" />
+  </g>
+</svg>

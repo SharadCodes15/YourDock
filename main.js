@@ -335,7 +335,7 @@ function loadConfig() {
     } else {
       // Fallback defaults
       config = {
-        pinned: ["finder", "launchpad", "safari", "messages", "mail", "maps", "photos", "facetime", "calendar", "notes", "reminders", "music", "appstore", "preferences"],
+        pinned: ["finder", "launchpad", "safari", "mail", "appstore", "preferences"],
         autoHide: true // default true
       };
       fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -600,6 +600,15 @@ function registerGlobalShortcuts() {
     } catch (err) {
       console.error('Failed to register openSettings shortcut:', err);
     }
+  }
+
+  // Register Spotlight search shortcut
+  try {
+    globalShortcut.register('CommandOrControl+Space', () => {
+      toggleSpotlight();
+    });
+  } catch (err) {
+    console.error('Failed to register spotlight shortcut:', err);
   }
 }
 
@@ -1115,6 +1124,22 @@ ipcMain.on('set-dock-width', (event, dockWidth) => {
   }
 });
 
+ipcMain.on('set-dock-height', (event, height) => {
+  if (dockWin) {
+    const bounds = dockWin.getBounds();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { height: screenHeight } = primaryDisplay.bounds;
+    const y = screenHeight - height;
+    
+    dockWin.setBounds({
+      x: bounds.x,
+      y: y,
+      width: bounds.width,
+      height: height
+    });
+  }
+});
+
 ipcMain.handle('get-config', () => {
   loadConfig();
   let appIconsMap = {};
@@ -1496,14 +1521,102 @@ ipcMain.on('toggle-drawer', () => {
   }
 });
 
+// Helper to check if a registry protocol or local executable is available on Windows
+function isAppInstalled(appConfig) {
+  const name = appConfig.name.toLowerCase();
+  
+  if (name === 'finder' || name === 'launchpad' || name === 'system preferences' || name === 'trash' || name === 'app store') {
+    return true;
+  }
+  
+  if (name === 'notes') {
+    return fs.existsSync('C:\\Windows\\System32\\notepad.exe') || fs.existsSync('C:\\Windows\\notepad.exe');
+  }
+
+  if (name === 'safari') {
+    return fs.existsSync('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe') || 
+           fs.existsSync('C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe');
+  }
+
+  if (name === 'facetime') {
+    return true;
+  }
+
+  if (fs.existsSync(appsJsonPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const allApps = [...(data.apps || []), ...(data.custom || [])];
+      
+      const processName = appConfig.process ? appConfig.process.toLowerCase() : '';
+      const execName = appConfig.win ? path.basename(appConfig.win).toLowerCase() : '';
+      
+      const match = allApps.some(app => {
+        if (!app.exec) return false;
+        const appExec = app.exec.toLowerCase();
+        return (processName && appExec.includes(processName)) || 
+               (execName && appExec.includes(execName));
+      });
+      
+      if (match) return true;
+    } catch (e) {}
+  }
+  
+  if (appConfig.win) {
+    if (appConfig.win.includes(':\\') || appConfig.win.includes(':/')) {
+      if (fs.existsSync(appConfig.win)) return true;
+    }
+    if (appConfig.win.endsWith(':') || appConfig.win.includes('://')) {
+      const protocol = appConfig.win.replace('://', '').replace(':', '');
+      try {
+        const { execSync } = require('child_process');
+        const stdout = execSync(`powershell -NoProfile -Command "Test-Path 'Registry::HKEY_CLASSES_ROOT\\${protocol}'"`, { encoding: 'utf8' });
+        if (stdout.trim().toLowerCase() === 'true') {
+          return true;
+        }
+      } catch (e) {}
+    }
+  }
+
+  return false;
+}
+
+// Helper to bring an already running window to the foreground on Windows
+function focusRunningApp(processName) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32' || !processName) {
+      resolve(false);
+      return;
+    }
+    const proc = processName.replace(/\.exe$/i, '').toLowerCase();
+    const tmpScript = path.join(app.getPath('temp'), '_dock_focus.ps1');
+    const psContent = [
+      `$p = Get-Process -Name '${proc}' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1`,
+      `if ($p) {`,
+      `  $sig = '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);'`,
+      `  $t = Add-Type -MemberDefinition $sig -Name 'WU' -Namespace 'W32' -PassThru -ErrorAction SilentlyContinue`,
+      `  if ($t) { $t::ShowWindow($p.MainWindowHandle, 9); $t::SetForegroundWindow($p.MainWindowHandle); Write-Host 'SUCCESS' }`,
+      `}`
+    ].join('\n');
+    
+    fs.writeFileSync(tmpScript, psContent, 'utf8');
+    exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpScript}"`, (err, stdout) => {
+      try { fs.unlinkSync(tmpScript); } catch(e) {}
+      if (!err && stdout && stdout.includes('SUCCESS')) {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+  });
+}
+
 ipcMain.on('hide-drawer', () => {
   closeDrawer();
 });
 
-ipcMain.on('launch-app', (event, appId) => {
+ipcMain.on('launch-app', async (event, appId) => {
   let appConfig = config && config.apps ? config.apps[appId] : null;
 
-  // Fallback to apps.json if not in config
   if (!appConfig && fs.existsSync(appsJsonPath)) {
     try {
       const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
@@ -1526,22 +1639,29 @@ ipcMain.on('launch-app', (event, appId) => {
   const targetPath = process.platform === 'win32' ? appConfig.win : appConfig.mac;
   if (!targetPath) return;
 
+  // Try focusing first if the app is already running
+  const processName = appConfig.process || path.basename(targetPath);
+  if (processName) {
+    const focused = await focusRunningApp(processName);
+    if (focused) {
+      setTimeout(pollProcesses, 1500);
+      return;
+    }
+  }
+
   const webProtocols = ['http://', 'https://', 'mailto:', 'ms-', 'microsoft.', 'outlookcal:', 'spotify:', 'whatsapp:'];
   const isProtocol = webProtocols.some(proto => targetPath.startsWith(proto));
 
   if (isProtocol) {
     shell.openExternal(targetPath).catch(err => console.error(err));
   } else {
-    // Attempt exec (direct exe launch)
     exec(targetPath, (err) => {
       if (err) {
-        // Fallback to shell openPath
         shell.openPath(targetPath).catch(err2 => console.error(err2));
       }
     });
   }
   
-  // Re-poll immediately to show dot indicator quickly
   setTimeout(pollProcesses, 1500);
 });
 
@@ -2197,4 +2317,79 @@ function broadcastConfigUpdate() {
     dockWin.webContents.send('config-changed', { config, appIconsMap });
   }
 }
+
+// ==========================================
+// CENTERED SPOTLIGHT SEARCH WINDOW
+// ==========================================
+let spotlightWin = null;
+
+function createSpotlightWindow() {
+  if (spotlightWin) return;
+  
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const winWidth = 600;
+  const winHeight = 400;
+  const x = Math.round((screenWidth - winWidth) / 2);
+  const y = Math.round((screenHeight - winHeight) / 3);
+
+  spotlightWin = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: x,
+    y: y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'spotlight-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  spotlightWin.loadFile(path.join(__dirname, 'spotlight.html'));
+
+  spotlightWin.on('blur', () => {
+    spotlightWin.hide();
+  });
+
+  spotlightWin.on('closed', () => {
+    spotlightWin = null;
+  });
+}
+
+function toggleSpotlight() {
+  if (!spotlightWin) {
+    createSpotlightWindow();
+  }
+  
+  if (spotlightWin.isVisible()) {
+    spotlightWin.hide();
+  } else {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+    const winWidth = 600;
+    const winHeight = 400;
+    const x = Math.round((screenWidth - winWidth) / 2);
+    const y = Math.round((screenHeight - winHeight) / 3);
+    spotlightWin.setBounds({ x, y, width: winWidth, height: winHeight });
+    
+    spotlightWin.show();
+    spotlightWin.focus();
+    spotlightWin.webContents.send('focus-input');
+  }
+}
+
+ipcMain.on('toggle-spotlight', () => {
+  toggleSpotlight();
+});
+
+ipcMain.on('close-spotlight', () => {
+  if (spotlightWin) spotlightWin.hide();
+});
 

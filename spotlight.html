@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Spotlight</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      background: transparent;
+      user-select: none;
+    }
+
+    .spotlight-box {
+      width: 600px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1.5px solid rgba(255, 255, 255, 0.5);
+      border-radius: 14px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.28);
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: hidden;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    body.dark-theme .spotlight-box {
+      background: rgba(36, 36, 36, 0.78);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+    }
+
+    .search-row {
+      display: flex;
+      align-items: center;
+      padding: 18px 24px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    body.dark-theme .search-row {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .search-icon {
+      color: #636366;
+      margin-right: 16px;
+      flex-shrink: 0;
+    }
+
+    body.dark-theme .search-icon {
+      color: #aeaeab;
+    }
+
+    .search-input {
+      flex: 1;
+      font-size: 22px;
+      font-weight: 300;
+      border: none;
+      background: transparent;
+      outline: none;
+      color: #1c1c1e;
+      padding: 0;
+    }
+
+    body.dark-theme .search-input {
+      color: #f5f5f7;
+    }
+
+    .search-input::placeholder {
+      color: #c7c7cc;
+    }
+
+    body.dark-theme .search-input::placeholder {
+      color: #48484a;
+    }
+
+    .results-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 16px;
+      box-sizing: border-box;
+    }
+
+    /* Custom Scrollbar */
+    .results-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    .results-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .results-container::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+    }
+    body.dark-theme .results-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .spotlight-section {
+      margin-bottom: 14px;
+    }
+
+    .spotlight-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #8e8e93;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 6px 0 6px 12px;
+    }
+
+    .spotlight-result-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: default;
+      margin-bottom: 2px;
+      transition: background-color 0.08s ease;
+      box-sizing: border-box;
+    }
+
+    .spotlight-result-item:hover,
+    .spotlight-result-item.selected {
+      background-color: rgba(0, 0, 0, 0.06);
+    }
+
+    body.dark-theme .spotlight-result-item:hover,
+    body.dark-theme .spotlight-result-item.selected {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .spotlight-result-item:active {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.dark-theme .spotlight-result-item:active {
+      background-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .spotlight-result-icon {
+      width: 24px;
+      height: 24px;
+      margin-right: 14px;
+      object-fit: contain;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .spotlight-result-icon-fallback {
+      width: 24px;
+      height: 24px;
+      background: rgba(0, 0, 0, 0.07);
+      color: #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 14px;
+      flex-shrink: 0;
+    }
+
+    body.dark-theme .spotlight-result-icon-fallback {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ccc;
+    }
+
+    .spotlight-result-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1c1c1e;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.dark-theme .spotlight-result-name {
+      color: #f5f5f7;
+    }
+
+    .spotlight-result-path {
+      font-size: 11px;
+      color: #8e8e93;
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+      padding-left: 10px;
+    }
+
+    .no-results {
+      padding: 30px;
+      text-align: center;
+      font-size: 13px;
+      color: #8e8e93;
+    }
+  </style>
+</head>
+<body>
+  <div class="spotlight-box">
+    <!-- Top Search Input Row -->
+    <div class="search-row">
+      <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" class="search-input" id="search-input" placeholder="Spotlight Search" autofocus />
+    </div>
+
+    <!-- Scrollable Results -->
+    <div class="results-container" id="results-container">
+      <div class="no-results">Type to search files and applications</div>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('search-input');
+    const resultsContainer = document.getElementById('results-container');
+    let searchTimeout = null;
+    let selectedIndex = 0;
+
+    // Apply active theme
+    function applyTheme(settings) {
+      if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+    }
+
+    window.electronAPI.getSettings().then(applyTheme).catch(console.error);
+    window.electronAPI.onSettingsChanged(applyTheme);
+
+    // Focus input on broadcast
+    window.electronAPI.onFocusInput(() => {
+      searchInput.value = '';
+      resultsContainer.innerHTML = '<div class="no-results">Type to search files and applications</div>';
+      searchInput.focus();
+    });
+
+    // Handle Input Search
+    searchInput.addEventListener('input', () => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      const query = searchInput.value.trim();
+
+      if (!query) {
+        resultsContainer.innerHTML = '<div class="no-results">Type to search files and applications</div>';
+        return;
+      }
+
+      searchTimeout = setTimeout(async () => {
+        try {
+          const data = await window.electronAPI.spotlightSearch(query);
+          renderResults(data);
+        } catch (e) {
+          console.error(e);
+        }
+      }, 150);
+    });
+
+    // Render Results
+    function renderResults(data) {
+      resultsContainer.innerHTML = '';
+      const { apps, files } = data;
+
+      if ((!apps || apps.length === 0) && (!files || files.length === 0)) {
+        resultsContainer.innerHTML = '<div class="no-results">No results found</div>';
+        return;
+      }
+
+      selectedIndex = 0;
+
+      // Apps Section
+      if (apps && apps.length > 0) {
+        const appSec = document.createElement('div');
+        appSec.className = 'spotlight-section';
+        
+        const title = document.createElement('div');
+        title.className = 'spotlight-section-title';
+        title.textContent = 'Applications';
+        appSec.appendChild(title);
+
+        apps.forEach(app => {
+          const item = document.createElement('div');
+          item.className = 'spotlight-result-item';
+          item.dataset.type = 'app';
+          item.dataset.id = app.id;
+
+          if (app.iconPath) {
+            const img = document.createElement('img');
+            img.src = app.iconPath;
+            img.className = 'spotlight-result-icon';
+            img.onerror = () => {
+              img.style.display = 'none';
+              const fallback = document.createElement('div');
+              fallback.className = 'spotlight-result-icon-fallback';
+              fallback.textContent = app.name ? app.name[0].toUpperCase() : 'A';
+              item.insertBefore(fallback, item.firstChild);
+            };
+            item.appendChild(img);
+          } else {
+            const fallback = document.createElement('div');
+            fallback.className = 'spotlight-result-icon-fallback';
+            fallback.textContent = app.name ? app.name[0].toUpperCase() : 'A';
+            item.appendChild(fallback);
+          }
+
+          const name = document.createElement('div');
+          name.className = 'spotlight-result-name';
+          name.textContent = app.name;
+          item.appendChild(name);
+
+          item.addEventListener('click', () => {
+            window.electronAPI.launchApp(app.id);
+            window.electronAPI.closeSpotlight();
+          });
+
+          appSec.appendChild(item);
+        });
+
+        resultsContainer.appendChild(appSec);
+      }
+
+      // Files Section
+      if (files && files.length > 0) {
+        const fileSec = document.createElement('div');
+        fileSec.className = 'spotlight-section';
+
+        const title = document.createElement('div');
+        title.className = 'spotlight-section-title';
+        title.textContent = 'Documents & Desktop';
+        fileSec.appendChild(title);
+
+        files.forEach(file => {
+          const item = document.createElement('div');
+          item.className = 'spotlight-result-item';
+          item.dataset.type = 'file';
+          item.dataset.path = file.path;
+
+          const fallback = document.createElement('div');
+          fallback.className = 'spotlight-result-icon-fallback';
+          const ext = file.name.split('.').pop().toUpperCase();
+          fallback.textContent = ext.length > 3 ? ext.substring(0, 3) : ext;
+          item.appendChild(fallback);
+
+          const name = document.createElement('div');
+          name.className = 'spotlight-result-name';
+          name.textContent = file.name;
+          item.appendChild(name);
+
+          const filePath = document.createElement('div');
+          filePath.className = 'spotlight-result-path';
+          filePath.textContent = file.path;
+          item.appendChild(filePath);
+
+          item.addEventListener('click', () => {
+            window.electronAPI.openFile(file.path);
+            window.electronAPI.closeSpotlight();
+          });
+
+          fileSec.appendChild(item);
+        });
+
+        resultsContainer.appendChild(fileSec);
+      }
+
+      updateSelection();
+    }
+
+    // Keyboard Navigation Selection
+    function updateSelection() {
+      const listItems = document.querySelectorAll('.spotlight-result-item');
+      listItems.forEach((item, index) => {
+        if (index === selectedIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const listItems = document.querySelectorAll('.spotlight-result-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (listItems.length > 0) {
+          selectedIndex = (selectedIndex + 1) % listItems.length;
+          updateSelection();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (listItems.length > 0) {
+          selectedIndex = (selectedIndex - 1 + listItems.length) % listItems.length;
+          updateSelection();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (listItems.length > 0 && selectedIndex >= 0 && selectedIndex < listItems.length) {
+          listItems[selectedIndex].click();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        window.electronAPI.closeSpotlight();
+      }
+    });
+  </script>
+</body>
+</html>

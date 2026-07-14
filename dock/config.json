@@ -3,15 +3,7 @@
     "finder",
     "launchpad",
     "safari",
-    "messages",
     "mail",
-    "maps",
-    "photos",
-    "facetime",
-    "calendar",
-    "notes",
-    "reminders",
-    "music",
     "appstore",
     "preferences"
   ],
@@ -35,59 +27,11 @@
       "mac": "/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app",
       "process": "msedge.exe"
     },
-    "messages": {
-      "name": "Messages",
-      "win": "whatsapp://",
-      "mac": "/System/Applications/Messages.app",
-      "process": "whatsapp.exe"
-    },
     "mail": {
       "name": "Mail",
       "win": "mailto:",
       "mac": "/System/Applications/Mail.app",
       "process": "outlook.exe"
-    },
-    "maps": {
-      "name": "Maps",
-      "win": "https://www.google.com/maps",
-      "mac": "/System/Applications/Maps.app",
-      "process": "chrome.exe"
-    },
-    "photos": {
-      "name": "Photos",
-      "win": "explorer.exe shell:My Pictures",
-      "mac": "/System/Applications/Photos.app",
-      "process": "explorer.exe"
-    },
-    "facetime": {
-      "name": "FaceTime",
-      "win": "microsoft.windows.camera:",
-      "mac": "/System/Applications/FaceTime.app",
-      "process": "camera.exe"
-    },
-    "calendar": {
-      "name": "Calendar",
-      "win": "outlookcal:",
-      "mac": "/System/Applications/Calendar.app",
-      "process": "outlook.exe"
-    },
-    "notes": {
-      "name": "Notes",
-      "win": "notepad.exe",
-      "mac": "/System/Applications/Notes.app",
-      "process": "notepad.exe"
-    },
-    "reminders": {
-      "name": "Reminders",
-      "win": "ms-to-do:",
-      "mac": "/System/Applications/Reminders.app",
-      "process": "todo.exe"
-    },
-    "music": {
-      "name": "Music",
-      "win": "spotify:",
-      "mac": "/System/Applications/Music.app",
-      "process": "spotify.exe"
     },
     "appstore": {
       "name": "App Store",

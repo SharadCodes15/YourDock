@@ -1032,15 +1032,11 @@
       </div>
 
       <!-- Spotlight (Magnifying Glass) -->
-      <div class="spotlight-container interactive" id="spotlight-container">
-        <div class="spotlight-btn" id="spotlight-btn-trigger">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-        <input type="text" class="spotlight-input" id="spotlight-input" placeholder="Spotlight..." />
-        <div class="spotlight-results" id="spotlight-results" style="display: none;"></div>
+      <div class="menu-item status-icon interactive" id="spotlight-container">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
       </div>
 
       <!-- Control Center -->
@@ -1423,167 +1419,12 @@
     }
     generateCalendar();
 
-    // Spotlight Input Toggle and Search
+    // Spotlight Search Toggle
     const spotlightContainer = document.getElementById('spotlight-container');
-    const spotlightTrigger = document.getElementById('spotlight-btn-trigger');
-    const spotlightInput = document.getElementById('spotlight-input');
-    const spotlightResults = document.getElementById('spotlight-results');
-    let spotlightSearchTimeout = null;
-
-    spotlightTrigger.addEventListener('click', (e) => {
+    spotlightContainer.addEventListener('click', (e) => {
       e.stopPropagation();
-      isSpotlightExpanded = !isSpotlightExpanded;
-      if (isSpotlightExpanded) {
-        spotlightContainer.classList.add('expanded-input');
-        spotlightInput.focus();
-        window.electronAPI.setIgnoreMouse(false);
-      } else {
-        closeSpotlight();
-      }
-    });
-
-    spotlightInput.addEventListener('input', (e) => {
-      const query = e.target.value;
-      if (spotlightSearchTimeout) clearTimeout(spotlightSearchTimeout);
-
-      if (!query || query.trim() === '') {
-        spotlightResults.style.display = 'none';
-        spotlightResults.innerHTML = '';
-        return;
-      }
-
-      spotlightSearchTimeout = setTimeout(async () => {
-        try {
-          const data = await window.electronAPI.spotlightSearch(query);
-          renderSpotlightResults(data);
-        } catch (err) {
-          console.error(err);
-        }
-      }, 150); // 150ms debounce
-    });
-
-    function renderSpotlightResults(data) {
-      spotlightResults.innerHTML = '';
-      const { apps, files } = data;
-
-      if (apps.length === 0 && files.length === 0) {
-        spotlightResults.innerHTML = '<div style="padding: 10px; font-size: 11px; text-align: center; color: #86868b;">No results found</div>';
-        spotlightResults.style.display = 'block';
-        return;
-      }
-
-      // Applications Section
-      if (apps.length > 0) {
-        const appSec = document.createElement('div');
-        appSec.className = 'spotlight-section';
-        
-        const title = document.createElement('div');
-        title.className = 'spotlight-section-title';
-        title.textContent = 'Applications';
-        appSec.appendChild(title);
-
-        apps.forEach(app => {
-          const item = document.createElement('div');
-          item.className = 'spotlight-result-item';
-          
-          let iconElem;
-          const iconSrc = app.iconPath || app.icon;
-          if (iconSrc) {
-            iconElem = document.createElement('img');
-            iconElem.className = 'spotlight-result-icon';
-            iconElem.src = iconSrc;
-            iconElem.onerror = () => {
-              iconElem.replaceWith(createSpotlightFallbackIcon(app));
-            };
-          } else {
-            iconElem = createSpotlightFallbackIcon(app);
-          }
-
-          const label = document.createElement('span');
-          label.textContent = app.name;
-
-          item.appendChild(iconElem);
-          item.appendChild(label);
-
-          item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.electronAPI.launchApp(app.id);
-            closeSpotlight();
-          });
-
-          appSec.appendChild(item);
-        });
-        spotlightResults.appendChild(appSec);
-      }
-
-      // Files Section
-      if (files.length > 0) {
-        const fileSec = document.createElement('div');
-        fileSec.className = 'spotlight-section';
-        
-        const title = document.createElement('div');
-        title.className = 'spotlight-section-title';
-        title.textContent = 'Files';
-        fileSec.appendChild(title);
-
-        files.forEach(file => {
-          const item = document.createElement('div');
-          item.className = 'spotlight-result-item';
-
-          const iconElem = document.createElement('div');
-          iconElem.className = 'spotlight-result-icon-fallback';
-          iconElem.style.background = 'linear-gradient(135deg, #a4a4a5, #636366)';
-          iconElem.textContent = '📄';
-
-          const label = document.createElement('span');
-          label.textContent = file.name;
-          label.title = file.path;
-
-          item.appendChild(iconElem);
-          item.appendChild(label);
-
-          item.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await window.electronAPI.openFile(file.path);
-            closeSpotlight();
-          });
-
-          fileSec.appendChild(item);
-        });
-        spotlightResults.appendChild(fileSec);
-      }
-
-      spotlightResults.style.display = 'block';
-    }
-
-    function createSpotlightFallbackIcon(app) {
-      const fallback = document.createElement('div');
-      fallback.className = 'spotlight-result-icon-fallback';
-      fallback.textContent = app.name ? app.name.charAt(0) : '?';
-      return fallback;
-    }
-
-    function closeSpotlight() {
-      isSpotlightExpanded = false;
-      spotlightContainer.classList.remove('expanded-input');
-      spotlightInput.value = '';
-      spotlightResults.style.display = 'none';
-      spotlightResults.innerHTML = '';
-      spotlightInput.blur();
-      checkMouseIgnore();
-    }
-
-    // Close Spotlight on outside click
-    document.addEventListener('click', (e) => {
-      if (isSpotlightExpanded && !e.target.closest('#spotlight-container')) {
-        closeSpotlight();
-      }
-    });
-
-    spotlightInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeSpotlight();
-      }
+      closeAllDropdowns();
+      window.electronAPI.toggleSpotlight();
     });
 
     // Control Center Toggle

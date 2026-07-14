@@ -654,21 +654,24 @@
         badgeBtn.style.display = 'flex';
       }
 
+      // Expand window height so context menu is not clipped
+      window.electronAPI.setDockHeight(300);
+      window.electronAPI.setIgnoreMouse(false);
+
       ctxMenu.style.display = 'block';
       
       // Position menu above the cursor/icon (adjusting for offset)
       const menuWidth = 175;
-      const menuHeight = ctxMenu.offsetHeight || 150;
+      const menuHeight = ctxMenu.offsetHeight || 160;
       
       ctxMenu.style.left = `${clientX - menuWidth / 2}px`;
-      ctxMenu.style.top = `${clientY - menuHeight - 12}px`;
-
-      window.electronAPI.setIgnoreMouse(false);
+      ctxMenu.style.top = `${clientY + (300 - 85) - menuHeight - 12}px`;
     }
 
     function closeContextMenu() {
       selectedCtxAppId = null;
       ctxMenu.style.display = 'none';
+      window.electronAPI.setDockHeight(85);
       checkMouseIgnore();
     }
 

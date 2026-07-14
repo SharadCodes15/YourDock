@@ -1,1 +1,26 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#0284c7"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g3)"/><circle cx="50" cy="50" r="28" fill="#ffffff" stroke="#0284c7" stroke-width="4"/><path d="M 50,26 L 56,44 L 74,50 L 56,56 L 50,74 L 44,56 L 26,50 L 44,44 Z" fill="#ff3b30"/><path d="M 50,50 L 56,44 L 50,26 Z" fill="#ffffff" opacity="0.6"/><circle cx="50" cy="50" r="4" fill="#ffffff"/></svg>
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="safariBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e5e7eb" />
+    </linearGradient>
+    <linearGradient id="dialBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="url(#safariBg)" filter="url(#shadow)"/>
+  <circle cx="50" cy="50" r="38" fill="url(#dialBg)" stroke="#ffffff" stroke-width="2.5"/>
+  <path d="M 50,16 L 50,22 M 50,78 L 50,84 M 16,50 L 22,50 M 78,50 L 84,50" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 26,26 L 30,30 M 70,70 L 74,74 M 26,74 L 30,70 M 70,26 L 74,30" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+  <g transform="rotate(45 50 50)">
+    <path d="M 50,18 L 56,50 L 50,47 Z" fill="#ef4444" />
+    <path d="M 50,18 L 44,50 L 50,47 Z" fill="#b91c1c" />
+    <path d="M 50,82 L 56,50 L 50,53 Z" fill="#ffffff" />
+    <path d="M 50,82 L 44,50 L 50,53 Z" fill="#d1d5db" />
+    <circle cx="50" cy="50" r="3.5" fill="#f59e0b" />
+  </g>
+</svg>

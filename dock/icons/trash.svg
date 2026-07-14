@@ -1,1 +1,17 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g15" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f1f5f9"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g15)"/><rect x="30" y="32" width="40" height="42" rx="4" fill="none" stroke="#334155" stroke-width="5"/><line x1="24" y1="26" x2="76" y2="26" stroke="#334155" stroke-width="5" stroke-linecap="round"/><rect x="42" y="18" width="16" height="8" rx="2" fill="none" stroke="#334155" stroke-width="4"/><line x1="42" y1="42" x2="42" y2="62" stroke="#334155" stroke-width="4.5" stroke-linecap="round"/><line x1="50" y1="42" x2="50" y2="62" stroke="#334155" stroke-width="4.5" stroke-linecap="round"/><line x1="58" y1="42" x2="58" y2="62" stroke="#334155" stroke-width="4.5" stroke-linecap="round"/></svg>
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="trashGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#d1d5db" stop-opacity="0.6" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <path d="M 28,30 L 72,30 L 66,85 C 66,88 63,90 60,90 L 40,90 C 37,90 34,88 34,85 Z" fill="url(#trashGrad)" filter="url(#shadow)"/>
+  <path d="M 38,30 L 42,90 M 50,30 L 50,90 M 62,30 L 58,90 M 30,30 L 36,85 M 70,30 L 64,85" stroke="#9ca3af" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 32,50 L 68,50 M 33,70 L 67,70 M 28,30 L 72,30" stroke="#9ca3af" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 24,25 L 76,25 C 78,25 78,22 76,22 L 24,22 C 22,22 22,25 24,25 Z" fill="#9ca3af" filter="url(#shadow)"/>
+  <path d="M 44,22 C 44,16 56,16 56,22" fill="none" stroke="#9ca3af" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 38,40 C 35,42 38,48 42,46 C 45,44 48,48 52,43 C 55,40 58,45 62,41" stroke="#cbd5e1" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

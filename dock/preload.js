@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId),
   keepInDock: (appId) => ipcRenderer.send('keep-in-dock', appId),
   setBadge: (appId, count) => ipcRenderer.send('set-badge', appId, count),
-  onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, config) => callback(config)),
-  onPlayGenie: (callback) => ipcRenderer.on('play-genie', (_event, appId) => callback(appId))
+  onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, data) => callback(data)),
+  onPlayGenie: (callback) => ipcRenderer.on('play-genie', (_event, appId) => callback(appId)),
+  setDockHeight: (height) => ipcRenderer.send('set-dock-height', height)
 });
