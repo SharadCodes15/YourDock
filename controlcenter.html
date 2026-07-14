@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Center</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: transparent;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Popover Panel styling matching Big Sur macOS */
+    .cc-panel {
+      width: 290px;
+      height: 350px;
+      background: rgba(35, 35, 35, 0.75);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-top: 1px solid rgba(255, 255, 255, 0.28);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      border-radius: 18px;
+      padding: 14px;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeInScale 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-origin: top right;
+    }
+
+    @keyframes fadeInScale {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Grid for Wifi/Bluetooth/AirDrop & DND */
+    .cc-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 8px;
+      height: 140px;
+    }
+
+    /* Control Box base */
+    .cc-box {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cc-network-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cc-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .cc-item-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .cc-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: #ffffff;
+      transition: background 0.2s;
+    }
+
+    .cc-icon.active {
+      background: #007aff;
+    }
+
+    .cc-icon.active.dnd-color {
+      background: #5856d6;
+    }
+
+    .cc-text-group {
+      min-width: 0;
+    }
+
+    .cc-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cc-desc {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.55);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    /* Error text style */
+    .error-text {
+      color: #ff453a;
+      font-size: 8px;
+      font-weight: 500;
+      margin-top: 1px;
+      display: none;
+    }
+
+    /* Toggle Switch styling */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 28px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.2);
+      transition: .2s;
+      border-radius: 16px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    input:checked + .slider {
+      background-color: #007aff;
+    }
+
+    input:checked + .slider.dnd-color {
+      background-color: #5856d6;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(12px);
+    }
+
+    /* Sliders section */
+    .cc-slider-box {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cc-slider-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .cc-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cc-slider-icon {
+      color: rgba(255, 255, 255, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cc-range {
+      flex: 1;
+      height: 20px;
+      accent-color: #ffffff;
+      cursor: pointer;
+    }
+
+    /* Now Playing style */
+    .cc-now-playing {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cc-np-art {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #ff5e62, #ff9966);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .cc-np-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .cc-np-title {
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cc-np-artist {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.5);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="cc-panel">
+    <!-- Grid for Network & DND -->
+    <div class="cc-grid">
+      <!-- Network Panel (Wifi + Bluetooth) -->
+      <div class="cc-box cc-network-group">
+        <!-- Wifi Item -->
+        <div class="cc-item-row">
+          <div class="cc-item-info">
+            <div class="cc-icon active" id="wifi-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12.55a11 11 0 0 1 14 0" />
+                <path d="M12 20h.01" />
+              </svg>
+            </div>
+            <div class="cc-text-group">
+              <div class="cc-title">Wi-Fi</div>
+              <div class="cc-desc" id="wifi-desc">Connecting...</div>
+              <div class="error-text" id="wifi-error">Unable to toggle</div>
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="wifi-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Bluetooth Item -->
+        <div class="cc-item-row">
+          <div class="cc-item-info">
+            <div class="cc-icon active" id="bt-icon">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m7 7 10 10-5 5V2l5 5L7 17"/>
+              </svg>
+            </div>
+            <div class="cc-text-group">
+              <div class="cc-title">Bluetooth</div>
+              <div class="cc-desc" id="bt-desc">On</div>
+              <div class="error-text" id="bt-error">Unable to toggle</div>
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="bt-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- DND Panel -->
+      <div class="cc-box">
+        <div class="cc-item-row">
+          <div class="cc-icon" id="dnd-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            </svg>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="dnd-toggle">
+            <span class="slider dnd-color"></span>
+          </label>
+        </div>
+        <div>
+          <div class="cc-title">Do Not Disturb</div>
+          <div class="cc-desc" id="dnd-desc">Off</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Display Brightness Slider -->
+    <div class="cc-slider-box">
+      <div class="cc-slider-title">Display</div>
+      <div class="cc-slider-row">
+        <div class="cc-slider-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+        </div>
+        <input type="range" class="cc-range" id="brightness-slider" min="10" max="100" value="80">
+      </div>
+    </div>
+
+    <!-- Sound Volume Slider -->
+    <div class="cc-slider-box">
+      <div class="cc-slider-title">Sound</div>
+      <div class="cc-slider-row">
+        <div class="cc-slider-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          </svg>
+        </div>
+        <input type="range" class="cc-range" id="sound-slider" min="0" max="100" value="70">
+      </div>
+    </div>
+
+    <!-- Now Playing Status -->
+    <div class="cc-now-playing">
+      <div class="cc-np-art">🎵</div>
+      <div class="cc-np-info">
+        <div class="cc-np-title">Stairway to Heaven</div>
+        <div class="cc-np-artist">Led Zeppelin</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State UI items
+    const wifiToggle = document.getElementById('wifi-toggle');
+    const wifiIcon = document.getElementById('wifi-icon');
+    const wifiDesc = document.getElementById('wifi-desc');
+    const wifiError = document.getElementById('wifi-error');
+
+    const btToggle = document.getElementById('bt-toggle');
+    const btIcon = document.getElementById('bt-icon');
+    const btDesc = document.getElementById('bt-desc');
+    const btError = document.getElementById('bt-error');
+
+    const dndToggle = document.getElementById('dnd-toggle');
+    const dndIcon = document.getElementById('dnd-icon');
+    const dndDesc = document.getElementById('dnd-desc');
+
+    const brightnessSlider = document.getElementById('brightness-slider');
+    const soundSlider = document.getElementById('sound-slider');
+
+    // Init volumes and brightness
+    async function initControls() {
+      try {
+        const vol = await window.ccAPI.getVolume();
+        soundSlider.value = vol;
+      } catch (e) {}
+
+      try {
+        const bright = await window.ccAPI.getBrightness();
+        brightnessSlider.value = bright;
+      } catch (e) {}
+
+      try {
+        const dnd = await window.ccAPI.getDND();
+        dndToggle.checked = dnd;
+        updateDndUI(dnd);
+      } catch (e) {}
+    }
+    initControls();
+
+    // Volume Slider input handler with 100ms debounce
+    let volTimeout;
+    soundSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      if (volTimeout) clearTimeout(volTimeout);
+      volTimeout = setTimeout(() => {
+        window.ccAPI.setVolume(val);
+      }, 100);
+    });
+
+    // Brightness Slider input handler
+    let brightTimeout;
+    brightnessSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      if (brightTimeout) clearTimeout(brightTimeout);
+      brightTimeout = setTimeout(() => {
+        window.ccAPI.setBrightness(val);
+      }, 100);
+    });
+
+    // WiFi toggle handler
+    wifiToggle.addEventListener('change', async () => {
+      const on = wifiToggle.checked;
+      wifiError.style.display = 'none';
+      const res = await window.ccAPI.toggleWifi(on);
+      if (res && res.success) {
+        updateWifiUI(on, on ? 'On' : 'Off');
+      } else {
+        wifiError.style.display = 'block';
+        wifiToggle.checked = !on; // revert
+      }
+    });
+
+    // Bluetooth toggle handler
+    btToggle.addEventListener('change', async () => {
+      const on = btToggle.checked;
+      btError.style.display = 'none';
+      const res = await window.ccAPI.toggleBluetooth(on);
+      if (res && res.success) {
+        updateBluetoothUI(on);
+      } else {
+        btError.style.display = 'block';
+        btToggle.checked = !on; // revert
+      }
+    });
+
+    // DND toggle handler
+    dndToggle.addEventListener('change', () => {
+      const on = dndToggle.checked;
+      window.ccAPI.setDND(on);
+      updateDndUI(on);
+    });
+
+    function updateWifiUI(on, ssid) {
+      if (on) {
+        wifiIcon.classList.add('active');
+        wifiDesc.textContent = ssid || 'On';
+      } else {
+        wifiIcon.classList.remove('active');
+        wifiDesc.textContent = 'Off';
+      }
+    }
+
+    function updateBluetoothUI(on) {
+      if (on) {
+        btIcon.classList.add('active');
+        btDesc.textContent = 'On';
+      } else {
+        btIcon.classList.remove('active');
+        btDesc.textContent = 'Off';
+      }
+    }
+
+    function updateDndUI(on) {
+      if (on) {
+        dndIcon.classList.add('active');
+        dndIcon.classList.add('dnd-color');
+        dndDesc.textContent = 'On';
+      } else {
+        dndIcon.classList.remove('active');
+        dndIcon.classList.remove('dnd-color');
+        dndDesc.textContent = 'Off';
+      }
+    }
+
+    // System data update listener
+    window.ccAPI.onSystemDataUpdate((data) => {
+      if (data.wifi) {
+        wifiToggle.checked = data.wifi.on;
+        updateWifiUI(data.wifi.on, data.wifi.ssid);
+      }
+      if (data.bluetooth) {
+        btToggle.checked = data.bluetooth.on;
+        updateBluetoothUI(data.bluetooth.on);
+      }
+    });
+
+    // Escape to close CC Popover
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        window.ccAPI.closeCcWindow();
+      }
+    });
+  </script>
+</body>
+</html>

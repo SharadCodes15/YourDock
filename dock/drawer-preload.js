@@ -9,5 +9,8 @@ contextBridge.exposeInMainWorld('drawerAPI', {
   saveFavorites: (favs) => ipcRenderer.invoke('save-favorites', favs),
   onOpenDrawer: (callback) => ipcRenderer.on('open-drawer', (_event, screenshotUrl) => callback(screenshotUrl)),
   onCloseDrawer: (callback) => ipcRenderer.on('close-drawer', () => callback()),
-  onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback())
+  onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback()),
+  getDockConfig: () => ipcRenderer.invoke('get-config'),
+  addToDock: (appId, appInfo) => ipcRenderer.send('add-to-dock', appId, appInfo),
+  removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId)
 });

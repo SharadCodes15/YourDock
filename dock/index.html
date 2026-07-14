@@ -228,6 +228,39 @@
       font-weight: bold;
       font-size: 11px;
     }
+
+    /* Red Badge Count Circle */
+    .badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      background: #ff3b30;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      border: 1.5px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    /* Minimize Genie Animation */
+    @keyframes genie {
+      0% { transform: scale(1); }
+      30% { transform: scale(1.3, 0.6); }
+      60% { transform: scale(0.8, 1.25); }
+      100% { transform: scale(1); }
+    }
+    .genie .icon-container {
+      animation: genie 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
   </style>
 </head>
 <body>
@@ -242,6 +275,9 @@
   <div class="context-menu" id="context-menu">
     <div class="menu-item-custom" id="ctx-open">Open</div>
     <div class="menu-item-custom" id="ctx-show">Show in Finder</div>
+    <div class="menu-item-custom" id="ctx-remove" style="color: #ff3b30;">Remove from Dock</div>
+    <div class="menu-item-custom" id="ctx-keep">Keep in Dock</div>
+    <div class="menu-item-custom" id="ctx-badge">Set Badge Count...</div>
     <div class="menu-divider-custom"></div>
     <div class="menu-item-custom" id="ctx-autohide">
       <span>Turn Hiding On</span>
@@ -253,15 +289,15 @@
 
   <script>
     let appConfig = {};
+    let appIconsMap = {};
     let autoHide = false;
     let runningApps = [];
+    let tempRunningApps = [];
     let mouseX = 0;
     let isHovered = false;
     let ticking = false;
     let autoHideTimeout = null;
     let selectedCtxAppId = null;
-
-
 
     // Magnification constants
     const R = 110; // Radius of influence
@@ -269,7 +305,9 @@
 
     // Load initial layout config
     async function loadDock() {
-      appConfig = await window.electronAPI.getConfig();
+      const data = await window.electronAPI.getConfig();
+      appConfig = data.config || data;
+      appIconsMap = data.appIconsMap || {};
       autoHide = appConfig.autoHide;
       
       // Update checkmark in custom context menu
@@ -296,18 +334,34 @@
         const itemData = appConfig.apps[appId];
         if (!itemData) return;
 
-        const itemEl = createDockItem(appId, itemData, true);
+        const isRunning = runningApps.includes(appId);
+        const itemEl = createDockItem(appId, itemData, true, isRunning, false);
         itemsContainer.appendChild(itemEl);
       });
 
-      // 2. Render Divider
+      // 2. Render Divider for Temp Apps
+      const hasTempApps = tempRunningApps && tempRunningApps.length > 0;
+      if (hasTempApps) {
+        const tempDivider = document.createElement('div');
+        tempDivider.className = 'divider';
+        itemsContainer.appendChild(tempDivider);
+
+        // 3. Render Temp Running Apps
+        tempRunningApps.forEach(app => {
+          const itemEl = createDockItem(app.id, { name: app.name, iconPath: app.iconPath, exec: app.exec }, false, true, true);
+          itemsContainer.appendChild(itemEl);
+        });
+      }
+
+      // 4. Render Main Divider
       const divider = document.createElement('div');
       divider.className = 'divider';
       itemsContainer.appendChild(divider);
 
-      // 3. Render Trash
+      // 5. Render Trash
       if (appConfig.apps['trash']) {
-        const trashEl = createDockItem('trash', appConfig.apps['trash'], false);
+        const isTrashRunning = runningApps.includes('trash');
+        const trashEl = createDockItem('trash', appConfig.apps['trash'], false, isTrashRunning, false);
         itemsContainer.appendChild(trashEl);
       }
 
@@ -315,12 +369,16 @@
       setTimeout(updateDockWidth, 100);
     }
 
-    function createDockItem(appId, data, isDraggable) {
+    function createDockItem(appId, data, isDraggable, isRunning, isTemp) {
       const item = document.createElement('div');
       item.className = 'dock-item interactive';
       item.setAttribute('data-app-id', appId);
+      if (isTemp) {
+        item.setAttribute('data-is-temp', 'true');
+        item.setAttribute('data-exec', data.exec || '');
+      }
 
-      if (runningApps.includes(appId)) {
+      if (isRunning) {
         item.classList.add('active');
       }
 
@@ -330,12 +388,33 @@
 
       const img = document.createElement('img');
       img.className = 'dock-icon';
-      img.src = `icons/${appId}.svg`;
+      if (isTemp) {
+        img.src = data.iconPath || 'icons/preferences.svg';
+        img.onerror = () => {
+          img.src = 'icons/preferences.svg';
+        };
+      } else {
+        const customIcon = appIconsMap && appIconsMap[appId];
+        img.src = customIcon || `icons/${appId}.svg`;
+        img.onerror = () => {
+          img.src = 'icons/preferences.svg';
+        };
+      }
       img.alt = data.name;
       img.draggable = false; // Prevent default image dragging
 
       wrapper.appendChild(img);
       item.appendChild(wrapper);
+
+      // Render Badge Count if > 0
+      const badgesMap = appConfig.badges || {};
+      const badgeCount = badgesMap[appId] || 0;
+      if (badgeCount > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'badge';
+        badge.textContent = badgeCount > 99 ? '99+' : badgeCount;
+        item.appendChild(badge);
+      }
 
       // Dot indicator
       const dot = document.createElement('div');
@@ -549,19 +628,37 @@
     function openContextMenu(appId, clientX, clientY) {
       selectedCtxAppId = appId;
       
-      // Toggle Option strings based on Trash vs standard items
       const showInFinderBtn = document.getElementById('ctx-show');
-      if (appId === 'trash') {
+      const removeBtn = document.getElementById('ctx-remove');
+      const keepBtn = document.getElementById('ctx-keep');
+      const badgeBtn = document.getElementById('ctx-badge');
+      
+      const isPinned = appConfig.pinned.includes(appId);
+      const isTrash = appId === 'trash';
+      
+      if (isTrash) {
         showInFinderBtn.style.display = 'none';
-      } else {
+        removeBtn.style.display = 'none';
+        keepBtn.style.display = 'none';
+        badgeBtn.style.display = 'none';
+      } else if (isPinned) {
         showInFinderBtn.style.display = 'flex';
+        removeBtn.style.display = 'flex';
+        keepBtn.style.display = 'none';
+        badgeBtn.style.display = 'flex';
+      } else {
+        // Temp running app
+        showInFinderBtn.style.display = 'flex';
+        removeBtn.style.display = 'none';
+        keepBtn.style.display = 'flex';
+        badgeBtn.style.display = 'flex';
       }
 
       ctxMenu.style.display = 'block';
       
       // Position menu above the cursor/icon (adjusting for offset)
       const menuWidth = 175;
-      const menuHeight = ctxMenu.offsetHeight || 135;
+      const menuHeight = ctxMenu.offsetHeight || 150;
       
       ctxMenu.style.left = `${clientX - menuWidth / 2}px`;
       ctxMenu.style.top = `${clientY - menuHeight - 12}px`;
@@ -594,6 +691,35 @@
       closeContextMenu();
     });
 
+    document.getElementById('ctx-remove').addEventListener('click', () => {
+      if (selectedCtxAppId) {
+        window.electronAPI.removeFromDock(selectedCtxAppId);
+      }
+      closeContextMenu();
+    });
+
+    document.getElementById('ctx-keep').addEventListener('click', () => {
+      if (selectedCtxAppId) {
+        window.electronAPI.keepInDock(selectedCtxAppId);
+      }
+      closeContextMenu();
+    });
+
+    document.getElementById('ctx-badge').addEventListener('click', () => {
+      if (selectedCtxAppId) {
+        const badgesMap = appConfig.badges || {};
+        const currentCount = badgesMap[selectedCtxAppId] || 0;
+        const input = window.prompt("Set Badge Count (0 to clear):", currentCount);
+        if (input !== null) {
+          const count = parseInt(input);
+          if (!isNaN(count)) {
+            window.electronAPI.setBadge(selectedCtxAppId, count);
+          }
+        }
+      }
+      closeContextMenu();
+    });
+
     document.getElementById('ctx-autohide').addEventListener('click', () => {
       autoHide = !autoHide;
       window.electronAPI.saveAutoHide(autoHide);
@@ -617,19 +743,38 @@
     });
 
     // Handle incoming process list updates from Main process
-    window.electronAPI.onProcessUpdate((runningList) => {
-      runningApps = runningList;
-      
-      // Update dot indicators
-      const items = document.querySelectorAll('.dock-item');
-      items.forEach(item => {
-        const appId = item.getAttribute('data-app-id');
-        if (runningApps.includes(appId)) {
-          item.classList.add('active');
-        } else {
-          item.classList.remove('active');
-        }
-      });
+    window.electronAPI.onProcessUpdate((data) => {
+      if (Array.isArray(data)) {
+        runningApps = data;
+        tempRunningApps = [];
+      } else {
+        runningApps = data.runningPinned || [];
+        tempRunningApps = data.tempRunning || [];
+      }
+      renderDock();
+    });
+
+    // Listen for config changes
+    window.electronAPI.onConfigChanged((data) => {
+      appConfig = data.config || data;
+      appIconsMap = data.appIconsMap || {};
+      autoHide = appConfig.autoHide;
+      document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
+      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
+      renderDock();
+    });
+
+    // Listen for play-genie minimize animations
+    window.electronAPI.onPlayGenie((appId) => {
+      const item = document.querySelector(`.dock-item[data-app-id="${appId}"]`);
+      if (item) {
+        item.classList.add('genie');
+        item.addEventListener('animationend', (e) => {
+          if (e.animationName === 'genie') {
+            item.classList.remove('genie');
+          }
+        }, { once: true });
+      }
     });
 
     // Listen for collapse state changes (Dynamic Island notch mode)

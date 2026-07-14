@@ -9,5 +9,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getApps: () => ipcRenderer.invoke('get-apps'),
   overrideAppIcon: (appId, exePath) => ipcRenderer.invoke('override-app-icon', { appId, exePath }),
   resetAppIcon: (appId, exePath) => ipcRenderer.invoke('reset-app-icon', { appId, exePath }),
-  onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback())
+  onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback()),
+  getDockConfig: () => ipcRenderer.invoke('get-config'),
+  saveAutoHide: (autoHide) => ipcRenderer.send('save-auto-hide', autoHide),
+  exportSettings: () => ipcRenderer.invoke('export-settings'),
+  importSettings: () => ipcRenderer.invoke('import-settings')
 });

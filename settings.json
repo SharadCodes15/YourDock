@@ -12,11 +12,11 @@
     "accentColor": "#007aff"
   },
   "hiding": {
-    "enabled": false,
-    "mode": "fully-hide",
+    "enabled": true,
+    "mode": "collapsed",
     "sensitivity": 100,
     "delay": 400,
-    "pillWidth": 180
+    "pillWidth": 172
   },
   "menuItems": {
     "visible": {

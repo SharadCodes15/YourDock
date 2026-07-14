@@ -12,5 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showInFinder: (appId) => ipcRenderer.send('show-in-finder', appId),
   setDockHover: (hover) => ipcRenderer.send('set-dock-hover', hover),
   onSetCollapseState: (callback) => ipcRenderer.on('set-collapse-state', (_event, value) => callback(value)),
-  toggleDrawer: () => ipcRenderer.send('toggle-drawer')
+  toggleDrawer: () => ipcRenderer.send('toggle-drawer'),
+  removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId),
+  keepInDock: (appId) => ipcRenderer.send('keep-in-dock', appId),
+  setBadge: (appId, count) => ipcRenderer.send('set-badge', appId, count),
+  onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, config) => callback(config)),
+  onPlayGenie: (callback) => ipcRenderer.on('play-genie', (_event, appId) => callback(appId))
 });

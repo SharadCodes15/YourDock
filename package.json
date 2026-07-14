@@ -7,7 +7,9 @@
     "start": "electron ."
   },
   "dependencies": {
-    "active-win": "^8.0.2"
+    "active-win": "^8.0.2",
+    "loudness": "^0.4.2",
+    "systeminformation": "^5.31.17"
   },
   "devDependencies": {
     "electron": "^31.1.0"

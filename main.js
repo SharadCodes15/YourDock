@@ -799,6 +799,10 @@ function createMenuBarWindow() {
     }
   });
 
+  menuBarWin.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[MenuBar Console] ${message} (${sourceId}:${line})`);
+  });
+
   // Enable macOS menu bar vibrancy
   if (process.platform === 'darwin') {
     menuBarWin.setVibrancy('menu');
@@ -819,6 +823,7 @@ function createMenuBarWindow() {
 
   // Polling active window name at max 1 check/second
   let lastAppName = '';
+  let lastActiveAppId = '';
   if (activeAppInterval) clearInterval(activeAppInterval);
   activeAppInterval = setInterval(async () => {
     try {
@@ -834,6 +839,39 @@ function createMenuBarWindow() {
             menuBarWin.webContents.send('active-app-changed', appName);
           }
         }
+
+        // Determine current app ID for genie effect
+        let currentAppId = '';
+        if (activeWindow.owner.path) {
+          const exeName = path.basename(activeWindow.owner.path).toLowerCase();
+          
+          if (config && config.apps) {
+            for (const [key, appConfig] of Object.entries(config.apps)) {
+              if (appConfig.process && appConfig.process.toLowerCase() === exeName) {
+                currentAppId = key;
+                break;
+              }
+            }
+          }
+          
+          if (!currentAppId && fs.existsSync(appsJsonPath)) {
+            try {
+              const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+              const allApps = [...(data.apps || []), ...(data.custom || [])];
+              const match = allApps.find(a => a.exec && path.basename(a.exec).toLowerCase() === exeName);
+              if (match) {
+                currentAppId = match.id;
+              }
+            } catch (e) {}
+          }
+        }
+
+        if (currentAppId !== lastActiveAppId) {
+          if (lastActiveAppId && dockWin) {
+            dockWin.webContents.send('play-genie', lastActiveAppId);
+          }
+          lastActiveAppId = currentAppId;
+        }
       } else {
         const defaultApp = process.platform === 'darwin' ? 'Finder' : 'Explorer';
         if (lastAppName !== defaultApp) {
@@ -842,6 +880,10 @@ function createMenuBarWindow() {
             menuBarWin.webContents.send('active-app-changed', lastAppName);
           }
         }
+        if (lastActiveAppId && dockWin) {
+          dockWin.webContents.send('play-genie', lastActiveAppId);
+        }
+        lastActiveAppId = '';
       }
     } catch (err) {
       // Graceful fallback to prevent app crashes due to native permission or load errors
@@ -947,20 +989,61 @@ function pollProcesses() {
       if (err || !stdout) return;
 
       const output = stdout.toLowerCase();
-      const runningAppIds = [];
+      const runningPinnedAppIds = [];
+      const tempRunningApps = [];
 
+      // 1. Check pinned apps (default config)
       if (config && config.apps) {
         for (const [appId, appConfig] of Object.entries(config.apps)) {
           if (!appConfig.process) continue;
           const procName = appConfig.process.toLowerCase();
           if (output.includes(procName)) {
-            runningAppIds.push(appId);
+            runningPinnedAppIds.push(appId);
           }
         }
       }
 
+      // 2. Check all apps in apps.json (scanned + custom)
+      if (fs.existsSync(appsJsonPath)) {
+        try {
+          const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+          const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
+          
+          for (const app of allApps) {
+            if (!app.exec) continue;
+            const exeName = path.basename(app.exec).toLowerCase();
+            if (output.includes(exeName)) {
+              // It is running!
+              // Is it pinned? Pinned apps are listed in config.pinned
+              const isPinned = config.pinned && config.pinned.includes(app.id);
+              if (isPinned) {
+                if (!runningPinnedAppIds.includes(app.id)) {
+                  runningPinnedAppIds.push(app.id);
+                }
+              } else {
+                // It's running but NOT pinned! Add to tempRunningApps!
+                const alreadyAdded = tempRunningApps.some(t => t.id === app.id);
+                if (!alreadyAdded) {
+                  tempRunningApps.push({
+                    id: app.id,
+                    name: app.name,
+                    iconPath: app.iconPath || '',
+                    exec: app.exec
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to scan running apps from apps.json:', e);
+        }
+      }
+
       if (dockWin) {
-        dockWin.webContents.send('process-update', runningAppIds);
+        dockWin.webContents.send('process-update', {
+          runningPinned: runningPinnedAppIds,
+          tempRunning: tempRunningApps
+        });
       }
     });
   } else {
@@ -969,20 +1052,24 @@ function pollProcesses() {
       if (err || !stdout) return;
 
       const output = stdout.toLowerCase();
-      const runningAppIds = [];
+      const runningPinnedAppIds = [];
+      const tempRunningApps = [];
 
       if (config && config.apps) {
         for (const [appId, appConfig] of Object.entries(config.apps)) {
           if (!appConfig.process) continue;
           const procName = appConfig.process.toLowerCase();
           if (output.includes(procName)) {
-            runningAppIds.push(appId);
+            runningPinnedAppIds.push(appId);
           }
         }
       }
 
       if (dockWin) {
-        dockWin.webContents.send('process-update', runningAppIds);
+        dockWin.webContents.send('process-update', {
+          runningPinned: runningPinnedAppIds,
+          tempRunning: tempRunningApps
+        });
       }
     });
   }
@@ -1030,7 +1117,19 @@ ipcMain.on('set-dock-width', (event, dockWidth) => {
 
 ipcMain.handle('get-config', () => {
   loadConfig();
-  return config;
+  let appIconsMap = {};
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const allApps = [...(data.apps || []), ...(data.custom || [])];
+      for (const app of allApps) {
+        if (app.iconPath) {
+          appIconsMap[app.id] = app.iconPath;
+        }
+      }
+    }
+  } catch (e) {}
+  return { config, appIconsMap };
 });
 
 ipcMain.on('save-config', (event, pinned) => {
@@ -1146,21 +1245,49 @@ function notifyAppsUpdated() {
 
 ipcMain.handle('get-apps', () => {
   try {
+    let appsList = [];
+    let favorites = [];
+    let settingsData = {};
+
+    // 1. Load Drawer apps from apps.json
     if (fs.existsSync(appsJsonPath)) {
       const raw = fs.readFileSync(appsJsonPath, 'utf8');
       const data = JSON.parse(raw);
-      // Merge scanned apps + custom apps into a single apps array for the renderer
       const scanned = data.apps || [];
       const custom = data.custom || [];
-      const favorites = data.favorites || [];
-      return { 
-        settings: data.settings, 
-        apps: [...scanned, ...custom],
-        favorites: favorites
-      };
+      favorites = data.favorites || [];
+      settingsData = data.settings || {};
+      appsList = [...scanned, ...custom];
     }
+
+    // 2. Load Pinned apps from config.json
+    loadConfig();
+    if (config && config.apps) {
+      for (const [appId, appConfig] of Object.entries(config.apps)) {
+        const execPath = appConfig.exec || appConfig.win;
+        if (!execPath) continue;
+
+        // Check if already in drawer apps list
+        const exists = appsList.some(a => (a.exec && a.exec.toLowerCase() === execPath.toLowerCase()) || a.id === appId);
+        if (!exists) {
+          appsList.push({
+            id: appId,
+            name: appConfig.name,
+            exec: execPath,
+            iconPath: appConfig.iconPath || '',
+            iconSource: appConfig.iconSource || 'system'
+          });
+        }
+      }
+    }
+
+    return {
+      settings: settingsData,
+      apps: appsList,
+      favorites: favorites
+    };
   } catch (err) {
-    console.error('Failed to read apps.json:', err);
+    console.error('Failed to read apps in get-apps:', err);
   }
   return { apps: [], favorites: [] };
 });
@@ -1210,14 +1337,15 @@ ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
 
   try {
     fs.copyFileSync(selectedPath, cachePath);
+    const iconUrl = `file://${cachePath.replace(/\\/g, '/')}`;
     
-    // Read and update apps.json
+    // 1. Read and update apps.json
     if (fs.existsSync(appsJsonPath)) {
       const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
       
       const updateEntry = (appEntry) => {
-        if (appEntry.id === appId || appEntry.exec.toLowerCase() === exePath.toLowerCase()) {
-          appEntry.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+        if (appEntry.id === appId || (appEntry.exec && appEntry.exec.toLowerCase() === exePath.toLowerCase())) {
+          appEntry.iconPath = iconUrl;
           appEntry.iconSource = 'manual';
         }
       };
@@ -1226,10 +1354,28 @@ ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
       if (data.custom) data.custom.forEach(updateEntry);
 
       fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
-      
       notifyAppsUpdated();
-      return { success: true };
     }
+
+    // 2. Read and update config.json
+    loadConfig();
+    let configChanged = false;
+    if (config && config.apps) {
+      for (const [key, appConfig] of Object.entries(config.apps)) {
+        const execPath = appConfig.exec || appConfig.win;
+        if (key === appId || (execPath && execPath.toLowerCase() === exePath.toLowerCase())) {
+          appConfig.iconPath = iconUrl;
+          appConfig.iconSource = 'manual';
+          configChanged = true;
+        }
+      }
+    }
+    if (configChanged) {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+      broadcastConfigUpdate();
+    }
+
+    return { success: true };
   } catch (err) {
     console.error('Failed to override app icon:', err);
   }
@@ -1244,14 +1390,15 @@ ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
     
     // Save extracted image as PNG
     fs.writeFileSync(cachePath, nativeImg.toPNG());
+    const iconUrl = `file://${cachePath.replace(/\\/g, '/')}`;
     
-    // Read and update apps.json
+    // 1. Read and update apps.json
     if (fs.existsSync(appsJsonPath)) {
       const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
       
       const updateEntry = (appEntry) => {
-        if (appEntry.id === appId || appEntry.exec.toLowerCase() === exePath.toLowerCase()) {
-          appEntry.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+        if (appEntry.id === appId || (appEntry.exec && appEntry.exec.toLowerCase() === exePath.toLowerCase())) {
+          appEntry.iconPath = iconUrl;
           appEntry.iconSource = 'extracted';
         }
       };
@@ -1260,10 +1407,28 @@ ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
       if (data.custom) data.custom.forEach(updateEntry);
 
       fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
-      
       notifyAppsUpdated();
-      return { success: true };
     }
+
+    // 2. Read and update config.json
+    loadConfig();
+    let configChanged = false;
+    if (config && config.apps) {
+      for (const [key, appConfig] of Object.entries(config.apps)) {
+        const execPath = appConfig.exec || appConfig.win;
+        if (key === appId || (execPath && execPath.toLowerCase() === exePath.toLowerCase())) {
+          appConfig.iconPath = iconUrl;
+          appConfig.iconSource = 'extracted';
+          configChanged = true;
+        }
+      }
+    }
+    if (configChanged) {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+      broadcastConfigUpdate();
+    }
+
+    return { success: true };
   } catch (err) {
     console.error('Failed to reset app icon:', err);
   }
@@ -1430,6 +1595,7 @@ if (!isPrimaryInstance) {
     registerGlobalShortcuts();
     startCursorPolling(); // Starts menu bar hover polling
     startDockCursorPolling(); // Starts dock hover polling
+    startSystemDataPolling(); // Starts WiFi, Bluetooth, Battery status polling
  
     // Perform slow startup scanning in background after 3 seconds
     setTimeout(() => {
@@ -1549,3 +1715,486 @@ function regenerateAppsJson() {
 }
 // regenerateAppsJson();
 */
+
+// ==========================================
+// CONTROL CENTER, SYSTEM DATA & DOCK BADGES
+// ==========================================
+let ccWin = null;
+let dndActive = false;
+
+function createControlCenterWindow() {
+  if (ccWin) return;
+  ccWin = new BrowserWindow({
+    width: 290,
+    height: 350,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'controlcenter-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  ccWin.loadFile(path.join(__dirname, 'controlcenter.html'));
+
+  ccWin.on('blur', () => {
+    ccWin.hide();
+  });
+
+  ccWin.on('closed', () => {
+    ccWin = null;
+  });
+}
+
+function getWifiAdapterName() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve('Wi-Fi');
+      return;
+    }
+    exec('netsh wlan show interfaces', (err, stdout) => {
+      if (err || !stdout) {
+        resolve('Wi-Fi');
+        return;
+      }
+      const match = stdout.match(/Name\s*:\s*(.+)/);
+      if (match && match[1]) {
+        resolve(match[1].trim());
+      } else {
+        resolve('Wi-Fi');
+      }
+    });
+  });
+}
+
+async function toggleWifi(on) {
+  if (process.platform !== 'win32') return true;
+  const name = await getWifiAdapterName();
+  const state = on ? 'enabled' : 'disabled';
+  return new Promise((resolve) => {
+    exec(`netsh interface set interface name="${name}" admin=${state}`, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+function getBluetoothState() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve(false);
+      return;
+    }
+    exec('powershell -NoProfile -Command "Get-Service bthserv | Select-Object -ExpandProperty Status"', (err, stdout) => {
+      if (err || !stdout) {
+        resolve(false);
+        return;
+      }
+      const isServiceRunning = stdout.trim().toLowerCase() === 'running';
+      if (!isServiceRunning) {
+        resolve(false);
+        return;
+      }
+      exec('powershell -NoProfile -Command "Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq \'OK\' } | Measure-Object | Select-Object -ExpandProperty Count"', (err2, stdout2) => {
+        if (err2 || !stdout2) {
+          resolve(false);
+          return;
+        }
+        const count = parseInt(stdout2.trim());
+        resolve(count > 0);
+      });
+    });
+  });
+}
+
+function toggleBluetooth(on) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve(true);
+      return;
+    }
+    const cmd = on
+      ? `powershell -NoProfile -Command "Start-Service bthserv -ErrorAction SilentlyContinue; Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue"`
+      : `powershell -NoProfile -Command "Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue"`;
+    exec(cmd, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+function getBrightness() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve(80);
+      return;
+    }
+    exec('powershell -NoProfile -Command "(Get-WmiObject -Namespace root\\wmi -Class WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness"', (err, stdout) => {
+      if (err || !stdout) {
+        resolve(80);
+        return;
+      }
+      const val = parseInt(stdout.trim());
+      resolve(isNaN(val) ? 80 : val);
+    });
+  });
+}
+
+function setBrightness(level) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve(true);
+      return;
+    }
+    exec(`powershell -NoProfile -Command "(Get-WmiObject -Namespace root\\wmi -Class WmiMonitorBrightnessMethods -ErrorAction SilentlyContinue).WmiSetBrightness(1, ${level})"`, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+let sysDataTick = 0;
+let lastWifiSSID = '';
+let lastBluetoothOn = false;
+let lastBatteryPercent = 100;
+let lastBatteryIsCharging = false;
+
+function startSystemDataPolling() {
+  const si = require('systeminformation');
+  
+  const poll = async () => {
+    try {
+      let ssid = '';
+      try {
+        const wifi = await si.wifiConnections();
+        ssid = (wifi && wifi.length > 0) ? wifi[0].ssid : '';
+      } catch (e) {}
+
+      let bluetoothOn = false;
+      try {
+        bluetoothOn = await getBluetoothState();
+      } catch (e) {}
+      
+      let batteryPercent = lastBatteryPercent;
+      let batteryIsCharging = lastBatteryIsCharging;
+      
+      if (sysDataTick % 2 === 0) {
+        try {
+          const battery = await si.battery();
+          if (battery && battery.hasBattery) {
+            batteryPercent = battery.percent;
+            batteryIsCharging = battery.isCharging;
+          }
+        } catch (e) {}
+      }
+      
+      sysDataTick++;
+      
+      lastWifiSSID = ssid;
+      lastBluetoothOn = bluetoothOn;
+      lastBatteryPercent = batteryPercent;
+      lastBatteryIsCharging = batteryIsCharging;
+      
+      const payload = {
+        wifi: { ssid: lastWifiSSID, on: lastWifiSSID !== '' },
+        bluetooth: { on: lastBluetoothOn },
+        battery: { percent: lastBatteryPercent, isCharging: lastBatteryIsCharging }
+      };
+      
+      if (menuBarWin && !menuBarWin.isDestroyed()) {
+        menuBarWin.webContents.send('system-data-update', payload);
+      }
+      if (ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
+        ccWin.webContents.send('system-data-update', payload);
+      }
+    } catch (err) {
+      console.error('System data polling error:', err);
+    }
+  };
+  
+  poll();
+  setInterval(poll, 30000);
+}
+
+// IPC Handlers Registration
+ipcMain.on('toggle-control-center', (event, rect) => {
+  if (!ccWin) {
+    createControlCenterWindow();
+  }
+  
+  if (ccWin.isVisible()) {
+    ccWin.hide();
+  } else {
+    const x = Math.round(rect.right - 290);
+    const y = Math.round(rect.bottom + 4);
+    ccWin.setBounds({ x, y, width: 290, height: 350 });
+    ccWin.show();
+    ccWin.focus();
+  }
+});
+
+ipcMain.on('close-cc-window', () => {
+  if (ccWin) ccWin.hide();
+});
+
+ipcMain.handle('get-volume', async () => {
+  try {
+    const loudness = require('loudness');
+    return await loudness.getVolume();
+  } catch (e) {
+    return 50;
+  }
+});
+
+ipcMain.on('set-volume', async (event, val) => {
+  try {
+    const loudness = require('loudness');
+    await loudness.setVolume(val);
+    if (menuBarWin && !menuBarWin.isDestroyed()) {
+      menuBarWin.webContents.send('volume-sync', val);
+    }
+    if (ccWin && !ccWin.isDestroyed()) {
+      ccWin.webContents.send('volume-sync', val);
+    }
+  } catch (e) {}
+});
+
+ipcMain.handle('get-brightness', async () => {
+  return await getBrightness();
+});
+
+ipcMain.on('set-brightness', async (event, val) => {
+  await setBrightness(val);
+});
+
+ipcMain.handle('toggle-wifi', async (event, on) => {
+  const success = await toggleWifi(on);
+  return { success };
+});
+
+ipcMain.handle('toggle-bluetooth', async (event, on) => {
+  const success = await toggleBluetooth(on);
+  return { success };
+});
+
+ipcMain.handle('get-dnd', () => {
+  return dndActive;
+});
+
+ipcMain.on('set-dnd', (event, on) => {
+  dndActive = on;
+});
+
+ipcMain.handle('spotlight-search', async (event, query) => {
+  if (!query || query.trim() === '') {
+    return { apps: [], files: [] };
+  }
+  
+  const queryLower = query.toLowerCase().trim();
+  const matchedApps = [];
+  
+  if (fs.existsSync(appsJsonPath)) {
+    try {
+      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
+      for (const app of allApps) {
+        if (app.name && app.name.toLowerCase().includes(queryLower)) {
+          matchedApps.push(app);
+          if (matchedApps.length >= 5) break;
+        }
+      }
+    } catch (e) {}
+  }
+  
+  const matchedFiles = [];
+  try {
+    const homeDir = app.getPath('home');
+    const dirs = [
+      path.join(homeDir, 'Desktop'),
+      path.join(homeDir, 'Documents')
+    ];
+    
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        if (file.toLowerCase().includes(queryLower)) {
+          matchedFiles.push({
+            name: file,
+            path: path.join(dir, file)
+          });
+          if (matchedFiles.length >= 5) break;
+        }
+      }
+      if (matchedFiles.length >= 5) break;
+    }
+  } catch (e) {}
+  
+  return { apps: matchedApps, files: matchedFiles };
+});
+
+ipcMain.handle('open-file', async (event, filePath) => {
+  try {
+    await shell.openPath(filePath);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('export-settings', async () => {
+  const result = await dialog.showSaveDialog({
+    title: 'Export Settings',
+    defaultPath: 'settings_backup.json',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return { success: false };
+  try {
+    const backup = {
+      type: 'macos-dock-backup',
+      version: '1.0.0',
+      settings: settings,
+      apps: fs.existsSync(appsJsonPath) ? JSON.parse(fs.readFileSync(appsJsonPath, 'utf8')) : {},
+      config: config
+    };
+    fs.writeFileSync(result.filePath, JSON.stringify(backup, null, 2), 'utf8');
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('import-settings', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Import Settings',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) return { success: false };
+  try {
+    const raw = fs.readFileSync(result.filePaths[0], 'utf8');
+    const backup = JSON.parse(raw);
+    if (backup.type !== 'macos-dock-backup' || !backup.settings || !backup.config) {
+      return { success: false, error: 'Invalid settings backup schema.' };
+    }
+    
+    const timestamp = Date.now();
+    if (fs.existsSync(settingsPath)) {
+      fs.copyFileSync(settingsPath, `${settingsPath}.bak_${timestamp}`);
+    }
+    if (fs.existsSync(appsJsonPath)) {
+      fs.copyFileSync(appsJsonPath, `${appsJsonPath}.bak_${timestamp}`);
+    }
+    if (fs.existsSync(configPath)) {
+      fs.copyFileSync(configPath, `${configPath}.bak_${timestamp}`);
+    }
+    
+    settings = backup.settings;
+    config = backup.config;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    if (backup.apps && Object.keys(backup.apps).length > 0) {
+      fs.writeFileSync(appsJsonPath, JSON.stringify(backup.apps, null, 2), 'utf8');
+    }
+    
+    if (menuBarWin && !menuBarWin.isDestroyed()) menuBarWin.reload();
+    if (dockWin && !dockWin.isDestroyed()) dockWin.reload();
+    if (drawerWin && !drawerWin.isDestroyed()) drawerWin.reload();
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.reload();
+    if (ccWin && !ccWin.isDestroyed()) ccWin.reload();
+    
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.on('add-to-dock', (event, appId, appInfo) => {
+  loadConfig();
+  if (!config.pinned.includes(appId)) {
+    config.pinned.push(appId);
+  }
+  
+  config.apps = config.apps || {};
+  if (!config.apps[appId]) {
+    const exeName = path.basename(appInfo.exec || appInfo.win);
+    config.apps[appId] = {
+      name: appInfo.name,
+      win: exeName,
+      mac: '',
+      process: exeName
+    };
+  }
+  
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+  broadcastConfigUpdate();
+});
+
+ipcMain.on('remove-from-dock', (event, appId) => {
+  loadConfig();
+  config.pinned = config.pinned.filter(id => id !== appId);
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+  broadcastConfigUpdate();
+});
+
+ipcMain.on('keep-in-dock', (event, appId) => {
+  loadConfig();
+  if (!config.pinned.includes(appId)) {
+    config.pinned.push(appId);
+    
+    if (fs.existsSync(appsJsonPath)) {
+      try {
+        const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+        const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
+        const app = allApps.find(a => a.id === appId);
+        if (app) {
+          config.apps = config.apps || {};
+          const exeName = path.basename(app.exec);
+          config.apps[appId] = {
+            name: app.name,
+            win: exeName,
+            mac: '',
+            process: exeName,
+            iconPath: app.iconPath || ''
+          };
+        }
+      } catch (e) {}
+    }
+  }
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+  broadcastConfigUpdate();
+});
+
+ipcMain.on('set-badge', (event, appId, count) => {
+  loadConfig();
+  config.badges = config.badges || {};
+  if (count <= 0) {
+    delete config.badges[appId];
+  } else {
+    config.badges[appId] = count;
+  }
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+  broadcastConfigUpdate();
+});
+
+function broadcastConfigUpdate() {
+  if (dockWin && !dockWin.isDestroyed()) {
+    let appIconsMap = {};
+    try {
+      if (fs.existsSync(appsJsonPath)) {
+        const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+        const allApps = [...(data.apps || []), ...(data.custom || [])];
+        for (const app of allApps) {
+          if (app.iconPath) {
+            appIconsMap[app.id] = app.iconPath;
+          }
+        }
+      }
+    } catch (e) {}
+    dockWin.webContents.send('config-changed', { config, appIconsMap });
+  }
+}
+

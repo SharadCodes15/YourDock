@@ -455,6 +455,7 @@
     <!-- Context Menu -->
     <div class="context-menu" id="context-menu">
       <div class="context-menu-item" id="menu-toggle-fav">Add to Favorites</div>
+      <div class="context-menu-item" id="menu-toggle-dock">Add to Dock</div>
     </div>
   </div>
 
@@ -497,6 +498,17 @@
     const toast = document.getElementById('toast-notify');
     const contextMenu = document.getElementById('context-menu');
     const menuToggleFav = document.getElementById('menu-toggle-fav');
+    const menuToggleDock = document.getElementById('menu-toggle-dock');
+
+    let dockConfig = { pinned: [] };
+    async function loadDockConfig() {
+      try {
+        const res = await window.drawerAPI.getDockConfig();
+        dockConfig = res.config || res;
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     let favoritesList = [];
 
@@ -807,10 +819,14 @@
     });
 
     // Context Menu Logic
-    function showContextMenu(e, app) {
+    async function showContextMenu(e, app) {
       contextTargetApp = app;
       const isFav = favoritesList.includes(app.exec);
       menuToggleFav.textContent = isFav ? 'Remove from Favorites' : 'Add to Favorites';
+      
+      await loadDockConfig();
+      const isPinned = dockConfig && dockConfig.pinned && dockConfig.pinned.includes(app.id);
+      menuToggleDock.textContent = isPinned ? 'Remove from Dock' : 'Add to Dock';
       
       contextMenu.style.left = `${e.clientX}px`;
       contextMenu.style.top = `${e.clientY}px`;
@@ -839,6 +855,23 @@
         favoritesList = newFavs;
         renderFavorites();
       }
+    });
+
+    menuToggleDock.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      contextMenu.style.display = 'none';
+      if (!contextTargetApp) return;
+
+      const isPinned = dockConfig && dockConfig.pinned && dockConfig.pinned.includes(contextTargetApp.id);
+      if (isPinned) {
+        window.drawerAPI.removeFromDock(contextTargetApp.id);
+      } else {
+        window.drawerAPI.addToDock(contextTargetApp.id, {
+          name: contextTargetApp.name,
+          exec: contextTargetApp.exec
+        });
+      }
+      setTimeout(loadDockConfig, 200);
     });
 
     // App Rescan / Refresh Button

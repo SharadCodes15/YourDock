@@ -749,6 +749,84 @@
       border: none !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
+    /* Spotlight Search Results styling */
+    .spotlight-results {
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 320px;
+      max-height: 380px;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      padding: 8px 0;
+      z-index: 99999;
+      color: #1d1d1f;
+      text-align: left;
+    }
+    body.dark-theme .spotlight-results {
+      background: rgba(30, 30, 30, 0.96);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #dfdfe0;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .spotlight-section {
+      display: flex;
+      flex-direction: column;
+    }
+    .spotlight-section-title {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #86868b;
+      padding: 6px 12px 4px 12px;
+      letter-spacing: 0.5px;
+    }
+    .spotlight-result-item {
+      padding: 8px 14px;
+      font-size: 12px;
+      cursor: default;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.08s, color 0.08s;
+    }
+    .spotlight-result-item:hover {
+      background: var(--accent-color);
+      color: white !important;
+    }
+    body.dark-theme .spotlight-result-item:hover {
+      color: white !important;
+    }
+    .spotlight-result-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .spotlight-result-icon-fallback {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #007aff, #0056b3);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -962,6 +1040,7 @@
           </svg>
         </div>
         <input type="text" class="spotlight-input" id="spotlight-input" placeholder="Spotlight..." />
+        <div class="spotlight-results" id="spotlight-results" style="display: none;"></div>
       </div>
 
       <!-- Control Center -->
@@ -977,129 +1056,7 @@
           <line x1="9" y1="8" x2="15" y2="8"/>
           <line x1="17" y1="16" x2="23" y2="16"/>
         </svg>
-        <!-- Big Sur style dropdown -->
-        <div class="dropdown-menu right-align cc-dropdown" style="width: 310px; padding: 12px;">
-          <div class="cc-grid">
-            
-            <!-- Wi-Fi / Bluetooth / AirDrop Group -->
-            <div class="cc-box cc-network">
-              <div class="cc-net-item" id="cc-wifi-toggle-item">
-                <div class="cc-net-icon active" id="cc-wifi-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12.55a11 11 0 0 1 14 0" />
-                    <path d="M12 20h.01" />
-                  </svg>
-                </div>
-                <div>
-                  <div class="cc-net-title">Wi-Fi</div>
-                  <div class="cc-net-desc" id="cc-wifi-desc">HomeWiFi_5G</div>
-                </div>
-              </div>
-              
-              <div class="cc-net-item" id="cc-bt-toggle-item">
-                <div class="cc-net-icon active" id="cc-bt-icon">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m7 7 10 10-5 5V2l5 5L7 17"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="cc-net-title">Bluetooth</div>
-                  <div class="cc-net-desc" id="cc-bt-desc">On</div>
-                </div>
-              </div>
-              
-              <div class="cc-net-item">
-                <div class="cc-net-icon active">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="m12 8-4 4h8Z"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="cc-net-title">AirDrop</div>
-                  <div class="cc-net-desc">Contacts Only</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Focus / Do Not Disturb Block -->
-            <div class="cc-box cc-focus" id="cc-focus-toggle-item">
-              <div class="cc-focus-icon" id="cc-focus-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="cc-focus-title">Focus</div>
-                <div class="cc-focus-desc" id="cc-focus-desc">Off</div>
-              </div>
-            </div>
-
-            <!-- Keyboard Brightness -->
-            <div class="cc-box cc-kbd">
-              <div class="cc-kbd-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="4" width="20" height="16" rx="2" />
-                  <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M7 16h10" />
-                </svg>
-              </div>
-              <div class="cc-kbd-text">Keyboard Brightness</div>
-            </div>
-
-            <!-- Screen Mirroring -->
-            <div class="cc-box cc-mirror">
-              <div class="cc-mirror-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2"/>
-                  <path d="m8 21 4-4 4 4"/>
-                </svg>
-              </div>
-              <div class="cc-mirror-text">Screen Mirroring</div>
-            </div>
-
-            <!-- Display Brightness Slider -->
-            <div class="cc-box-wide cc-slider-box">
-              <div class="cc-slider-title">Display</div>
-              <div class="cc-slider-row">
-                <div class="cc-slider-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="4"/>
-                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-                  </svg>
-                </div>
-                <input type="range" class="cc-slider" id="cc-brightness-slider" min="10" max="100" value="80" />
-              </div>
-            </div>
-
-            <!-- Sound Slider -->
-            <div class="cc-box-wide cc-slider-box">
-              <div class="cc-slider-title">Sound</div>
-              <div class="cc-slider-row">
-                <div class="cc-slider-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  </svg>
-                </div>
-                <input type="range" class="cc-slider" id="cc-sound-slider" min="0" max="100" value="70" />
-              </div>
-            </div>
-
-            <!-- Now Playing Card -->
-            <div class="cc-box-wide cc-now-playing">
-              <div class="cc-np-art">🎵</div>
-              <div class="cc-np-info">
-                <div class="cc-np-title" style="letter-spacing: -0.1px;">Stairway to Heaven</div>
-                <div class="cc-np-artist">Led Zeppelin</div>
-              </div>
-              <div class="cc-np-controls">
-                <button class="cc-np-btn">⏮</button>
-                <button class="cc-np-btn" id="cc-play-pause-btn">⏸</button>
-                <button class="cc-np-btn">⏭</button>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <!-- Standalone Popover ccWin loaded dynamically -->
       </div>
 
       <!-- Settings Gear -->
@@ -1466,10 +1423,12 @@
     }
     generateCalendar();
 
-    // Spotlight Input Toggle
+    // Spotlight Input Toggle and Search
     const spotlightContainer = document.getElementById('spotlight-container');
     const spotlightTrigger = document.getElementById('spotlight-btn-trigger');
     const spotlightInput = document.getElementById('spotlight-input');
+    const spotlightResults = document.getElementById('spotlight-results');
+    let spotlightSearchTimeout = null;
 
     spotlightTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1479,133 +1438,222 @@
         spotlightInput.focus();
         window.electronAPI.setIgnoreMouse(false);
       } else {
-        spotlightContainer.classList.remove('expanded-input');
-        spotlightInput.value = '';
-        spotlightInput.blur();
-        checkMouseIgnore();
+        closeSpotlight();
       }
     });
+
+    spotlightInput.addEventListener('input', (e) => {
+      const query = e.target.value;
+      if (spotlightSearchTimeout) clearTimeout(spotlightSearchTimeout);
+
+      if (!query || query.trim() === '') {
+        spotlightResults.style.display = 'none';
+        spotlightResults.innerHTML = '';
+        return;
+      }
+
+      spotlightSearchTimeout = setTimeout(async () => {
+        try {
+          const data = await window.electronAPI.spotlightSearch(query);
+          renderSpotlightResults(data);
+        } catch (err) {
+          console.error(err);
+        }
+      }, 150); // 150ms debounce
+    });
+
+    function renderSpotlightResults(data) {
+      spotlightResults.innerHTML = '';
+      const { apps, files } = data;
+
+      if (apps.length === 0 && files.length === 0) {
+        spotlightResults.innerHTML = '<div style="padding: 10px; font-size: 11px; text-align: center; color: #86868b;">No results found</div>';
+        spotlightResults.style.display = 'block';
+        return;
+      }
+
+      // Applications Section
+      if (apps.length > 0) {
+        const appSec = document.createElement('div');
+        appSec.className = 'spotlight-section';
+        
+        const title = document.createElement('div');
+        title.className = 'spotlight-section-title';
+        title.textContent = 'Applications';
+        appSec.appendChild(title);
+
+        apps.forEach(app => {
+          const item = document.createElement('div');
+          item.className = 'spotlight-result-item';
+          
+          let iconElem;
+          const iconSrc = app.iconPath || app.icon;
+          if (iconSrc) {
+            iconElem = document.createElement('img');
+            iconElem.className = 'spotlight-result-icon';
+            iconElem.src = iconSrc;
+            iconElem.onerror = () => {
+              iconElem.replaceWith(createSpotlightFallbackIcon(app));
+            };
+          } else {
+            iconElem = createSpotlightFallbackIcon(app);
+          }
+
+          const label = document.createElement('span');
+          label.textContent = app.name;
+
+          item.appendChild(iconElem);
+          item.appendChild(label);
+
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.electronAPI.launchApp(app.id);
+            closeSpotlight();
+          });
+
+          appSec.appendChild(item);
+        });
+        spotlightResults.appendChild(appSec);
+      }
+
+      // Files Section
+      if (files.length > 0) {
+        const fileSec = document.createElement('div');
+        fileSec.className = 'spotlight-section';
+        
+        const title = document.createElement('div');
+        title.className = 'spotlight-section-title';
+        title.textContent = 'Files';
+        fileSec.appendChild(title);
+
+        files.forEach(file => {
+          const item = document.createElement('div');
+          item.className = 'spotlight-result-item';
+
+          const iconElem = document.createElement('div');
+          iconElem.className = 'spotlight-result-icon-fallback';
+          iconElem.style.background = 'linear-gradient(135deg, #a4a4a5, #636366)';
+          iconElem.textContent = '📄';
+
+          const label = document.createElement('span');
+          label.textContent = file.name;
+          label.title = file.path;
+
+          item.appendChild(iconElem);
+          item.appendChild(label);
+
+          item.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await window.electronAPI.openFile(file.path);
+            closeSpotlight();
+          });
+
+          fileSec.appendChild(item);
+        });
+        spotlightResults.appendChild(fileSec);
+      }
+
+      spotlightResults.style.display = 'block';
+    }
+
+    function createSpotlightFallbackIcon(app) {
+      const fallback = document.createElement('div');
+      fallback.className = 'spotlight-result-icon-fallback';
+      fallback.textContent = app.name ? app.name.charAt(0) : '?';
+      return fallback;
+    }
+
+    function closeSpotlight() {
+      isSpotlightExpanded = false;
+      spotlightContainer.classList.remove('expanded-input');
+      spotlightInput.value = '';
+      spotlightResults.style.display = 'none';
+      spotlightResults.innerHTML = '';
+      spotlightInput.blur();
+      checkMouseIgnore();
+    }
 
     // Close Spotlight on outside click
     document.addEventListener('click', (e) => {
       if (isSpotlightExpanded && !e.target.closest('#spotlight-container')) {
-        isSpotlightExpanded = false;
-        spotlightContainer.classList.remove('expanded-input');
-        spotlightInput.value = '';
-        spotlightInput.blur();
-        checkMouseIgnore();
+        closeSpotlight();
       }
     });
 
-    // Synchronize Volume/Sound Sliders
+    spotlightInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeSpotlight();
+      }
+    });
+
+    // Control Center Toggle
+    document.getElementById('menu-cc').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      const rect = document.getElementById('menu-cc').getBoundingClientRect();
+      window.electronAPI.toggleControlCenter({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height
+      });
+    });
+
+    // Volume Slider
     const volSlider = document.getElementById('vol-slider');
-    const ccSoundSlider = document.getElementById('cc-sound-slider');
 
     function updateVolumeIcon(val) {
       const volumeBarIcon = document.getElementById('volume-bar-icon');
-      if (val == 0) {
-        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>`;
-      } else if (val < 50) {
-        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>`;
-      } else {
-        volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`;
+      if (volumeBarIcon) {
+        if (val == 0) {
+          volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>`;
+        } else if (val < 50) {
+          volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>`;
+        } else {
+          volumeBarIcon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`;
+        }
       }
     }
 
-    volSlider.addEventListener('input', (e) => {
-      const val = e.target.value;
-      ccSoundSlider.value = val;
+    // Load and listen system volume
+    window.electronAPI.getVolume().then(val => {
+      volSlider.value = val;
       updateVolumeIcon(val);
+    }).catch(err => console.error(err));
+
+    let volTimeout;
+    volSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      updateVolumeIcon(val);
+      if (volTimeout) clearTimeout(volTimeout);
+      volTimeout = setTimeout(() => {
+        window.electronAPI.setVolume(val);
+      }, 100);
     });
 
-    ccSoundSlider.addEventListener('input', (e) => {
-      const val = e.target.value;
+    // Listen to volume updates from Control Center
+    window.electronAPI.onVolumeSync((val) => {
       volSlider.value = val;
       updateVolumeIcon(val);
     });
 
     // WiFi toggles
     const wifiToggle = document.getElementById('wifi-toggle');
-    const ccWifiIcon = document.getElementById('cc-wifi-icon');
-    const ccWifiDesc = document.getElementById('cc-wifi-desc');
-    const wifiList = document.getElementById('wifi-list');
-    const wifiListHeader = document.getElementById('wifi-list-header');
     const wifiBarIcon = document.getElementById('wifi-bar-icon');
 
     wifiToggle.addEventListener('change', () => {
       const on = wifiToggle.checked;
-      if (on) {
-        ccWifiIcon.classList.add('active');
-        ccWifiDesc.textContent = 'HomeWiFi_5G';
-        wifiList.style.display = 'block';
-        wifiListHeader.style.display = 'block';
-        wifiBarIcon.style.opacity = '1';
-      } else {
-        ccWifiIcon.classList.remove('active');
-        ccWifiDesc.textContent = 'Off';
-        wifiList.style.display = 'none';
-        wifiListHeader.style.display = 'none';
-        wifiBarIcon.style.opacity = '0.4';
-      }
-    });
-
-    // Control Center Wi-Fi click toggles too
-    document.getElementById('cc-wifi-toggle-item').addEventListener('click', (e) => {
-      wifiToggle.checked = !wifiToggle.checked;
-      wifiToggle.dispatchEvent(new Event('change'));
+      window.electronAPI.toggleWifi(on);
     });
 
     // Bluetooth toggles
     const btToggle = document.getElementById('bt-toggle');
-    const ccBtIcon = document.getElementById('cc-bt-icon');
-    const ccBtDesc = document.getElementById('cc-bt-desc');
-    const btList = document.getElementById('bt-list');
-    const btListHeader = document.getElementById('bt-list-header');
 
     btToggle.addEventListener('change', () => {
       const on = btToggle.checked;
-      if (on) {
-        ccBtIcon.classList.add('active');
-        ccBtDesc.textContent = 'On';
-        btList.style.display = 'block';
-        btListHeader.style.display = 'block';
-      } else {
-        ccBtIcon.classList.remove('active');
-        ccBtDesc.textContent = 'Off';
-        btList.style.display = 'none';
-        btListHeader.style.display = 'none';
-      }
-    });
-
-    // CC Bluetooth click toggle
-    document.getElementById('cc-bt-toggle-item').addEventListener('click', () => {
-      btToggle.checked = !btToggle.checked;
-      btToggle.dispatchEvent(new Event('change'));
-    });
-
-    // Focus / DND toggle in Control Center
-    const ccFocusToggle = document.getElementById('cc-focus-toggle-item');
-    const ccFocusIcon = document.getElementById('cc-focus-icon');
-    const ccFocusDesc = document.getElementById('cc-focus-desc');
-    let focusActive = false;
-
-    ccFocusToggle.addEventListener('click', () => {
-      focusActive = !focusActive;
-      if (focusActive) {
-        ccFocusIcon.classList.add('active');
-        ccFocusDesc.textContent = 'On';
-      } else {
-        ccFocusIcon.classList.remove('active');
-        ccFocusDesc.textContent = 'Off';
-      }
-    });
-
-    // Play/Pause Control Center interaction
-    const ccPlayPauseBtn = document.getElementById('cc-play-pause-btn');
-    let isPlaying = true;
-    ccPlayPauseBtn.addEventListener('click', () => {
-      isPlaying = !isPlaying;
-      ccPlayPauseBtn.textContent = isPlaying ? '⏸' : '▶';
+      window.electronAPI.toggleBluetooth(on);
     });
 
     // Battery Percent Show/Hide Toggle
@@ -1621,6 +1669,44 @@
       } else {
         batteryText.style.display = 'none';
         batteryPercentToggle.querySelector('.checkmark').style.visibility = 'hidden';
+      }
+    });
+
+    // Unified system data updates
+    window.electronAPI.onSystemDataUpdate((data) => {
+      // Update Wifi Status
+      if (data.wifi) {
+        wifiToggle.checked = data.wifi.on;
+        wifiBarIcon.style.opacity = data.wifi.on ? '1' : '0.4';
+        const wifiDescElem = document.getElementById('wifi-list');
+        if (data.wifi.on && data.wifi.ssid) {
+          wifiDescElem.innerHTML = `<div class="dropdown-item selected wifi-network-item">${data.wifi.ssid} <span class="checkmark">✓</span></div>`;
+        } else {
+          wifiDescElem.innerHTML = `<div class="dropdown-item wifi-network-item">Not Connected</div>`;
+        }
+      }
+
+      // Update Bluetooth Status
+      if (data.bluetooth) {
+        btToggle.checked = data.bluetooth.on;
+        const btIconSvg = document.querySelector('#menu-bluetooth svg');
+        if (btIconSvg) {
+          btIconSvg.style.opacity = data.bluetooth.on ? '1' : '0.4';
+        }
+      }
+
+      // Update Battery Status
+      if (data.battery) {
+        batteryText.textContent = `${data.battery.percent}%`;
+        const batteryFill = document.getElementById('battery-fill');
+        if (batteryFill) {
+          batteryFill.setAttribute('width', `${Math.round(11 * (data.battery.percent / 100))}`);
+          if (data.battery.isCharging) {
+            batteryFill.setAttribute('fill', '#34c759'); // green when charging
+          } else {
+            batteryFill.setAttribute('fill', 'currentColor');
+          }
+        }
       }
     });
 

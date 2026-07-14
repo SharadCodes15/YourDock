@@ -559,6 +559,15 @@
         <input type="checkbox" id="hide-master">
       </div>
 
+      <div class="section-title" style="margin-top: 15px;">Dock Settings</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable Dock Auto-Hide</div>
+          <div class="setting-desc">Automatically hide the Dock when not in use.</div>
+        </div>
+        <input type="checkbox" id="hide-dock">
+      </div>
+
       <div id="hiding-options">
         <div class="setting-row">
           <div>
@@ -680,7 +689,15 @@
         </div>
       </div>
 
-      <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px; display: flex; justify-content: center;">
+      <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px; text-align: center;">
+        <div class="setting-label" style="margin-bottom: 8px;">Backup & Restore</div>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <button id="about-export" class="btn-primary" style="padding: 6px 14px;">Export Settings...</button>
+          <button id="about-import" style="padding: 6px 14px;">Import Settings...</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; justify-content: center;">
         <button id="about-reset-all" class="btn-danger" style="padding: 8px 16px; font-weight: 500;">Restore All Settings to Defaults</button>
       </div>
     </div>
@@ -772,6 +789,11 @@
 
       // Hiding Bindings
       document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
+      
+      // Dock Hiding Binding
+      window.settingsAPI.getDockConfig().then(dockCfg => {
+        document.getElementById('hide-dock').checked = dockCfg.autoHide || false;
+      }).catch(err => console.error(err));
       
       const hideModeVal = currentSettings.hiding.mode;
       document.getElementById(`hide-mode-${hideModeVal === 'collapsed' ? 'island' : 'hide'}`).checked = true;
@@ -871,6 +893,10 @@
       currentSettings.hiding.enabled = e.target.checked;
       toggleHidingSubOptions(e.target.checked);
       triggerSave();
+    });
+
+    document.getElementById('hide-dock').addEventListener('change', (e) => {
+      window.settingsAPI.saveAutoHide(e.target.checked);
     });
 
     document.querySelectorAll('input[name="hide-mode"]').forEach(radio => {
@@ -1075,6 +1101,28 @@
       await window.settingsAPI.registerShortcut(settingKey, '');
       currentSettings.shortcuts[settingKey] = '';
     }
+
+    // Backup & Restore
+    document.getElementById('about-export').addEventListener('click', async () => {
+      const res = await window.settingsAPI.exportSettings();
+      if (res && res.success) {
+        alert("Settings exported successfully!");
+      } else if (res && res.error) {
+        alert(`Export failed: ${res.error}`);
+      }
+    });
+
+    document.getElementById('about-import').addEventListener('click', async () => {
+      const confirm = window.confirm("Importing settings will overwrite current settings and reload all windows. Proceed?");
+      if (confirm) {
+        const res = await window.settingsAPI.importSettings();
+        if (res && res.success) {
+          alert("Settings imported successfully!");
+        } else if (res && res.error) {
+          alert(`Import failed: ${res.error}`);
+        }
+      }
+    });
 
     // Reset All settings
     document.getElementById('about-reset-all').addEventListener('click', async () => {
