@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Force Quit Applications</title>
+  <style>
+    :root {
+      --bg-color: #f6f6f6;
+      --text-color: #333333;
+      --text-muted: #666666;
+      --border-color: rgba(0, 0, 0, 0.1);
+      --accent-color: #007aff;
+      --card-bg: rgba(255, 255, 255, 0.6);
+      --glass-blur: 20px;
+      --selected-bg: rgba(0, 122, 255, 0.15);
+      --selected-text: #007aff;
+    }
+
+    body.dark-theme {
+      --bg-color: #1e1e1e;
+      --text-color: #dddddd;
+      --text-muted: #999999;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --accent-color: #0a84ff;
+      --card-bg: rgba(30, 30, 30, 0.6);
+      --selected-bg: rgba(10, 132, 255, 0.25);
+      --selected-text: #0a84ff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      overflow: hidden;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .header-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+
+    /* List Container */
+    .app-list-container {
+      flex: 1;
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .app-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: default;
+      transition: background 0.1s;
+    }
+
+    .app-row:last-child {
+      border-bottom: none;
+    }
+
+    .app-row:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    body.dark-theme .app-row:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .app-row.selected {
+      background: var(--selected-bg) !important;
+      color: var(--selected-text) !important;
+      font-weight: 600;
+    }
+
+    .app-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      border-radius: 3px;
+      background: linear-gradient(135deg, var(--accent-color), rgba(0,0,0,0.2));
+      opacity: 0.85;
+    }
+
+    .app-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Footer Layout */
+    .footer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .buttons-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: default;
+      transition: background 0.15s, opacity 0.1s;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    body.dark-theme .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary:disabled {
+      background: #ccc;
+      color: #888;
+      box-shadow: none;
+      opacity: 0.6;
+    }
+
+    body.dark-theme .btn-primary:disabled {
+      background: #444;
+      color: #777;
+    }
+
+    .empty-message {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-title">Force Quit Applications</div>
+  <div class="header-desc">If an application doesn't respond, you can force it to quit. Select the application and click Force Quit.</div>
+
+  <div class="app-list-container" id="app-list">
+    <div class="empty-message">Scanning for applications...</div>
+  </div>
+
+  <div class="footer-bar">
+    <span>Select an app to quit.</span>
+    <div class="buttons-group">
+      <button class="btn btn-secondary" onclick="window.close()">Cancel</button>
+      <button class="btn btn-primary" id="btn-force-quit" disabled>Force Quit</button>
+    </div>
+  </div>
+
+  <script>
+    let selectedApp = null; // { pid, processName, name }
+    let listRefreshInterval = null;
+
+    // Apply theme
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', themeData.glassIntensity === 'Subtle' ? '8px' : themeData.glassIntensity === 'Heavy' ? '40px' : '20px');
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--selected-bg', `rgba(${r}, ${g}, ${b}, ${themeData.theme === 'dark' ? '0.25' : '0.15'})`);
+      document.documentElement.style.setProperty('--selected-text', themeData.accentColor);
+    }
+
+    if (window.electronAPI && window.electronAPI.onThemeChanged) {
+      window.electronAPI.onThemeChanged(applyThemeConfig);
+      window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
+
+    // Load running apps
+    function loadRunningApps() {
+      if (!window.electronAPI || !window.electronAPI.getRunningApps) return;
+
+      window.electronAPI.getRunningApps().then(apps => {
+        const container = document.getElementById('app-list');
+        if (apps.length === 0) {
+          container.innerHTML = '<div class="empty-message">No running user applications found.</div>';
+          document.getElementById('btn-force-quit').disabled = true;
+          selectedApp = null;
+          return;
+        }
+
+        // Store current selected processName to re-select it if still running
+        const lastSelectedProcess = selectedApp ? selectedApp.processName : null;
+        container.innerHTML = '';
+        selectedApp = null;
+
+        apps.forEach(app => {
+          const row = document.createElement('div');
+          row.className = 'app-row';
+          if (lastSelectedProcess === app.processName) {
+            row.classList.add('selected');
+            selectedApp = app;
+            document.getElementById('btn-force-quit').disabled = false;
+          }
+
+          // A small color disk icon for visual flair
+          const icon = document.createElement('div');
+          icon.className = 'app-icon';
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'app-name';
+          nameSpan.textContent = app.name;
+
+          row.appendChild(icon);
+          row.appendChild(nameSpan);
+
+          row.addEventListener('click', () => {
+            document.querySelectorAll('.app-row').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+            selectedApp = app;
+            document.getElementById('btn-force-quit').disabled = false;
+          });
+
+          container.appendChild(row);
+        });
+
+        if (lastSelectedProcess && !selectedApp) {
+          // Re-select first row if last selected app is gone
+          document.getElementById('btn-force-quit').disabled = true;
+        }
+      }).catch(err => {
+        console.error('Failed to get running apps:', err);
+      });
+    }
+
+    // Initial load
+    loadRunningApps();
+
+    // Refresh every 2 seconds when open
+    listRefreshInterval = setInterval(loadRunningApps, 2000);
+
+    // Force Quit Action
+    document.getElementById('btn-force-quit').addEventListener('click', () => {
+      if (!selectedApp || !window.electronAPI || !window.electronAPI.forceQuitApp) return;
+      
+      // Stop refreshing list during prompt to prevent row updates blinking
+      clearInterval(listRefreshInterval);
+
+      window.electronAPI.forceQuitApp(selectedApp.processName).then(result => {
+        // Resume refreshing list
+        listRefreshInterval = setInterval(loadRunningApps, 2000);
+        // Reload list immediately
+        loadRunningApps();
+      }).catch(err => {
+        console.error('Failed to force quit:', err);
+        listRefreshInterval = setInterval(loadRunningApps, 2000);
+      });
+    });
+
+    // Capture Escape key to close window
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        window.close();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About This Mac</title>
+  <style>
+    :root {
+      --bg-color: #f6f6f6;
+      --text-color: #333333;
+      --text-muted: #666666;
+      --border-color: rgba(0, 0, 0, 0.1);
+      --accent-color: #007aff;
+      --card-bg: rgba(255, 255, 255, 0.6);
+      --glass-blur: 20px;
+    }
+
+    body.dark-theme {
+      --bg-color: #1e1e1e;
+      --text-color: #dddddd;
+      --text-muted: #999999;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --accent-color: #0a84ff;
+      --card-bg: rgba(30, 30, 30, 0.6);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .about-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Shiny Circle Logo */
+    .os-logo {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      box-shadow: 0 8px 24px rgba(0, 114, 255, 0.35);
+      position: relative;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    
+    .os-logo::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 15%;
+      width: 70%;
+      height: 35%;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.0));
+      border-radius: 50% / 100% 100% 0 0;
+    }
+
+    .os-logo svg {
+      width: 48px;
+      height: 48px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+    }
+
+    .os-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: -0.2px;
+    }
+
+    .os-version {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    /* Grid Layout for details */
+    .specs-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 100%;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .spec-row {
+      display: flex;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .spec-label {
+      width: 90px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .spec-value {
+      flex: 1;
+      font-weight: 500;
+      word-break: break-word;
+    }
+
+    .footer {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: auto;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .footer-button {
+      margin-top: 10px;
+      padding: 4px 12px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-color);
+      font-size: 11px;
+      cursor: default;
+      transition: background 0.15s;
+    }
+
+    .footer-button:hover {
+      background: var(--border-color);
+    }
+
+    /* Accent color dynamic mapping */
+    .os-logo.accent-themed {
+      background: linear-gradient(135deg, var(--accent-color), #004da6);
+      box-shadow: 0 8px 24px var(--accent-color-translucent);
+    }
+  </style>
+</head>
+<body>
+  <div class="about-container">
+    <!-- OS Logo represented by a macOS Big Sur style disk -->
+    <div class="os-logo" id="logo-disk">
+      <!-- Apple Logo inline svg -->
+      <svg viewBox="0 0 170 170" fill="currentColor">
+        <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.37.13-9.13-1.9-14.28-6.07-3.47-2.9-7.38-7.69-11.75-14.38-5.82-8.88-10.37-18.79-13.65-29.7C8.1 104.3 6.43 93.38 6.43 83.12c0-14.5 3.73-26.6 11.18-36.31 7.46-9.7 16.73-14.6 27.81-14.7 5.26 0 10.74 1.45 16.44 4.36 5.7 2.91 10.07 4.36 13.12 4.36 2.68 0 6.94-1.39 12.78-4.18 5.83-2.79 11.23-4.13 16.2-4.02 15.32.33 26.96 5.86 34.93 16.58-12.29 7.48-18.35 17.51-18.19 30.1.18 10.05 3.97 18.52 11.39 25.43 7.42 6.9 16.14 10.59 26.17 11.06-2.45 7.15-5.91 14.8-10.4 22.95zM119.22 9.64c0 7.82-2.85 15.11-8.56 21.88-5.7 6.76-12.79 10.87-21.26 12.33-.22-1.79-.34-3.46-.34-5.03 0-7.37 2.91-14.64 8.72-21.8 5.81-7.15 13.08-11.45 21.8-12.89.56 2.12.7 3.96.7 5.51z"/>
+      </svg>
+    </div>
+
+    <div class="os-name" id="os-name">Windows</div>
+    <div class="os-version" id="os-version">Version Loading...</div>
+
+    <div class="specs-card">
+      <div class="spec-row">
+        <div class="spec-label">Processor</div>
+        <div class="spec-value" id="cpu">Loading...</div>
+      </div>
+      <div class="spec-row">
+        <div class="spec-label">Memory</div>
+        <div class="spec-value" id="ram">Loading...</div>
+      </div>
+      <div class="spec-row">
+        <div class="spec-label">System Distro</div>
+        <div class="spec-value" id="distro">Loading...</div>
+      </div>
+      <div class="spec-row">
+        <div class="spec-label">App Version</div>
+        <div class="spec-value" id="app-version">1.0.0</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>TM and &copy; 2026 Apple Inc.</div>
+      <div>All rights reserved.</div>
+      <button class="footer-button" onclick="window.close()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // Apply theme
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', themeData.glassIntensity === 'Subtle' ? '8px' : themeData.glassIntensity === 'Heavy' ? '40px' : '20px');
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.25)`);
+      
+      // Update logo disk background to use accent
+      const disk = document.querySelector('.os-logo');
+      if (disk) {
+        disk.classList.add('accent-themed');
+      }
+    }
+
+    if (window.electronAPI && window.electronAPI.onThemeChanged) {
+      window.electronAPI.onThemeChanged(applyThemeConfig);
+      window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
+
+    // Fetch and populate system details
+    if (window.electronAPI && window.electronAPI.getAboutInfo) {
+      window.electronAPI.getAboutInfo().then(info => {
+        document.getElementById('os-name').textContent = info.osName;
+        document.getElementById('os-version').textContent = `Version ${info.osVersion}`;
+        document.getElementById('cpu').textContent = info.cpuModel;
+        document.getElementById('ram').textContent = info.totalRam;
+        document.getElementById('distro').textContent = info.osName;
+        document.getElementById('app-version').textContent = info.appVersion;
+      }).catch(err => {
+        console.error('Failed to get about info:', err);
+      });
+    }
+
+    // Capture Escape key to close window
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        window.close();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -894,7 +894,7 @@
       
       // Dock Hiding Binding
       window.settingsAPI.getDockConfig().then(dockCfg => {
-        document.getElementById('hide-dock').checked = dockCfg.autoHide || false;
+        document.getElementById('hide-dock').checked = dockCfg.autoHide !== false;
       }).catch(err => console.error(err));
       
       const hideModeVal = currentSettings.hiding.mode;

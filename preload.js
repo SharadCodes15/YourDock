@@ -21,6 +21,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleSpotlight: () => ipcRenderer.send('toggle-spotlight'),
   pressEscape: () => ipcRenderer.send('escape-pressed'),
   onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
-  getThemeConfig: () => ipcRenderer.invoke('get-theme-config')
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config'),
+  getAboutInfo: () => ipcRenderer.invoke('get-about-info'),
+  getRunningApps: () => ipcRenderer.invoke('get-running-apps'),
+  forceQuitApp: (processName) => ipcRenderer.invoke('force-quit-app', processName),
+  forwardShortcut: (combo) => ipcRenderer.invoke('forward-shortcut', combo),
+  windowAction: (action) => ipcRenderer.invoke('window-action', action),
+  appleAction: (action) => ipcRenderer.send('apple-action', action),
+  showAbout: () => ipcRenderer.send('show-about'),
+  showForceQuit: () => ipcRenderer.send('show-force-quit')
 });
 

@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { exec, execFile } = require('node:child_process');
 const crypto = require('crypto');
+const focusForwarder = require('./focusForwarder');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
@@ -17,6 +18,9 @@ const configPath = path.join(__dirname, 'dock', 'config.json');
 let settings = {};
 const settingsPath = path.join(__dirname, 'settings.json');
 let settingsWin = null;
+let aboutWin = null;
+let forceQuitWin = null;
+let globalProcessMap = {};
 
 // Cache dynamically loaded modules
 let activeWinModule = null;
@@ -367,6 +371,10 @@ async function loadConfig() {
     if (fs.existsSync(configPath)) {
       const rawData = await fs.promises.readFile(configPath, 'utf8');
       config = JSON.parse(rawData);
+      if (config.autoHide === undefined) {
+        config.autoHide = true;
+        await saveConfig();
+      }
     } else {
       // Fallback defaults
       config = {
@@ -633,7 +641,7 @@ function pollDockHover() {
               dockWin.webContents.send('close-context-menu');
               dockWin.setBounds({
                 x: checkBounds.x,
-                y: screenHeight - 85,
+                y: displayBounds.y + screenHeight - 85,
                 width: checkBounds.width,
                 height: 85
               });
@@ -772,7 +780,7 @@ function resolveThemeConfig() {
 
 function broadcastThemeConfig() {
   const resolved = resolveThemeConfig();
-  const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin];
+  const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin, aboutWin, forceQuitWin];
   for (const w of windows) {
     if (w && !w.isDestroyed()) {
       w.webContents.send('theme-changed', resolved);
@@ -835,6 +843,242 @@ ipcMain.handle('get-ram-usage', () => {
   }
   return Math.round(totalKb / 1024);
 });
+
+ipcMain.handle('get-about-info', async () => {
+  try {
+    if (!sysInfoMod) {
+      sysInfoMod = require('systeminformation');
+    }
+    const cpu = await sysInfoMod.cpu();
+    const mem = await sysInfoMod.mem();
+    const osInfo = await sysInfoMod.osInfo();
+    const cpuModel = cpu.brand || 'Unknown CPU';
+    const totalRamGB = Math.round(mem.total / (1024 * 1024 * 1024));
+    const osName = osInfo.distro || 'Windows';
+    const osVersion = osInfo.release || '';
+    const appVersion = app.getVersion();
+    return { osName, osVersion, cpuModel, totalRam: `${totalRamGB} GB`, appVersion };
+  } catch (err) {
+    console.error('Failed to get about info:', err);
+    return { osName: 'Windows', osVersion: '', cpuModel: 'Intel/AMD Processor', totalRam: '8 GB', appVersion: '1.0.0' };
+  }
+});
+
+ipcMain.handle('get-running-apps', async () => {
+  try {
+    const openWindows = await getOpenWindowsList();
+    const appList = [];
+    const seenProcesses = new Set();
+
+    const ownPids = new Set();
+    ownPids.add(process.pid);
+    BrowserWindow.getAllWindows().forEach(w => {
+      try {
+        if (!w.isDestroyed()) {
+          ownPids.add(w.webContents.getOSProcessId());
+        }
+      } catch (e) {}
+    });
+
+    for (const win of openWindows) {
+      const pid = win.ProcessId || win.pid;
+      if (!pid || ownPids.has(pid)) continue;
+
+      const exeName = globalProcessMap ? globalProcessMap[pid] : null;
+      if (!exeName) continue;
+
+      const exeLower = exeName.toLowerCase();
+      if (exeLower === 'explorer.exe' || exeLower === 'taskmgr.exe' || exeLower === 'conhost.exe' || exeLower === 'electron.exe') {
+        continue;
+      }
+
+      if (seenProcesses.has(exeLower)) continue;
+      seenProcesses.add(exeLower);
+
+      let displayName = path.basename(exeName, '.exe');
+      displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+
+      let appConfig = null;
+      if (config && config.apps) {
+        appConfig = Object.values(config.apps).find(a => 
+          (a.process && a.process.toLowerCase() === exeLower) || 
+          (a.win && path.basename(a.win).toLowerCase() === exeLower)
+        );
+      }
+      
+      if (appConfig) {
+        displayName = appConfig.name;
+      }
+
+      appList.push({ pid, processName: exeName, name: displayName });
+    }
+
+    return appList;
+  } catch (err) {
+    console.error('Failed to get running apps:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('force-quit-app', async (event, processName) => {
+  const result = await dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Cancel', 'Force Quit'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Force Quit Confirmation',
+    message: `Do you want to force quit "${processName}"?`,
+    detail: 'Any unsaved changes in this application will be permanently lost.',
+  });
+
+  if (result.response === 1) {
+    return new Promise((resolve) => {
+      exec(`taskkill /IM "${processName}" /F`, (err, stdout, stderr) => {
+        if (err) {
+          dialog.showErrorBox('Force Quit Failed', `Could not kill process "${processName}": ${stderr || err.message}`);
+          resolve({ success: false });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    });
+  }
+  return { success: false, reason: 'canceled' };
+});
+
+ipcMain.handle('forward-shortcut', async (event, combo) => {
+  return focusForwarder.forwardShortcut(combo);
+});
+
+ipcMain.handle('window-action', async (event, action) => {
+  return focusForwarder.performWindowAction(action);
+});
+
+ipcMain.on('apple-action', async (event, action) => {
+  try {
+    if (action === 'sleep') {
+      exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0', (err, stdout, stderr) => {
+        if (err) {
+          dialog.showErrorBox('Sleep Action Failed', `Failed to put computer to sleep: ${stderr || err.message}`);
+        }
+      });
+    } else if (action === 'restart') {
+      const result = await dialog.showMessageBox({
+        type: 'question',
+        buttons: ['Cancel', 'Restart'],
+        defaultId: 1,
+        cancelId: 0,
+        title: 'Restart System',
+        message: 'This will restart your computer now. Are you sure?'
+      });
+      if (result.response === 1) {
+        exec('shutdown /r /t 0', (err, stdout, stderr) => {
+          if (err) dialog.showErrorBox('Shutdown Failed', `Failed to restart: ${stderr || err.message}`);
+        });
+      }
+    } else if (action === 'shutdown') {
+      const result = await dialog.showMessageBox({
+        type: 'question',
+        buttons: ['Cancel', 'Shut Down'],
+        defaultId: 1,
+        cancelId: 0,
+        title: 'Shut Down System',
+        message: 'This will shut down your computer now. Are you sure?'
+      });
+      if (result.response === 1) {
+        exec('shutdown /s /t 0', (err, stdout, stderr) => {
+          if (err) dialog.showErrorBox('Shutdown Failed', `Failed to shut down: ${stderr || err.message}`);
+        });
+      }
+    }
+  } catch (err) {
+    dialog.showErrorBox('System Action Error', `An error occurred: ${err.message}`);
+  }
+});
+
+ipcMain.on('show-about', () => {
+  showAboutWindow();
+});
+
+ipcMain.on('show-force-quit', () => {
+  showForceQuitWindow();
+});
+
+function createAboutWindow() {
+  if (aboutWin) return;
+  aboutWin = new BrowserWindow({
+    width: 360,
+    height: 420,
+    frame: true,
+    resizable: false,
+    show: false,
+    title: 'About This Mac',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  aboutWin.loadFile(path.join(__dirname, 'about.html'));
+
+  aboutWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      aboutWin.hide();
+    }
+  });
+
+  aboutWin.on('closed', () => {
+    aboutWin = null;
+  });
+}
+
+function showAboutWindow() {
+  if (!aboutWin) {
+    createAboutWindow();
+  }
+  aboutWin.center();
+  aboutWin.show();
+}
+
+function createForceQuitWindow() {
+  if (forceQuitWin) return;
+  forceQuitWin = new BrowserWindow({
+    width: 360,
+    height: 480,
+    frame: true,
+    resizable: false,
+    show: false,
+    title: 'Force Quit Applications',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  forceQuitWin.loadFile(path.join(__dirname, 'forcequit.html'));
+
+  forceQuitWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      forceQuitWin.hide();
+    }
+  });
+
+  forceQuitWin.on('closed', () => {
+    forceQuitWin = null;
+  });
+}
+
+function showForceQuitWindow() {
+  if (!forceQuitWin) {
+    createForceQuitWindow();
+  }
+  forceQuitWin.center();
+  forceQuitWin.show();
+}
 
 // Apply settings state to system (e.g. skipTaskbar, opacity, launchAtLogin, etc.)
 function applySettings() {
@@ -1027,6 +1271,9 @@ async function pollActiveApp() {
       activeWinModule = await import('active-win');
     }
     const activeWindow = await activeWinModule.activeWindow();
+    if (activeWindow) {
+      focusForwarder.updateLastFocusedWindow(activeWindow);
+    }
     if (activeWindow && activeWindow.owner) {
       const appName = activeWindow.owner.name;
       if (appName && appName !== lastAppName) {
@@ -1348,6 +1595,7 @@ function pollProcesses() {
           }
         }
       }
+      globalProcessMap = processMap;
 
       const output = stdout.toLowerCase();
       const runningPinnedAppIds = [];
@@ -1518,10 +1766,10 @@ ipcMain.on('set-window-height', (event, height) => {
 // IPC handler to dynamically resize dock width and keep it centered at the bottom (Dock)
 ipcMain.on('set-dock-width', (event, dockWidth) => {
   if (dockWin) {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-    const x = Math.round((screenWidth - dockWidth) / 2);
-    const y = screenHeight - 85;
+    const targetDisplay = getTargetDisplay();
+    const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+    const x = dx + Math.round((screenWidth - dockWidth) / 2);
+    const y = dy + screenHeight - 85;
     
     dockWin.setBounds({
       x: x,
@@ -1577,11 +1825,11 @@ function forceCollapseAll() {
     stopProcessPolling();
     
     const bounds = dockWin.getBounds();
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { height: screenHeight } = primaryDisplay.bounds;
+    const targetDisplay = getTargetDisplay();
+    const { y: dy, height: screenHeight } = targetDisplay.bounds;
     dockWin.setBounds({
       x: bounds.x,
-      y: screenHeight - 85,
+      y: dy + screenHeight - 85,
       width: bounds.width,
       height: 85
     });
@@ -1609,9 +1857,9 @@ function forceCollapseAll() {
 ipcMain.on('set-dock-height', (event, height) => {
   if (dockWin) {
     const bounds = dockWin.getBounds();
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { height: screenHeight } = primaryDisplay.bounds;
-    const y = screenHeight - height;
+    const targetDisplay = getTargetDisplay();
+    const { y: dy, height: screenHeight } = targetDisplay.bounds;
+    const y = dy + screenHeight - height;
     
     dockWin.setBounds({
       x: bounds.x,
@@ -2147,6 +2395,8 @@ if (!isPrimaryInstance) {
     await loadConfig();
     await loadSettings();
     ensureIconsFolder();
+    createAboutWindow();
+    createForceQuitWindow();
     createTray();
     if (settings.general && settings.general.checkForUpdatesAutomatically !== false) {
       debugLog("[Update Check] Stub: Automatically checking for updates...");
@@ -2780,12 +3030,12 @@ let spotlightWin = null;
 function createSpotlightWindow() {
   if (spotlightWin) return;
   
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const targetDisplay = getTargetDisplay();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
   const winWidth = 600;
   const winHeight = 400;
-  const x = Math.round((screenWidth - winWidth) / 2);
-  const y = Math.round((screenHeight - winHeight) / 3);
+  const x = dx + Math.round((screenWidth - winWidth) / 2);
+  const y = dy + Math.round((screenHeight - winHeight) / 3);
 
   spotlightWin = new BrowserWindow({
     width: winWidth,
@@ -2825,12 +3075,12 @@ function toggleSpotlight() {
   if (spotlightWin.isVisible()) {
     spotlightWin.hide();
   } else {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+    const targetDisplay = getTargetDisplay();
+    const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
     const winWidth = 600;
     const winHeight = 400;
-    const x = Math.round((screenWidth - winWidth) / 2);
-    const y = Math.round((screenHeight - winHeight) / 3);
+    const x = dx + Math.round((screenWidth - winWidth) / 2);
+    const y = dy + Math.round((screenHeight - winHeight) / 3);
     spotlightWin.setBounds({ x, y, width: winWidth, height: winHeight });
     
     spotlightWin.show();

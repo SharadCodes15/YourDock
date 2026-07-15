@@ -7,7 +7,7 @@
     "appstore",
     "preferences"
   ],
-  "autoHide": true,
+  "autoHide": false,
   "apps": {
     "finder": {
       "name": "Finder",
@@ -51,5 +51,15 @@
       "mac": "",
       "process": "explorer.exe"
     }
+  },
+  "launchCounts": {
+    "safari": 2,
+    "antigravity": 3,
+    "trash": 1,
+    "visualstudiocode": 2,
+    "finder": 6,
+    "mail": 1,
+    "preferences": 1,
+    "microsoftedge": 1
   }
 }

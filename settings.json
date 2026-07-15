@@ -4,7 +4,8 @@
     "showInDock": true,
     "clockFormat12h": true,
     "showDate": true,
-    "checkForUpdatesAutomatically": false
+    "checkForUpdatesAutomatically": false,
+    "smartOrdering": true
   },
   "appearance": {
     "theme": "dark",
@@ -16,7 +17,7 @@
   },
   "hiding": {
     "enabled": true,
-    "mode": "collapsed",
+    "mode": "fully-hide",
     "sensitivity": 100,
     "delay": 400,
     "pillWidth": 172
@@ -71,6 +72,6 @@
     }
   ],
   "performance": {
-    "lowRamMode": false
+    "lowRamMode": true
   }
 }

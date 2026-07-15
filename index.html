@@ -828,9 +828,35 @@
       font-weight: bold;
       flex-shrink: 0;
     }
+
+    /* Toast Message Banner */
+    .toast-message {
+      position: absolute;
+      top: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 59, 48, 0.95);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      z-index: 10000000;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .toast-message.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
+  <div id="toast-message" class="toast-message" style="display: none;">No active app to send this to</div>
   <div class="menu-bar" id="menu-bar">
     <!-- Left Section: Apple, Active App, menus -->
     <div class="menu-left">
@@ -843,12 +869,12 @@
           <div class="dropdown-item" id="apple-about">About This Mac</div>
           <div class="dropdown-item" id="apple-settings">Menu Bar Settings...</div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-item">System Preferences...</div>
-          <div class="dropdown-item">App Store... <span class="shortcut">1 update</span></div>
+          <div class="dropdown-item" id="apple-preferences">System Preferences...</div>
+          <div class="dropdown-item" id="apple-force-quit">Force Quit Applications... <span class="shortcut">⌥⌘Esc</span></div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Sleep</div>
-          <div class="dropdown-item">Restart...</div>
-          <div class="dropdown-item">Shut Down...</div>
+          <div class="dropdown-item" id="apple-sleep">Sleep</div>
+          <div class="dropdown-item" id="apple-restart">Restart...</div>
+          <div class="dropdown-item" id="apple-shutdown">Shut Down...</div>
         </div>
       </div>
 
@@ -861,64 +887,59 @@
       <div class="menu-item interactive">
         <span>File</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">New Window <span class="shortcut">⌘N</span></div>
-          <div class="dropdown-item">New Tab <span class="shortcut">⌘T</span></div>
-          <div class="dropdown-item">Open File... <span class="shortcut">⌘O</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+N">New Window <span class="shortcut">⌘N</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+O">Open File... <span class="shortcut">⌘O</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+S">Save <span class="shortcut">⌘S</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+Shift+S">Save As... <span class="shortcut">⇧⌘S</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+P">Print <span class="shortcut">⌘P</span></div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Close Window <span class="shortcut">⌘W</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+W">Close Window <span class="shortcut">⌘W</span></div>
         </div>
       </div>
       <div class="menu-item interactive">
         <span>Edit</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">Undo <span class="shortcut">⌘Z</span></div>
-          <div class="dropdown-item">Redo <span class="shortcut">⇧⌘Z</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+Z">Undo <span class="shortcut">⌘Z</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+Y">Redo <span class="shortcut">⇧⌘Z</span></div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Cut <span class="shortcut">⌘X</span></div>
-          <div class="dropdown-item">Copy <span class="shortcut">⌘C</span></div>
-          <div class="dropdown-item">Paste <span class="shortcut">⌘V</span></div>
-          <div class="dropdown-item">Select All <span class="shortcut">⌘A</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+X">Cut <span class="shortcut">⌘X</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+C">Copy <span class="shortcut">⌘C</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+V">Paste <span class="shortcut">⌘V</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+A">Select All <span class="shortcut">⌘A</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+F">Find <span class="shortcut">⌘F</span></div>
         </div>
       </div>
       <div class="menu-item interactive">
         <span>View</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">As Icons <span class="shortcut">⌘1</span></div>
-          <div class="dropdown-item">As List <span class="shortcut">⌘2</span></div>
-          <div class="dropdown-item">As Columns <span class="shortcut">⌘3</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+equal">Zoom In <span class="shortcut">⌘+</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+minus">Zoom Out <span class="shortcut">⌘-</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+0">Actual Size <span class="shortcut">⌘0</span></div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Show Sidebar <span class="shortcut">⌥⌘S</span></div>
-          <div class="dropdown-item">Enter Full Screen <span class="shortcut">⌃⌘F</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+1" title="May not apply to all applications.">As Icons <span class="shortcut">⌘1</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+2" title="May not apply to all applications.">As List <span class="shortcut">⌘2</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Ctrl+3" title="May not apply to all applications.">As Columns <span class="shortcut">⌘3</span></div>
         </div>
       </div>
       <div class="menu-item interactive">
         <span>Go</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">Back <span class="shortcut">⌘[</span></div>
-          <div class="dropdown-item">Forward <span class="shortcut">⌘]</span></div>
-          <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Enclosing Folder <span class="shortcut">⌘↑</span></div>
-          <div class="dropdown-item">Recents <span class="shortcut">⇧⌘F</span></div>
-          <div class="dropdown-item">Documents <span class="shortcut">⇧⌘O</span></div>
-          <div class="dropdown-item">Downloads <span class="shortcut">⌥⌘L</span></div>
-          <div class="dropdown-item">Home <span class="shortcut">⇧⌘H</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Alt+Left" title="May not apply to all applications.">Back <span class="shortcut">⌘[</span></div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="Alt+Right" title="May not apply to all applications.">Forward <span class="shortcut">⌘]</span></div>
         </div>
       </div>
       <div class="menu-item interactive">
         <span>Window</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">Minimize <span class="shortcut">⌘M</span></div>
-          <div class="dropdown-item">Zoom</div>
-          <div class="dropdown-divider"></div>
-          <div class="dropdown-item">Bring All to Front</div>
+          <div class="dropdown-item window-action" data-action="minimize">Minimize <span class="shortcut">⌘M</span></div>
+          <div class="dropdown-item window-action" data-action="maximize">Zoom</div>
         </div>
       </div>
       <div class="menu-item interactive">
         <span>Help</span>
         <div class="dropdown-menu">
-          <div class="dropdown-item">Search</div>
-          <div class="dropdown-divider"></div>
-          <div class="dropdown-item">macOS Help</div>
+          <div class="dropdown-item shortcut-forward" data-shortcut="F1" title="May not apply to all applications.">macOS Help <span class="shortcut">F1</span></div>
         </div>
       </div>
     </div>
@@ -945,7 +966,7 @@
           <div class="dropdown-divider"></div>
           <div class="dropdown-header" id="wifi-list-header">Known Networks</div>
           <div class="wifi-list" id="wifi-list">
-            <div class="dropdown-item selected wifi-network-item">HomeWiFi_5G <span class="checkmark">✓</span></div>
+            <div class="dropdown-item selected wifi-network-item">Example Wi-Fi <span class="checkmark">✓</span></div>
             <div class="dropdown-item wifi-network-item">Office_Secure</div>
             <div class="dropdown-item wifi-network-item">Guest_Access</div>
           </div>
@@ -1375,6 +1396,95 @@
       window.electronAPI.onThemeChanged(applyThemeConfig);
       window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
     }
+
+    // Toast Helper
+    let toastTimeout = null;
+    function showToast(message) {
+      const toast = document.getElementById('toast-message');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.style.display = 'block';
+      // Force layout trigger for transition
+      toast.offsetHeight;
+      toast.classList.add('show');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+        toastTimeout = setTimeout(() => {
+          toast.style.display = 'none';
+        }, 200);
+      }, 2500);
+    }
+
+    // Handle standard shortcut forward items
+    document.querySelectorAll('.shortcut-forward').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllDropdowns();
+        const combo = item.getAttribute('data-shortcut');
+        if (combo && window.electronAPI.forwardShortcut) {
+          window.electronAPI.forwardShortcut(combo).then(res => {
+            if (res && res.success === false && res.reason === 'no_active_app') {
+              showToast("No active app to send this to");
+            }
+          }).catch(console.error);
+        }
+      });
+    });
+
+    // Handle direct window action items (Minimize / Zoom)
+    document.querySelectorAll('.window-action').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllDropdowns();
+        const action = item.getAttribute('data-action');
+        if (action && window.electronAPI.windowAction) {
+          window.electronAPI.windowAction(action).then(res => {
+            if (res && res.success === false && res.reason === 'no_active_app') {
+              showToast("No active app to send this to");
+            }
+          }).catch(console.error);
+        }
+      });
+    });
+
+    // Apple Menu Actions
+    document.getElementById('apple-about').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.showAbout) window.electronAPI.showAbout();
+    });
+
+    document.getElementById('apple-preferences').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.openSettings) window.electronAPI.openSettings();
+    });
+
+    document.getElementById('apple-force-quit').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.showForceQuit) window.electronAPI.showForceQuit();
+    });
+
+    document.getElementById('apple-sleep').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.appleAction) window.electronAPI.appleAction('sleep');
+    });
+
+    document.getElementById('apple-restart').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.appleAction) window.electronAPI.appleAction('restart');
+    });
+
+    document.getElementById('apple-shutdown').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns();
+      if (window.electronAPI.appleAction) window.electronAPI.appleAction('shutdown');
+    });
 
     // Apple Settings click
     document.getElementById('apple-settings').addEventListener('click', (e) => {

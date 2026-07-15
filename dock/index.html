@@ -342,7 +342,7 @@
       const data = await window.electronAPI.getConfig();
       appConfig = data.config || data;
       appIconsMap = data.appIconsMap || {};
-      autoHide = appConfig.autoHide;
+      autoHide = appConfig.autoHide !== false;
       
       // Update checkmark in custom context menu
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
@@ -771,7 +771,7 @@
           let left = clientX - menuWidth / 2;
           left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, left));
           ctxMenu.style.left = `${left}px`;
-          ctxMenu.style.top = `${clientY + (300 - 85) - menuHeight - 12}px`;
+          ctxMenu.style.top = `${clientY + (300 - 115) - menuHeight - 12}px`;
         }
       }
     }
@@ -779,7 +779,7 @@
     function closeContextMenu() {
       selectedCtxAppId = null;
       ctxMenu.style.display = 'none';
-      window.electronAPI.setDockHeight(85);
+      window.electronAPI.setDockHeight(115);
       window.electronAPI.contextMenuState(false);
       checkMouseIgnore();
     }
@@ -845,7 +845,7 @@
     });
 
     document.getElementById('ctx-quit').addEventListener('click', () => {
-      window.electronAPI.quitApp();
+      window.electronAPI.quitApp(selectedCtxAppId);
     });
 
     // Close context menu on outside click
@@ -873,7 +873,7 @@
     window.electronAPI.onConfigChanged((data) => {
       appConfig = data.config || data;
       appIconsMap = data.appIconsMap || {};
-      autoHide = appConfig.autoHide;
+      autoHide = appConfig.autoHide !== false;
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
       renderDock();

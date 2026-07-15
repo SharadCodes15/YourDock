@@ -8,7 +8,7 @@
       "name": "4DDiG Partition Manager",
       "icon": "",
       "exec": "C:\\Program Files\\4DDiG Partition Manager\\NetFrameCheck.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/86e941f198821b0bea99bedacab66850.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -16,31 +16,31 @@
       "name": "7-Zip File Manager",
       "icon": "",
       "exec": "C:\\Program Files\\7-Zip\\7zFM.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/5c9daf451c4ee5672a17dea0d48e60d9.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "antigravity",
       "name": "Antigravity",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/dd839fd1d336d2312dfbd34bae976695.png",
+      "exec": "Antigravity.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "antigravityide",
       "name": "Antigravity IDE",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Antigravity IDE\\Antigravity IDE.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/2bff1a0bb953994088927a4b6c433d5a.png",
+      "exec": "Antigravity IDE.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "balenaetcher",
       "name": "balenaEtcher",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\balena_etcher\\balenaEtcher.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/cf71a82026a91c3a64dcf3439cee7e33.png",
+      "exec": "balenaEtcher.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -48,7 +48,7 @@
       "name": "Brave",
       "icon": "",
       "exec": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/56d8252dbfecc3d70a6ec07b19a95b33.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -56,15 +56,15 @@
       "name": "Character Map",
       "icon": "",
       "exec": "C:\\Windows\\system32\\charmap.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/a0d795a27228ccf2f58b9834bf223709.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "comet",
       "name": "Comet",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Perplexity\\Comet\\Application\\comet.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/ca5d88f89bdfce84e9159c22e73f5e12.png",
+      "exec": "comet.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -72,15 +72,15 @@
       "name": "Component Services",
       "icon": "",
       "exec": "C:\\Windows\\system32\\comexp.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/9cbbd426b7e68c0729ce847ca6477590.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "cursor",
       "name": "Cursor",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\cursor\\Cursor.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/e4b01a4314e889331178b393cb0a7a7f.png",
+      "exec": "Cursor.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -88,7 +88,7 @@
       "name": "dfrgui",
       "icon": "",
       "exec": "C:\\Windows\\system32\\dfrgui.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/2078488fb1601317864b2583ddf568ca.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -96,7 +96,7 @@
       "name": "Disk Cleanup",
       "icon": "",
       "exec": "C:\\Windows\\system32\\cleanmgr.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/bccc41ee4554a7e18256052d98c861be.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -104,7 +104,7 @@
       "name": "EaseUS Partition Master",
       "icon": "",
       "exec": "C:\\Program Files\\EaseUS\\EaseUS Partition Master\\bin\\EPMUI.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/d5869533ed5500b7178674d7bc661a3c.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -112,7 +112,7 @@
       "name": "Epic Games Launcher",
       "icon": "",
       "exec": "C:\\Program Files\\Epic Games\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/eedcd2709eb8c5cae5b6daeed77d9669.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -120,7 +120,7 @@
       "name": "Event Viewer",
       "icon": "",
       "exec": "C:\\Windows\\system32\\eventvwr.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/52b7a5d40b9d8498f54d1ce6f1754311.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -128,7 +128,7 @@
       "name": "Excel",
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/5fe3584fdcb61b07aef6c56ffc64ae1c.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -136,7 +136,7 @@
       "name": "Firefox",
       "icon": "",
       "exec": "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/c02eecfa2fbf2b74550a1f33d9d48157.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -144,15 +144,15 @@
       "name": "Firefox Private Browsing",
       "icon": "",
       "exec": "C:\\Program Files\\Mozilla Firefox\\private_browsing.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/493c8ebdb37f4b5a3e93f2fa703c84c7.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "githubdesktop",
       "name": "GitHub Desktop",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\GitHubDesktop\\GitHubDesktop.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/57839d9765997b2cedb3a557183ba656.png",
+      "exec": "GitHubDesktop.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -160,7 +160,7 @@
       "name": "Google Chrome",
       "icon": "",
       "exec": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/d57bbbfc5771446e415174a383d1450e.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -168,7 +168,7 @@
       "name": "Google Earth Pro",
       "icon": "",
       "exec": "C:\\Program Files\\Google\\Google Earth Pro\\client\\googleearth.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/35fb5865340c1be36980f0c4445e2c08.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -176,7 +176,7 @@
       "name": "iSCSI Initiator",
       "icon": "",
       "exec": "C:\\Windows\\system32\\iscsicpl.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/28318dcdb4a08b666e7a18d74464c311.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -184,7 +184,7 @@
       "name": "LiveCaptions",
       "icon": "",
       "exec": "C:\\Windows\\system32\\LiveCaptions.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/3f4d5fe4ad9b48b61c587e1eee34a084.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -192,7 +192,7 @@
       "name": "McAfee",
       "icon": "",
       "exec": "C:\\Program Files\\McAfee\\wps\\mc-launch.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/5449da619b9f4f306084ffba61d7222f.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -200,15 +200,15 @@
       "name": "Microsoft Edge",
       "icon": "",
       "exec": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/eadc383791a0013b549249be0618a7cb.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "notion",
       "name": "Notion",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Notion\\Notion.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/b208cdf7ef23f2d0228fba271980ec97.png",
+      "exec": "Notion.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -216,15 +216,15 @@
       "name": "NVIDIA App",
       "icon": "",
       "exec": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA App.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/e09f13952d2cc46c056b16c88d1d2c69.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "obsidian",
       "name": "Obsidian",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Obsidian\\Obsidian.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/ad5cfcaa83c4fe8fdc3b83fcf2e3578e.png",
+      "exec": "Obsidian.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -232,7 +232,7 @@
       "name": "ODBC Data Sources (32-bit)",
       "icon": "",
       "exec": "C:\\Windows\\syswow64\\odbcad32.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/5ab02c3e62fd7583c6de86e48f4d91a5.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -240,7 +240,7 @@
       "name": "ODBC Data Sources (64-bit)",
       "icon": "",
       "exec": "C:\\Windows\\system32\\odbcad32.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/9b33314015bd052629c44c071df8dab4.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -248,15 +248,15 @@
       "name": "Office Language Preferences",
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\SETLANG.EXE",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/98208a3bc7cd0f2ff7b78a1119d79ed9.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "ollama",
       "name": "Ollama",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Ollama\\ollama app.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/b2e219d45d2a5fb1c42f4913ea84d555.png",
+      "exec": "ollama app.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -264,15 +264,15 @@
       "name": "OneNote",
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\ONENOTE.EXE",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/9555e175476627c602ad7cdca7f1a770.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "opencode",
       "name": "OpenCode",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\@opencode-aidesktop\\OpenCode.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/099eb8673cae2086fe4817fc7b6a8892.png",
+      "exec": "OpenCode.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -280,7 +280,7 @@
       "name": "Performance Monitor",
       "icon": "",
       "exec": "C:\\Windows\\system32\\perfmon.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/dda375fec3226c1ee5c7946165587e63.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -288,7 +288,7 @@
       "name": "PowerPoint",
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\POWERPNT.EXE",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/854ec459b18677a4ce771d682b4064c3.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -296,7 +296,7 @@
       "name": "Rainmeter",
       "icon": "",
       "exec": "C:\\Program Files\\Rainmeter\\Rainmeter.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/4244258f92e02ff55032d9cae2f531cd.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -304,7 +304,7 @@
       "name": "RecoveryDrive",
       "icon": "",
       "exec": "C:\\Windows\\system32\\RecoveryDrive.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/7983783e7f4c7c08b2990e4e4447afd7.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -312,7 +312,7 @@
       "name": "Registry Editor",
       "icon": "",
       "exec": "C:\\Windows\\regedit.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/0146aaba8fa183348f40cc15aa946dc5.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -320,7 +320,7 @@
       "name": "Remote Desktop Connection",
       "icon": "",
       "exec": "C:\\Windows\\system32\\mstsc.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/a7723584b8f6315c89ed089b4f998a4f.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -328,7 +328,7 @@
       "name": "Resource Monitor",
       "icon": "",
       "exec": "C:\\Windows\\system32\\perfmon.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/ea4e0a15b182b59f6ee02805502177a9.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -336,7 +336,7 @@
       "name": "services",
       "icon": "",
       "exec": "C:\\Windows\\system32\\services.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/dfdf2a60e9e3ee33cbb185088c4af263.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -344,7 +344,7 @@
       "name": "Steps Recorder",
       "icon": "",
       "exec": "C:\\Windows\\system32\\psr.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/7a3ba8096a23b49cb7117b2272e2469b.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -352,7 +352,7 @@
       "name": "System Information",
       "icon": "",
       "exec": "C:\\Windows\\system32\\msinfo32.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/cf0cd5071293f8d2d5738d0100af35ac.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -360,7 +360,7 @@
       "name": "Task Manager",
       "icon": "",
       "exec": "C:\\Windows\\system32\\taskmgr.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/3d4eccabb1a694947d10717c2a531796.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -368,23 +368,23 @@
       "name": "Task Scheduler",
       "icon": "",
       "exec": "C:\\Windows\\system32\\taskschd.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/a8de719c679f6380abf83b6e82213b75.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "telegram",
       "name": "Telegram",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Roaming\\Telegram Desktop\\Telegram.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/2bcca287fc70606e06ea416e7a8a5518.png",
+      "exec": "Telegram.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "terax",
       "name": "Terax",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Terax\\terax.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/834f11049a20c99602ffbe60537e6a97.png",
+      "exec": "terax.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -392,14 +392,14 @@
       "name": "TickTick",
       "icon": "",
       "exec": "C:\\Program Files (x86)\\TickTick\\TickTick.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/95f52ab1b8a8601312ab0dc741ceaa4f.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "tlauncher",
       "name": "TLauncher",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Roaming\\.minecraft\\TLauncher.exe",
+      "exec": "TLauncher.exe",
       "iconPath": "",
       "iconSource": "extracted"
     },
@@ -408,23 +408,23 @@
       "name": "Virtual Network Editor",
       "icon": "",
       "exec": "C:\\Program Files\\VMware\\VMware Workstation\\vmnetcfg.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/484f475bde831a9827986248cfda5a29.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "visualstudiocode",
       "name": "Visual Studio Code",
       "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/56c91a765cc55760d6e63b9513536f81.png",
+      "exec": "Code.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
       "id": "vivaldi",
       "name": "Vivaldi",
       "icon": "",
-      "exec": "E:\\vivaldi\\Application\\vivaldi.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/2b1ebd5c8844f68ca7d96afb3cb3f290.png",
+      "exec": "vivaldi.exe",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -432,7 +432,7 @@
       "name": "VLC media player - reset preferences and cache files",
       "icon": "",
       "exec": "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/8341b9ad7ac75085256e200a552311b2.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -440,7 +440,7 @@
       "name": "VMware Workstation Pro",
       "icon": "",
       "exec": "C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/bf151ff2b8029a262acaa2da90c3f27f.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -448,7 +448,7 @@
       "name": "VoiceAccess",
       "icon": "",
       "exec": "C:\\Windows\\system32\\voiceaccess.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/3e6b7d6fb838185e26d4fa896eba610f.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -456,7 +456,7 @@
       "name": "Windows Defender Firewall with Advanced Security",
       "icon": "",
       "exec": "C:\\Windows\\system32\\WF.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/fb3a22b2d76e36cb5d1400f76ec88d5d.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -464,7 +464,7 @@
       "name": "Windows Media Player Legacy",
       "icon": "",
       "exec": "C:\\Program Files (x86)\\Windows Media Player\\wmplayer.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/9cc95d37527a4235f58eb1760cdfb58a.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -472,7 +472,7 @@
       "name": "Word",
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/31a8192b1210042285cf2799c9f6d5a9.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -480,7 +480,7 @@
       "name": "Zen",
       "icon": "",
       "exec": "C:\\Program Files\\Zen Browser\\zen.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/bf6cbceb92aed573a0099d57776a0f8a.png",
+      "iconPath": "",
       "iconSource": "extracted"
     },
     {
@@ -488,12 +488,12 @@
       "name": "Zen Private Browsing",
       "icon": "",
       "exec": "C:\\Program Files\\Zen Browser\\private_browsing.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/7bc9e2e68a2b85c4ca6411af351a8353.png",
+      "iconPath": "",
       "iconSource": "extracted"
     }
   ],
   "custom": [],
   "favorites": [
-    "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
+    "brave.exe"
   ]
 }
