@@ -28,17 +28,23 @@
     .dock-container {
       display: flex;
       align-items: flex-end;
-      background: rgba(255, 255, 255, 0.45);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-top: 1px solid rgba(255, 255, 255, 0.55);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.05);
-      border-radius: 20px;
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.45));
+      backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-radius: var(--corner-radius, 20px);
       padding: 6px 10px;
       margin-bottom: 6px;
       transition: transform 0.25s ease-out, background 0.25s ease-out, border-radius 0.25s ease-out, box-shadow 0.25s ease-out, padding 0.25s ease-out;
       transform-origin: bottom center;
+    }
+
+    body.dark-theme .dock-container {
+      background: rgba(30, 30, 30, var(--glass-opacity, 0.45));
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
 
     .dock-container.collapsed {
@@ -100,7 +106,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
-      border-radius: 11px;
+      border-radius: calc(var(--corner-radius, 11px) * 0.7);
       box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
       transition: box-shadow 0.15s;
     }
@@ -121,16 +127,27 @@
 
     /* Running Dot Indicator */
     .dot-indicator {
-      width: 4px;
-      height: 4px;
-      background-color: rgba(0, 0, 0, 0.65);
-      border-radius: 50%;
+      display: flex;
+      gap: 2.5px;
       position: absolute;
       bottom: -7px;
       left: 50%;
       transform: translateX(-50%);
       opacity: 0;
       transition: opacity 0.3s ease;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .dot-indicator-sub {
+      width: 4.2px;
+      height: 4.2px;
+      background-color: rgba(0, 0, 0, 0.6);
+      border-radius: 50%;
+    }
+
+    body.dark-theme .dot-indicator-sub {
+      background-color: rgba(255, 255, 255, 0.7);
     }
 
     .dock-item.active .dot-indicator {
@@ -187,19 +204,34 @@
     .context-menu {
       display: none;
       position: absolute;
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      border-top: 1px solid rgba(255, 255, 255, 0.4);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-      border-radius: 8px;
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.85));
+      backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-radius: var(--corner-radius, 8px);
       width: 175px;
       padding: 4px 0;
       z-index: 99999;
       color: #1d1d1f;
       font-size: 12.5px;
       transition: opacity 0.1s;
+    }
+
+    body.dark-theme .context-menu {
+      background: rgba(30, 30, 30, var(--glass-opacity, 0.85));
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      color: #dfdfe0;
+    }
+
+    body.dark-theme .menu-item-custom {
+      color: #dfdfe0;
+    }
+
+    body.dark-theme .menu-divider-custom {
+      background: rgba(255, 255, 255, 0.12);
     }
 
     .menu-item-custom {
@@ -287,9 +319,11 @@
     <div class="menu-item-custom" id="ctx-quit" style="color: #ff3b30; font-weight: 500;">Quit</div>
   </div>
 
+  <script src="../closeOnEscape.js"></script>
   <script>
     let appConfig = {};
     let appIconsMap = {};
+    let isLowRamMode = false;
     let autoHide = false;
     let runningApps = [];
     let tempRunningApps = [];
@@ -419,6 +453,16 @@
       // Dot indicator
       const dot = document.createElement('div');
       dot.className = 'dot-indicator';
+      if (isRunning) {
+        const windowCounts = (typeof runningAppsData !== 'undefined' && runningAppsData.windowCounts) || {};
+        const count = windowCounts[appId] || 1;
+        const maxDots = Math.min(3, count);
+        for (let i = 0; i < maxDots; i++) {
+          const sub = document.createElement('div');
+          sub.className = 'dot-indicator-sub';
+          dot.appendChild(sub);
+        }
+      }
       item.appendChild(dot);
 
       // Tooltip
@@ -550,6 +594,10 @@
     });
 
     function updateMagnification() {
+      if (isLowRamMode) {
+        resetMagnification();
+        return;
+      }
       if (!isHovered || draggedElement) return;
 
       const items = document.querySelectorAll('.dock-item');
@@ -628,6 +676,10 @@
     function openContextMenu(appId, clientX, clientY) {
       selectedCtxAppId = appId;
       
+      // Clear old dynamic window items
+      document.querySelectorAll('.ctx-window-item').forEach(el => el.remove());
+      document.querySelectorAll('.ctx-window-divider').forEach(el => el.remove());
+
       const showInFinderBtn = document.getElementById('ctx-show');
       const removeBtn = document.getElementById('ctx-remove');
       const keepBtn = document.getElementById('ctx-keep');
@@ -657,23 +709,81 @@
       // Expand window height so context menu is not clipped
       window.electronAPI.setDockHeight(300);
       window.electronAPI.setIgnoreMouse(false);
+      window.electronAPI.contextMenuState(true);
 
       ctxMenu.style.display = 'block';
-      
-      // Position menu above the cursor/icon (adjusting for offset)
-      const menuWidth = 175;
-      const menuHeight = ctxMenu.offsetHeight || 160;
-      
-      ctxMenu.style.left = `${clientX - menuWidth / 2}px`;
-      ctxMenu.style.top = `${clientY + (300 - 85) - menuHeight - 12}px`;
+
+      // [FIX] Perform instant positioning using the unified positioning function
+      doPositioning();
+
+      // Fetch windows and prepend to context menu
+      window.electronAPI.getOpenWindows(appId).then(windows => {
+        if (windows && windows.length > 0) {
+          const reversed = [...windows].reverse();
+          
+          const divider = document.createElement('div');
+          divider.className = 'menu-divider-custom ctx-window-divider';
+          ctxMenu.insertBefore(divider, ctxMenu.firstChild);
+
+          reversed.forEach(win => {
+            const item = document.createElement('div');
+            item.className = 'menu-item-custom ctx-window-item';
+            const title = win.Title || 'Untitled Window';
+            item.textContent = title.length > 30 ? title.substring(0, 27) + '...' : title;
+            item.title = title;
+            item.addEventListener('click', () => {
+              window.electronAPI.focusWindow(win.Pid);
+              closeContextMenu();
+            });
+            ctxMenu.insertBefore(item, ctxMenu.firstChild);
+          });
+
+          const header = document.createElement('div');
+          header.className = 'menu-item-custom ctx-window-item';
+          header.style.fontWeight = '600';
+          header.style.fontSize = '11px';
+          header.style.color = 'var(--accent-color)';
+          header.style.textTransform = 'uppercase';
+          header.style.letterSpacing = '0.5px';
+          header.style.pointerEvents = 'none';
+          header.style.opacity = '0.8';
+          header.style.paddingTop = '6px';
+          header.textContent = 'Open Windows';
+          ctxMenu.insertBefore(header, ctxMenu.firstChild);
+
+          // [FIX] Re-position context menu since its height has changed after async content rendering
+          doPositioning();
+        }
+      }).catch(err => {
+        console.error(err);
+      });
+
+      function doPositioning() {
+        const dockItem = document.querySelector(`.dock-item[data-app-id="${appId}"]`);
+        if (dockItem && window.positionContextMenu) {
+          const pos = window.positionContextMenu(dockItem, ctxMenu, true);
+          ctxMenu.style.left = `${pos.left}px`;
+          ctxMenu.style.top = `${pos.top}px`;
+        } else {
+          // Fallback to click position
+          const menuWidth = ctxMenu.offsetWidth || 175;
+          const menuHeight = ctxMenu.offsetHeight || 160;
+          let left = clientX - menuWidth / 2;
+          left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, left));
+          ctxMenu.style.left = `${left}px`;
+          ctxMenu.style.top = `${clientY + (300 - 85) - menuHeight - 12}px`;
+        }
+      }
     }
 
     function closeContextMenu() {
       selectedCtxAppId = null;
       ctxMenu.style.display = 'none';
       window.electronAPI.setDockHeight(85);
+      window.electronAPI.contextMenuState(false);
       checkMouseIgnore();
     }
+
 
     // Context menu click actions
     document.getElementById('ctx-open').addEventListener('click', () => {
@@ -745,8 +855,10 @@
       }
     });
 
+    let runningAppsData = {};
     // Handle incoming process list updates from Main process
     window.electronAPI.onProcessUpdate((data) => {
+      runningAppsData = data;
       if (Array.isArray(data)) {
         runningApps = data;
         tempRunningApps = [];
@@ -769,6 +881,7 @@
 
     // Listen for play-genie minimize animations
     window.electronAPI.onPlayGenie((appId) => {
+      if (isLowRamMode) return;
       const item = document.querySelector(`.dock-item[data-app-id="${appId}"]`);
       if (item) {
         item.classList.add('genie');
@@ -791,6 +904,56 @@
       // Update dock width instantly to avoid clipping
       updateDockWidth();
     });
+
+    window.electronAPI.onCloseContextMenu(() => {
+      closeContextMenu();
+    });
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      isLowRamMode = !!themeData.lowRamMode;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    if (window.electronAPI.onThemeChanged) {
+      window.electronAPI.onThemeChanged(applyThemeConfig);
+      window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
 
     // Startup Init
     loadDock();

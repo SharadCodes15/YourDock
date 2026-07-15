@@ -3,13 +3,16 @@
     "launchAtLogin": false,
     "showInDock": true,
     "clockFormat12h": true,
-    "showDate": true
+    "showDate": true,
+    "checkForUpdatesAutomatically": false
   },
   "appearance": {
-    "theme": "light",
+    "theme": "dark",
     "blurIntensity": 12,
     "opacity": 1,
-    "accentColor": "#007aff"
+    "accentColor": "#ff2d55",
+    "glassIntensity": "Standard",
+    "cornerRadius": 12
   },
   "hiding": {
     "enabled": true,
@@ -43,5 +46,31 @@
   "shortcuts": {
     "toggleMenuBar": "",
     "openSettings": ""
+  },
+  "themePresets": [
+    {
+      "name": "Glassic Light",
+      "theme": "light",
+      "accentColor": "#007aff",
+      "glassIntensity": "Heavy",
+      "cornerRadius": 16
+    },
+    {
+      "name": "Glassic Dark",
+      "theme": "dark",
+      "accentColor": "#007aff",
+      "glassIntensity": "Heavy",
+      "cornerRadius": 16
+    },
+    {
+      "name": "Neon Pink",
+      "theme": "dark",
+      "accentColor": "#ff2d55",
+      "glassIntensity": "Standard",
+      "cornerRadius": 12
+    }
+  ],
+  "performance": {
+    "lowRamMode": false
   }
 }

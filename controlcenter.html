@@ -27,13 +27,13 @@
     .cc-panel {
       width: 290px;
       height: 350px;
-      background: rgba(35, 35, 35, 0.75);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-top: 1px solid rgba(255, 255, 255, 0.28);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-      border-radius: 18px;
+      background: rgba(35, 35, 35, var(--glass-opacity, 0.75));
+      backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-radius: var(--corner-radius, 18px);
       padding: 14px;
       color: #ffffff;
       display: flex;
@@ -66,7 +66,7 @@
     .cc-box {
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
+      border-radius: calc(var(--corner-radius, 18px) - 4px);
       padding: 10px;
       display: flex;
       flex-direction: column;
@@ -383,6 +383,7 @@
     </div>
   </div>
 
+  <script src="closeOnEscape.js"></script>
   <script>
     // State UI items
     const wifiToggle = document.getElementById('wifi-toggle');
@@ -525,6 +526,64 @@
         window.ccAPI.closeCcWindow();
       }
     });
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      const panel = document.querySelector('.cc-panel');
+      if (panel) {
+        if (themeData.theme === 'dark') {
+          panel.style.background = `rgba(35, 35, 35, ${opacityVal})`;
+          panel.style.borderColor = 'rgba(0, 0, 0, 0.25)';
+          panel.style.borderTopColor = 'rgba(255, 255, 255, 0.12)';
+        } else {
+          panel.style.background = `rgba(255, 255, 255, ${opacityVal})`;
+          panel.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+          panel.style.borderTopColor = 'rgba(255, 255, 255, 0.25)';
+        }
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    if (window.ccAPI.onThemeChanged) {
+      window.ccAPI.onThemeChanged(applyThemeConfig);
+      window.ccAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
   </script>
 </body>
 </html>

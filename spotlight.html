@@ -16,12 +16,13 @@
     .spotlight-box {
       width: 600px;
       height: 400px;
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(40px);
-      -webkit-backdrop-filter: blur(40px);
-      border: 1.5px solid rgba(255, 255, 255, 0.5);
-      border-radius: 14px;
-      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.28);
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.72));
+      backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--corner-radius, 14px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
@@ -30,9 +31,10 @@
     }
 
     body.dark-theme .spotlight-box {
-      background: rgba(36, 36, 36, 0.78);
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+      background: rgba(36, 36, 36, var(--glass-opacity, 0.78));
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     }
 
     .search-row {
@@ -221,6 +223,7 @@
     </div>
   </div>
 
+  <script src="closeOnEscape.js"></script>
   <script>
     const searchInput = document.getElementById('search-input');
     const resultsContainer = document.getElementById('results-container');
@@ -228,16 +231,47 @@
     let selectedIndex = 0;
 
     // Apply active theme
-    function applyTheme(settings) {
-      if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
         document.body.classList.add('dark-theme');
       } else {
         document.body.classList.remove('dark-theme');
       }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      const box = document.querySelector('.spotlight-box');
+      if (box) {
+        if (themeData.theme === 'dark') {
+          box.style.background = `rgba(36, 36, 36, ${opacityVal})`;
+          box.style.borderColor = 'rgba(0, 0, 0, 0.25)';
+          box.style.borderTopColor = 'rgba(255, 255, 255, 0.12)';
+        } else {
+          box.style.background = `rgba(255, 255, 255, ${opacityVal})`;
+          box.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+          box.style.borderTopColor = 'rgba(255, 255, 255, 0.25)';
+        }
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
     }
 
-    window.electronAPI.getSettings().then(applyTheme).catch(console.error);
-    window.electronAPI.onSettingsChanged(applyTheme);
+    if (window.electronAPI.onThemeChanged) {
+      window.electronAPI.onThemeChanged(applyThemeConfig);
+      window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
 
     // Focus input on broadcast
     window.electronAPI.onFocusInput(() => {

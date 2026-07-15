@@ -12,5 +12,9 @@ contextBridge.exposeInMainWorld('drawerAPI', {
   onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback()),
   getDockConfig: () => ipcRenderer.invoke('get-config'),
   addToDock: (appId, appInfo) => ipcRenderer.send('add-to-dock', appId, appInfo),
-  removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId)
+  removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId),
+  pressEscape: () => ipcRenderer.send('escape-pressed'),
+  onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config')
 });
+

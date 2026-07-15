@@ -20,22 +20,6 @@
       "iconSource": "extracted"
     },
     {
-      "id": "anacondanavigator",
-      "name": "Anaconda Navigator",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\anaconda3\\pythonw.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/d4de6a5ab3635be9334d8e4a74e3fe7a.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "anacondaprompt",
-      "name": "Anaconda Prompt",
-      "icon": "",
-      "exec": "C:\\Windows\\System32\\cmd.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/1b4a7355fe2b883aa6a807e135e2c67e.png",
-      "iconSource": "extracted"
-    },
-    {
       "id": "antigravity",
       "name": "Antigravity",
       "icon": "",
@@ -89,14 +73,6 @@
       "icon": "",
       "exec": "C:\\Windows\\system32\\comexp.msc",
       "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/9cbbd426b7e68c0729ce847ca6477590.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "computermanagement",
-      "name": "Computer Management",
-      "icon": "",
-      "exec": "C:\\Windows\\system32\\compmgmt.msc",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/af4f7776e663411adc3f2803c8e8ab28.png",
       "iconSource": "extracted"
     },
     {
@@ -172,30 +148,6 @@
       "iconSource": "extracted"
     },
     {
-      "id": "gitbash",
-      "name": "Git Bash",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\Sharad_E\\sublime\\Git\\git-bash.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/8caaef6035d2772af8e78e5028f3146b.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "gitcmd",
-      "name": "Git CMD",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\Sharad_E\\sublime\\Git\\git-cmd.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/6de713c39757d87ce45a0ca05d650831.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "gitgui",
-      "name": "Git GUI",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\Sharad_E\\sublime\\Git\\cmd\\git-gui.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/60fb7d238350bc129ca947319178dba5.png",
-      "iconSource": "extracted"
-    },
-    {
       "id": "githubdesktop",
       "name": "GitHub Desktop",
       "icon": "",
@@ -220,27 +172,11 @@
       "iconSource": "extracted"
     },
     {
-      "id": "idlepython314",
-      "name": "IDLE (Python 3.14)",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Python\\pythoncore-3.14-64\\pythonw.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/3b069bf5651104470419626bd9107ee8.png",
-      "iconSource": "extracted"
-    },
-    {
       "id": "iscsiinitiator",
       "name": "iSCSI Initiator",
       "icon": "",
       "exec": "C:\\Windows\\system32\\iscsicpl.exe",
       "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/28318dcdb4a08b666e7a18d74464c311.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "jupyternotebook",
-      "name": "Jupyter Notebook",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\anaconda3\\python.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/8ea7f4bbc08d45fc0bca6b41b6355ae6.png",
       "iconSource": "extracted"
     },
     {
@@ -265,14 +201,6 @@
       "icon": "",
       "exec": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
       "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/eadc383791a0013b549249be0618a7cb.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "nodejs",
-      "name": "Node.js",
-      "icon": "",
-      "exec": "C:\\Program Files\\nodejs\\node.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/fcdc2efebe711f12f0419601963fe031.png",
       "iconSource": "extracted"
     },
     {
@@ -361,14 +289,6 @@
       "icon": "",
       "exec": "C:\\Program Files\\Microsoft Office\\root\\Office16\\POWERPNT.EXE",
       "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/854ec459b18677a4ce771d682b4064c3.png",
-      "iconSource": "extracted"
-    },
-    {
-      "id": "pydocpython314",
-      "name": "PyDoc (Python 3.14)",
-      "icon": "",
-      "exec": "C:\\Users\\shara\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-      "iconPath": "file://E:/sideProjects/dock/dock/icons-cache/c8778467fe7785c429d9cf9a88a63f43.png",
       "iconSource": "extracted"
     },
     {

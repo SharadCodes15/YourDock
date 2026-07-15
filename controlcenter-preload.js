@@ -10,5 +10,9 @@ contextBridge.exposeInMainWorld('ccAPI', {
   getDND: () => ipcRenderer.invoke('get-dnd'),
   setDND: (on) => ipcRenderer.send('set-dnd', on),
   onSystemDataUpdate: (callback) => ipcRenderer.on('system-data-update', (_event, data) => callback(data)),
-  closeCcWindow: () => ipcRenderer.send('close-cc-window')
+  closeCcWindow: () => ipcRenderer.send('close-cc-window'),
+  pressEscape: () => ipcRenderer.send('escape-pressed'),
+  onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config')
 });
+

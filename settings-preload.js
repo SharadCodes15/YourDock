@@ -13,5 +13,13 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getDockConfig: () => ipcRenderer.invoke('get-config'),
   saveAutoHide: (autoHide) => ipcRenderer.send('save-auto-hide', autoHide),
   exportSettings: () => ipcRenderer.invoke('export-settings'),
-  importSettings: () => ipcRenderer.invoke('import-settings')
+  importSettings: () => ipcRenderer.invoke('import-settings'),
+  pressEscape: () => ipcRenderer.send('escape-pressed'),
+  onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config'),
+  getDisplays: () => ipcRenderer.invoke('get-displays'),
+  getRamUsage: () => ipcRenderer.invoke('get-ram-usage'),
+  clearIconCache: () => ipcRenderer.invoke('clear-icon-cache'),
+  refreshApp: () => ipcRenderer.send('refresh-app')
 });
+

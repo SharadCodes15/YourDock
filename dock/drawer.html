@@ -249,16 +249,15 @@
       border-color: rgba(255, 255, 255, 0.45);
     }
 
-    /* Favorites Sidebar */
     .favorites-sidebar {
       position: absolute;
       top: 0;
       left: 0;
       bottom: 0;
       width: 64px;
-      background: rgba(0, 0, 0, 0.25);
-      backdrop-filter: blur(40px);
-      -webkit-backdrop-filter: blur(40px);
+      background: rgba(0, 0, 0, var(--glass-opacity, 0.25));
+      backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
       border-right: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       flex-direction: column;
@@ -459,6 +458,7 @@
     </div>
   </div>
 
+  <script src="../closeOnEscape.js"></script>
   <script>
     let allApps = [];
     let filteredApps = [];
@@ -802,12 +802,23 @@
       closeDrawer();
     });
 
-    // Mouse scroll horizontal gesture (wheel deltaX)
+    // Mouse scroll horizontal or vertical gesture to change page
     let scrollAccumulator = 0;
     window.addEventListener('wheel', (e) => {
-      if (Math.abs(e.deltaX) > 15) {
-        scrollAccumulator += e.deltaX;
-        if (Math.abs(scrollAccumulator) > 120) {
+      // Don't intercept vertical scroll if scrolling inside favorites-sidebar
+      if (e.target.closest('#favorites-sidebar')) {
+        return;
+      }
+      
+      const deltaX = e.deltaX;
+      const deltaY = e.deltaY;
+      
+      // Determine dominant direction
+      const dominantDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+      
+      if (Math.abs(dominantDelta) > 15) {
+        scrollAccumulator += dominantDelta;
+        if (Math.abs(scrollAccumulator) > 100) {
           if (scrollAccumulator > 0) {
             nextPage();
           } else {
@@ -828,8 +839,16 @@
       const isPinned = dockConfig && dockConfig.pinned && dockConfig.pinned.includes(app.id);
       menuToggleDock.textContent = isPinned ? 'Remove from Dock' : 'Add to Dock';
       
-      contextMenu.style.left = `${e.clientX}px`;
-      contextMenu.style.top = `${e.clientY}px`;
+      // [FIX] Position the drawer context menu above the right-clicked icon using the unified helper
+      const iconElement = e.currentTarget;
+      if (iconElement && window.positionContextMenu) {
+        const pos = window.positionContextMenu(iconElement, contextMenu, false);
+        contextMenu.style.left = `${pos.left}px`;
+        contextMenu.style.top = `${pos.top}px`;
+      } else {
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.top = `${e.clientY}px`;
+      }
       contextMenu.style.display = 'block';
     }
 
@@ -944,6 +963,51 @@
     window.drawerAPI.onAppsUpdated(async () => {
       await loadApps();
     });
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    if (window.drawerAPI.onThemeChanged) {
+      window.drawerAPI.onThemeChanged(applyThemeConfig);
+      window.drawerAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
 
     // Initial load
     loadApps();

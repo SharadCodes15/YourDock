@@ -1,8 +1,12 @@
-const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, globalShortcut, nativeTheme, desktopCapturer, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { exec, execFile } = require('node:child_process');
 const crypto = require('crypto');
+
+// [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
+const DEBUG = false;
+function debugLog(...args) { if (DEBUG) console.log('[DEBUG]', ...args); }
 
 let menuBarWin;
 let dockWin;
@@ -17,10 +21,10 @@ let settingsWin = null;
 // Cache dynamically loaded modules
 let activeWinModule = null;
 
-function loadSettings() {
+async function loadSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
-      const raw = fs.readFileSync(settingsPath, 'utf8');
+      const raw = await fs.promises.readFile(settingsPath, 'utf8');
       settings = JSON.parse(raw);
     } else {
       // Default settings.json
@@ -34,16 +38,16 @@ function loadSettings() {
         },
         shortcuts: { toggleMenuBar: '', openSettings: '' }
       };
-      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+      await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     }
   } catch (err) {
     console.error('Error loading settings:', err);
   }
 }
 
-function saveSettings() {
+async function saveSettings() {
   try {
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     if (menuBarWin) menuBarWin.webContents.send('settings-changed', settings);
     if (settingsWin) settingsWin.webContents.send('settings-changed', settings);
   } catch (err) {
@@ -58,16 +62,19 @@ let cachedScreenshot = null;
 let lastCaptureTime = 0;
 const appsJsonPath = path.join(__dirname, 'dock', 'apps.json');
 
-// Blacklist keywords — any .lnk whose filename or target path contains these (case-insensitive) is skipped
-const APP_BLACKLIST = [
-  'uninstall', 'remove', 'readme', 'help', 'changelog', 'release notes',
-  'setup', 'install', 'updater', 'update', 'uninst', 'license', 'eula',
-  'documentation', 'manual', 'website', 'web site', 'support', 'about',
-  'repair', 'diagnostic', 'troubleshoot', 'debug', 'crash', 'report',
-  'configuration', 'config tool', 'command prompt', 'powershell',
-  'accessibility', 'narrator', 'magnify', 'osk', 'on-screen keyboard',
-  'compatibility', 'migration', 'administrative tools'
-];
+// [FIX] Load blacklist from editable JSON config instead of hardcoding — allows user customization
+const devToolsBlacklistPath = path.join(__dirname, 'devToolsBlacklist.json');
+let devToolsBlacklist = { nameKeywords: [], devToolKeywords: [], exeBlacklist: [] };
+try {
+  if (fs.existsSync(devToolsBlacklistPath)) {
+    devToolsBlacklist = JSON.parse(fs.readFileSync(devToolsBlacklistPath, 'utf8'));
+  }
+} catch (e) {
+  console.error('Failed to load devToolsBlacklist.json:', e);
+}
+const APP_BLACKLIST = devToolsBlacklist.nameKeywords || [];
+const DEV_TOOL_KEYWORDS = devToolsBlacklist.devToolKeywords || [];
+const EXE_BLACKLIST = (devToolsBlacklist.exeBlacklist || []).map(e => e.toLowerCase());
 
 /**
  * Scan Windows Start Menu .lnk files using PowerShell + WScript.Shell COM.
@@ -120,31 +127,24 @@ if (-not $results) {
 }
 `;
 
-    try {
-      fs.writeFileSync(tempScriptPath, psScript, 'utf8');
-    } catch (e) {
-      console.error('Failed to write temp PowerShell script:', e);
-      resolve([]);
-      return;
-    }
+    fs.promises.writeFile(tempScriptPath, psScript, 'utf8').then(() => {
+      exec(
+        `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
+        { maxBuffer: 1024 * 1024 * 5, timeout: 30000 },
+        async (err, stdout, stderr) => {
+          // Clean up temp script
+          try { await fs.promises.unlink(tempScriptPath); } catch (e) {}
 
-    exec(
-      `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
-      { maxBuffer: 1024 * 1024 * 5, timeout: 30000 },
-      (err, stdout, stderr) => {
-        // Clean up temp script
-        try { fs.unlinkSync(tempScriptPath); } catch (e) {}
-
-        if (err) {
-          console.error('Start Menu scan error:', err.message);
-          if (stderr) console.error('PowerShell stderr:', stderr);
-          resolve([]);
-          return;
-        }
+          if (err) {
+            console.error('Start Menu scan error:', err.message);
+            if (stderr) console.error('PowerShell stderr:', stderr);
+            resolve([]);
+            return;
+          }
 
         const output = (stdout || '').trim();
         if (!output || output === '[]') {
-          console.log('Start Menu scan: no shortcuts found.');
+          debugLog('Start Menu scan: no shortcuts found.');
           resolve([]);
           return;
         }
@@ -162,9 +162,22 @@ if (-not $results) {
             const nameLower = entry.name.toLowerCase();
             const targetLower = (entry.target || '').toLowerCase();
 
-            // Blacklist filter
+            // Base blacklist filter (always applied — junk entries like uninstall/readme/help)
             const isBlacklisted = APP_BLACKLIST.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
             if (isBlacklisted) continue;
+
+            // [FIX] Multi-signal dev-tool filtering — only when hideDevTools setting is ON (default true)
+            const hideDevTools = !(settings.general && settings.general.hideDevTools === false);
+            if (hideDevTools) {
+              // Signal 1: Dev-tool name/path keyword match
+              const isDevTool = DEV_TOOL_KEYWORDS.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
+              if (isDevTool) continue;
+
+              // Signal 2: Target exe is a known console/runtime executable
+              const exeBasename = path.basename(targetLower);
+              const isBlacklistedExe = EXE_BLACKLIST.includes(exeBasename);
+              if (isBlacklistedExe) continue;
+            }
 
             // Must have a real executable target (skip URLs, empty targets, folders)
             if (!entry.target || (!targetLower.endsWith('.exe') && !targetLower.endsWith('.msc') && !targetLower.endsWith('.cmd') && !targetLower.endsWith('.bat'))) continue;
@@ -187,21 +200,35 @@ if (-not $results) {
           // Sort alphabetically by name
           apps.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
-          console.log(`Start Menu scan: found ${apps.length} apps (after filtering).`);
+          debugLog(`Start Menu scan: found ${apps.length} apps (after filtering).`);
           resolve(apps);
         } catch (parseErr) {
           console.error('Failed to parse Start Menu scan output:', parseErr.message);
           console.error('Raw output (first 500 chars):', output.substring(0, 500));
           resolve([]);
         }
-      }
-    );
+      });
+    }).catch(err => {
+      console.error('Failed to write temp PowerShell script:', err);
+      resolve([]);
+    });
   });
 }
 
 function getIconCachePath(exePath, extension = '.png') {
   const hash = crypto.createHash('md5').update(exePath.toLowerCase()).digest('hex');
   return path.join(__dirname, 'dock', 'icons-cache', `${hash}${extension}`);
+}
+
+let isAppsScanned = false;
+function ensureAppsScanned() {
+  if (isAppsScanned) return Promise.resolve();
+  isAppsScanned = true;
+  return scanAndPopulateApps().then(() => {
+    notifyAppsUpdated();
+  }).catch(err => {
+    console.error('Lazy app scan failed:', err);
+  });
 }
 
 /**
@@ -215,7 +242,8 @@ async function scanAndPopulateApps() {
   let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [], favorites: [] };
   try {
     if (fs.existsSync(appsJsonPath)) {
-      existingData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      existingData = JSON.parse(raw);
     }
   } catch (e) {}
 
@@ -265,11 +293,18 @@ async function scanAndPopulateApps() {
 
   // Helper to extract a single app's icon asynchronously
   const extractIcon = async (scannedApp) => {
-    if (scannedApp.iconSource !== 'manual' && !scannedApp.iconPath && fs.existsSync(scannedApp.exec)) {
+    if (scannedApp.iconSource === 'manual') {
+      return;
+    }
+    const cachePath = getIconCachePath(scannedApp.exec, '.png');
+    const cacheExists = fs.existsSync(cachePath);
+    if (cacheExists) {
+      scannedApp.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
+      scannedApp.iconSource = 'extracted';
+    } else if (fs.existsSync(scannedApp.exec)) {
       try {
         const nativeImg = await app.getFileIcon(scannedApp.exec, { size: 'large' });
-        const cachePath = getIconCachePath(scannedApp.exec, '.png');
-        fs.writeFileSync(cachePath, nativeImg.toPNG());
+        await fs.promises.writeFile(cachePath, nativeImg.toPNG());
         scannedApp.iconPath = `file://${cachePath.replace(/\\/g, '/')}`;
         scannedApp.iconSource = 'extracted';
       } catch (err) {
@@ -305,8 +340,8 @@ async function scanAndPopulateApps() {
   };
 
   try {
-    fs.writeFileSync(appsJsonPath, JSON.stringify(newData, null, 2), 'utf8');
-    console.log(`apps.json populated with ${newData.apps.length} scanned apps, ${newData.custom.length} custom apps, and ${newData.favorites.length} favorites.`);
+    await fs.promises.writeFile(appsJsonPath, JSON.stringify(newData, null, 2), 'utf8');
+    debugLog(`apps.json populated with ${newData.apps.length} scanned apps, ${newData.custom.length} custom apps, and ${newData.favorites.length} favorites.`);
   } catch (e) {
     console.error('Failed to write apps.json:', e);
   }
@@ -327,10 +362,10 @@ let consecutiveDockHotspotPolls = 0;
 let dockLeaveTimeout = null;
 
 // Read dock config file or write default if missing
-function loadConfig() {
+async function loadConfig() {
   try {
     if (fs.existsSync(configPath)) {
-      const rawData = fs.readFileSync(configPath, 'utf8');
+      const rawData = await fs.promises.readFile(configPath, 'utf8');
       config = JSON.parse(rawData);
     } else {
       // Fallback defaults
@@ -338,12 +373,21 @@ function loadConfig() {
         pinned: ["finder", "launchpad", "safari", "mail", "appstore", "preferences"],
         autoHide: true // default true
       };
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
     }
     dockAutoHide = config.autoHide !== false; // default to true
     dockState = dockAutoHide ? 'collapsed' : 'expanded'; // Set initial state correctly
   } catch (err) {
     console.error('Error loading config:', err);
+  }
+}
+
+// [FIX] saveConfig was called but never defined — caused ReferenceError on every IPC call touching config.json
+async function saveConfig() {
+  try {
+    await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving config:', err);
   }
 }
 
@@ -384,196 +428,235 @@ function ensureIconsFolder() {
   }
 }
 
-// Cursor polling for reveal when collapsed (Dynamic Island mode for Menu Bar)
-function startCursorPolling() {
-  if (cursorPollInterval) return;
-  consecutiveHotspotPolls = 0;
-
-  cursorPollInterval = setInterval(() => {
-    if (!menuBarWin) return;
-
-    // Check if auto-hide is enabled globally
-    if (!settings.hiding || !settings.hiding.enabled) {
-      if (menuBarState !== 'expanded') {
-        menuBarState = 'expanded';
-        menuBarWin.webContents.send('set-collapse-state', false);
-      }
-      return;
+let ccLeaveTimeout = null;
+function checkControlCenterCursor() {
+  if (!ccWin || ccWin.isDestroyed() || !ccWin.isVisible()) {
+    if (ccLeaveTimeout) {
+      clearTimeout(ccLeaveTimeout);
+      ccLeaveTimeout = null;
     }
-
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const displayBounds = primaryDisplay.bounds;
-    const cursorPoint = screen.getCursorScreenPoint();
-
-    const screenWidth = displayBounds.width;
-    const centerX = displayBounds.x + Math.round(screenWidth / 2);
-
-    if (menuBarState === 'collapsed') {
-      // 1. Hotspot Expand Detection
-      const sens = settings.hiding.sensitivity || 100;
-      const inHotspot = (
-        cursorPoint.x >= centerX - Math.round(sens / 2) &&
-        cursorPoint.x <= centerX + Math.round(sens / 2) &&
-        cursorPoint.y >= displayBounds.y &&
-        cursorPoint.y <= displayBounds.y + 8
-      );
-
-      if (inHotspot) {
-        consecutiveHotspotPolls++;
-        if (consecutiveHotspotPolls >= 2) {
-          menuBarState = 'expanded';
-          consecutiveHotspotPolls = 0;
-          if (leaveTimeout) {
-            clearTimeout(leaveTimeout);
-            leaveTimeout = null;
-          }
-          menuBarWin.webContents.send('set-collapse-state', false); // Expand visually
+    return;
+  }
+  
+  const cursorPoint = screen.getCursorScreenPoint();
+  const bounds = ccWin.getBounds();
+  const isWithin = (
+    cursorPoint.x >= bounds.x &&
+    cursorPoint.x <= bounds.x + bounds.width &&
+    cursorPoint.y >= bounds.y &&
+    cursorPoint.y <= bounds.y + bounds.height
+  );
+  
+  if (!isWithin) {
+    if (!ccLeaveTimeout) {
+      ccLeaveTimeout = setTimeout(() => {
+        const checkCursor = screen.getCursorScreenPoint();
+        const checkBounds = ccWin.getBounds();
+        const stillOutside = !(
+          checkCursor.x >= checkBounds.x &&
+          checkCursor.x <= checkBounds.x + checkBounds.width &&
+          checkCursor.y >= checkBounds.y &&
+          checkCursor.y <= checkBounds.y + checkBounds.height
+        );
+        
+        if (stillOutside && ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
+          ccWin.hide();
         }
-      } else {
+        ccLeaveTimeout = null;
+      }, 400);
+    }
+  } else {
+    if (ccLeaveTimeout) {
+      clearTimeout(ccLeaveTimeout);
+      ccLeaveTimeout = null;
+    }
+  }
+}
+
+// Cursor polling for reveal when collapsed (Dynamic Island mode for Menu Bar)
+function pollMenuBarHover() {
+  checkControlCenterCursor();
+  
+  if (!menuBarWin || menuBarWin.isDestroyed()) return;
+
+  // Check if auto-hide is enabled globally
+  if (!settings.hiding || !settings.hiding.enabled) {
+    if (menuBarState !== 'expanded') {
+      menuBarState = 'expanded';
+      menuBarWin.webContents.send('set-collapse-state', false);
+    }
+    return;
+  }
+
+  const primaryDisplay = getTargetDisplay();
+  const displayBounds = primaryDisplay.bounds;
+  const cursorPoint = screen.getCursorScreenPoint();
+
+  const screenWidth = displayBounds.width;
+  const centerX = displayBounds.x + Math.round(screenWidth / 2);
+
+  if (menuBarState === 'collapsed') {
+    // 1. Hotspot Expand Detection
+    const sens = settings.hiding.sensitivity || 100;
+    const inHotspot = (
+      cursorPoint.x >= centerX - Math.round(sens / 2) &&
+      cursorPoint.x <= centerX + Math.round(sens / 2) &&
+      cursorPoint.y >= displayBounds.y &&
+      cursorPoint.y <= displayBounds.y + 8
+    );
+
+    if (inHotspot) {
+      consecutiveHotspotPolls++;
+      if (consecutiveHotspotPolls >= 2) {
+        menuBarState = 'expanded';
         consecutiveHotspotPolls = 0;
-      }
-    } else {
-      // 2. Leave-Bounds Detection (check full menu bar bounds)
-      const menuBarBounds = menuBarWin.getBounds();
-      const isWithinMenuBar = (
-        cursorPoint.x >= displayBounds.x &&
-        cursorPoint.x <= displayBounds.x + displayBounds.width &&
-        cursorPoint.y >= displayBounds.y &&
-        cursorPoint.y <= displayBounds.y + menuBarBounds.height
-      );
-
-      if (!isWithinMenuBar) {
-        if (!leaveTimeout) {
-          const delay = settings.hiding.delay !== undefined ? settings.hiding.delay : 400;
-          leaveTimeout = setTimeout(() => {
-            // Double check cursor after configured delay
-            const checkCursor = screen.getCursorScreenPoint();
-            const checkBounds = menuBarWin.getBounds();
-            const stillOutside = !(
-              checkCursor.x >= displayBounds.x &&
-              checkCursor.x <= displayBounds.x + displayBounds.width &&
-              checkCursor.y >= displayBounds.y &&
-              checkCursor.y <= displayBounds.y + checkBounds.height
-            );
-
-            if (stillOutside) {
-              menuBarState = 'collapsed';
-              menuBarWin.webContents.send('set-collapse-state', true); // Collapse back to pill
-            }
-            leaveTimeout = null;
-          }, delay);
-        }
-      } else {
         if (leaveTimeout) {
           clearTimeout(leaveTimeout);
           leaveTimeout = null;
         }
+        menuBarWin.webContents.send('set-collapse-state', false); // Expand visually
+      }
+    } else {
+      consecutiveHotspotPolls = 0;
+    }
+  } else {
+    // 2. Leave-Bounds Detection (check full menu bar bounds)
+    const menuBarBounds = menuBarWin.getBounds();
+    const isWithinMenuBar = (
+      cursorPoint.x >= displayBounds.x &&
+      cursorPoint.x <= displayBounds.x + displayBounds.width &&
+      cursorPoint.y >= displayBounds.y &&
+      cursorPoint.y <= displayBounds.y + menuBarBounds.height
+    );
+
+    if (!isWithinMenuBar) {
+      if (!leaveTimeout) {
+        const delay = settings.hiding.delay !== undefined ? settings.hiding.delay : 400;
+        leaveTimeout = setTimeout(() => {
+          // Double check cursor after configured delay
+          const checkCursor = screen.getCursorScreenPoint();
+          const checkBounds = menuBarWin.getBounds();
+          const stillOutside = !(
+            checkCursor.x >= displayBounds.x &&
+            checkCursor.x <= displayBounds.x + displayBounds.width &&
+            checkCursor.y >= displayBounds.y &&
+            checkCursor.y <= displayBounds.y + checkBounds.height
+          );
+
+          if (stillOutside) {
+            menuBarState = 'collapsed';
+            menuBarWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+          }
+          leaveTimeout = null;
+        }, delay);
+      }
+    } else {
+      if (leaveTimeout) {
+        clearTimeout(leaveTimeout);
+        leaveTimeout = null;
       }
     }
-  }, 120);
-}
-
-function stopCursorPolling() {
-  if (cursorPollInterval) {
-    clearInterval(cursorPollInterval);
-    cursorPollInterval = null;
   }
 }
 
+function startCursorPolling() {}
+function stopCursorPolling() {}
+
 // Cursor polling for reveal when Dock is collapsed (Dynamic Island mode for Dock)
-function startDockCursorPolling() {
-  if (dockCursorPollInterval) return;
-  consecutiveDockHotspotPolls = 0;
-
-  dockCursorPollInterval = setInterval(() => {
-    if (!dockWin) return;
-    if (!dockAutoHide) {
-      if (dockState !== 'expanded') {
-        dockState = 'expanded';
-        dockWin.webContents.send('set-collapse-state', false);
-        startProcessPolling();
-      }
-      return;
+function pollDockHover() {
+  if (!dockWin || dockWin.isDestroyed()) return;
+  if (!dockAutoHide) {
+    if (dockState !== 'expanded') {
+      dockState = 'expanded';
+      dockWin.webContents.send('set-collapse-state', false);
     }
+    return;
+  }
 
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const displayBounds = primaryDisplay.bounds;
-    const cursorPoint = screen.getCursorScreenPoint();
-    const screenHeight = displayBounds.height;
+  const primaryDisplay = getTargetDisplay();
+  const displayBounds = primaryDisplay.bounds;
+  const cursorPoint = screen.getCursorScreenPoint();
+  const screenHeight = displayBounds.height;
 
-    if (dockState === 'collapsed') {
-      // 1. Hotspot Expand Detection (Center bottom ±100px wide, y >= bottom 15px of screen)
-      const screenWidth = displayBounds.width;
-      const centerX = displayBounds.x + Math.round(screenWidth / 2);
-      const inHotspot = (
-        cursorPoint.x >= centerX - 100 &&
-        cursorPoint.x <= centerX + 100 &&
-        cursorPoint.y >= displayBounds.y + screenHeight - 15
-      );
+  if (dockState === 'collapsed') {
+    // 1. Hotspot Expand Detection (Center bottom ±100px wide, y >= bottom 15px of screen)
+    const screenWidth = displayBounds.width;
+    const centerX = displayBounds.x + Math.round(screenWidth / 2);
+    const inHotspot = (
+      cursorPoint.x >= centerX - 100 &&
+      cursorPoint.x <= centerX + 100 &&
+      cursorPoint.y >= displayBounds.y + screenHeight - 15
+    );
 
-      if (inHotspot) {
-        consecutiveDockHotspotPolls++;
-        // Debounce: require cursor in hotspot for 1 poll cycle (2 consecutive checks)
-        if (consecutiveDockHotspotPolls >= 2) {
-          dockState = 'expanded';
-          consecutiveDockHotspotPolls = 0;
-          if (dockLeaveTimeout) {
-            clearTimeout(dockLeaveTimeout);
-            dockLeaveTimeout = null;
-          }
-          dockWin.webContents.send('set-collapse-state', false); // Expand visually
-          startProcessPolling();
-        }
-      } else {
+    if (inHotspot) {
+      consecutiveDockHotspotPolls++;
+      // Debounce: require cursor in hotspot for 1 poll cycle (2 consecutive checks)
+      if (consecutiveDockHotspotPolls >= 2) {
+        dockState = 'expanded';
         consecutiveDockHotspotPolls = 0;
-      }
-    } else {
-      // 2. Leave-Bounds Collapse Detection
-      const dockBounds = dockWin.getBounds();
-      const isWithinDock = (
-        cursorPoint.x >= dockBounds.x &&
-        cursorPoint.x <= dockBounds.x + dockBounds.width &&
-        cursorPoint.y >= displayBounds.y + screenHeight - 85 &&
-        cursorPoint.y <= displayBounds.y + screenHeight
-      );
-
-      if (!isWithinDock) {
-        if (!dockLeaveTimeout) {
-          dockLeaveTimeout = setTimeout(() => {
-            // Double check cursor after 400ms debounce
-            const checkCursor = screen.getCursorScreenPoint();
-            const checkBounds = dockWin.getBounds();
-            const stillOutside = !(
-              checkCursor.x >= checkBounds.x &&
-              checkCursor.x <= checkBounds.x + checkBounds.width &&
-              checkCursor.y >= displayBounds.y + screenHeight - 85 &&
-              checkCursor.y <= displayBounds.y + screenHeight
-            );
-
-            if (stillOutside && dockAutoHide) {
-              dockState = 'collapsed';
-              dockWin.webContents.send('set-collapse-state', true); // Collapse back to pill
-              stopProcessPolling();
-            }
-            dockLeaveTimeout = null;
-          }, 400);
-        }
-      } else {
         if (dockLeaveTimeout) {
           clearTimeout(dockLeaveTimeout);
           dockLeaveTimeout = null;
         }
+        dockWin.webContents.send('set-collapse-state', false); // Expand visually
+      }
+    } else {
+      consecutiveDockHotspotPolls = 0;
+    }
+  } else {
+    // 2. Leave-Bounds Collapse Detection
+    const dockBounds = dockWin.getBounds();
+    const currentHeight = isDockContextMenuOpen ? 300 : 85;
+    const isWithinDock = (
+      cursorPoint.x >= dockBounds.x &&
+      cursorPoint.x <= dockBounds.x + dockBounds.width &&
+      cursorPoint.y >= displayBounds.y + screenHeight - currentHeight &&
+      cursorPoint.y <= displayBounds.y + screenHeight
+    );
+
+    if (!isWithinDock) {
+      if (!dockLeaveTimeout) {
+        dockLeaveTimeout = setTimeout(() => {
+          // Double check cursor after 400ms debounce
+          const checkCursor = screen.getCursorScreenPoint();
+          const checkBounds = dockWin.getBounds();
+          const stillOutside = !(
+            checkCursor.x >= checkBounds.x &&
+            checkCursor.x <= checkBounds.x + checkBounds.width &&
+            checkCursor.y >= displayBounds.y + screenHeight - currentHeight &&
+            checkCursor.y <= displayBounds.y + screenHeight
+          );
+
+          if (stillOutside) {
+            if (isDockContextMenuOpen) {
+              isDockContextMenuOpen = false;
+              dockWin.webContents.send('close-context-menu');
+              dockWin.setBounds({
+                x: checkBounds.x,
+                y: screenHeight - 85,
+                width: checkBounds.width,
+                height: 85
+              });
+            }
+            if (dockAutoHide) {
+              dockState = 'collapsed';
+              dockWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+            }
+          }
+          dockLeaveTimeout = null;
+        }, 400);
+      }
+    } else {
+      if (dockLeaveTimeout) {
+        clearTimeout(dockLeaveTimeout);
+        dockLeaveTimeout = null;
       }
     }
-  }, 120);
-}
-
-function stopDockCursorPolling() {
-  if (dockCursorPollInterval) {
-    clearInterval(dockCursorPollInterval);
-    dockCursorPollInterval = null;
   }
 }
+
+function startDockCursorPolling() {}
+function stopDockCursorPolling() {}
 
 // Register Global Shortcuts
 function registerGlobalShortcuts() {
@@ -647,6 +730,7 @@ function createSettingsWindow() {
 }
 
 function showSettingsWindow() {
+  ensureAppsScanned();
   if (!settingsWin) {
     createSettingsWindow();
   }
@@ -654,9 +738,110 @@ function showSettingsWindow() {
   settingsWin.show();
 }
 
+
+
+// Resolve resolved theme values (Light/Dark, opacity, blur, cornerRadius)
+function resolveThemeConfig() {
+  let activeTheme = (settings.appearance && settings.appearance.theme) || 'light';
+  let glassIntensity = (settings.appearance && settings.appearance.glassIntensity) || 'Standard';
+  let cornerRadius = (settings.appearance && settings.appearance.cornerRadius) || 12;
+  let accentColor = (settings.appearance && settings.appearance.accentColor) || '#007aff';
+  
+  const presets = settings.themePresets || [];
+  const matchedPreset = presets.find(p => p.name === activeTheme);
+  if (matchedPreset) {
+    activeTheme = matchedPreset.theme;
+    glassIntensity = matchedPreset.glassIntensity;
+    cornerRadius = matchedPreset.cornerRadius;
+    accentColor = matchedPreset.accentColor;
+  }
+  
+  let themeValue = activeTheme;
+  if (activeTheme === 'auto') {
+    themeValue = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+  }
+  
+  return {
+    theme: themeValue,
+    accentColor,
+    glassIntensity,
+    cornerRadius,
+    lowRamMode: !!(settings.performance && settings.performance.lowRamMode)
+  };
+}
+
+function broadcastThemeConfig() {
+  const resolved = resolveThemeConfig();
+  const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin];
+  for (const w of windows) {
+    if (w && !w.isDestroyed()) {
+      w.webContents.send('theme-changed', resolved);
+    }
+  }
+}
+
+// Watch system theme change (Auto theme)
+nativeTheme.on('updated', () => {
+  if (settings.appearance && settings.appearance.theme === 'auto') {
+    broadcastThemeConfig();
+  }
+});
+
+// IPC Handles for theme config
+ipcMain.handle('get-theme-config', () => {
+  return resolveThemeConfig();
+});
+
+function getTargetDisplay() {
+  const all = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  if (settings.general && settings.general.displayMonitor && settings.general.displayMonitor !== 'primary') {
+    const matched = all.find(d => String(d.id) === String(settings.general.displayMonitor));
+    if (matched) return matched;
+  }
+  return primary;
+}
+
+ipcMain.handle('get-displays', () => {
+  return screen.getAllDisplays().map(d => ({
+    id: d.id,
+    bounds: d.bounds,
+    isPrimary: d.id === screen.getPrimaryDisplay().id
+  }));
+});
+
+function clearIconCache() {
+  const cacheDir = path.join(__dirname, 'dock', 'icons-cache');
+  if (fs.existsSync(cacheDir)) {
+    const files = fs.readdirSync(cacheDir);
+    for (const file of files) {
+      try {
+        fs.unlinkSync(path.join(cacheDir, file));
+      } catch (e) {}
+    }
+  }
+  return { success: true };
+}
+
+ipcMain.handle('clear-icon-cache', () => {
+  return clearIconCache();
+});
+
+ipcMain.handle('get-ram-usage', () => {
+  let totalKb = 0;
+  const metrics = app.getAppMetrics();
+  for (const m of metrics) {
+    totalKb += m.memory.workingSetSize;
+  }
+  return Math.round(totalKb / 1024);
+});
+
 // Apply settings state to system (e.g. skipTaskbar, opacity, launchAtLogin, etc.)
 function applySettings() {
   if (!menuBarWin) return;
+  
+  broadcastThemeConfig();
+
 
   // 1. Show in Dock / Taskbar (skipTaskbar)
   const skipDock = settings.general && settings.general.showInDock === false;
@@ -740,6 +925,7 @@ function createDrawerWindow() {
 }
 
 async function openDrawer() {
+  ensureAppsScanned();
   if (!drawerWin) {
     createDrawerWindow();
   }
@@ -749,7 +935,8 @@ async function openDrawer() {
 
   if (fs.existsSync(appsJsonPath)) {
     try {
-      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const appsData = JSON.parse(raw);
       if (appsData.settings && appsData.settings.useDesktopCapture === false) {
         useCapture = false;
       }
@@ -780,17 +967,195 @@ function closeDrawer() {
   }
 }
 
+let tray = null;
+function createTray() {
+  if (tray) return;
+  
+  const trayIconBase64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABJElEQVQ4y2P8//8/AyUYSAu4rihJ+N/QyGf959cfhszETBwMTAwM/wz1fNf/uC4jK+C2/C8j4/8M1NnAwMDA8O/Pf0ZWRqIEN4CBIOPvn/+MzDSwAGQASyNDwv/ffxiZKW4AWyPDf7D4f5qegY2BYcK1X6/PGBj+M+AyALmBbM3t/xV1zAxsa/8xMTAwMDBIqdgwTND8/4cBzX/mCbd//V7x7z8jA1wB35V/GQyMfzPQsAGmsYxM/xkYf+d/N7tSwszExMCwfPcfRj+/Pwxsa/6DxdkYGBj+MzLw3fxz4Vf2r3/M+GzBNeHaL7B4DQMTA8O/f//gCv6d+ZPxL04DGBgY/jH9O/33/M9sXF4EmwECDIz/z//Mxu9FmAEAw156yOchLpIAAAAASUVORK5CYII=';
+  const img = nativeImage.createFromBuffer(Buffer.from(trayIconBase64, 'base64'));
+  
+  tray = new Tray(img);
+  tray.setToolTip('macOS Dock & Menu Bar');
+  
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Open Settings', click: () => showSettingsWindow() },
+    { label: 'Show Menu Bar & Dock', click: () => {
+        if (menuBarWin && !menuBarWin.isDestroyed()) {
+          menuBarWin.show();
+          if (menuBarState === 'collapsed') {
+            menuBarWin.webContents.send('set-collapse-state', true);
+          } else {
+            menuBarWin.webContents.send('set-collapse-state', false);
+          }
+        }
+        if (dockWin && !dockWin.isDestroyed()) {
+          dockWin.show();
+          if (dockState === 'collapsed') {
+            dockWin.webContents.send('set-collapse-state', true);
+          } else {
+            dockWin.webContents.send('set-collapse-state', false);
+          }
+        }
+      }
+    },
+    { type: 'separator' },
+    { label: 'Quit', click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+  
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('double-click', () => {
+    if (menuBarWin && !menuBarWin.isDestroyed()) menuBarWin.show();
+    if (dockWin && !dockWin.isDestroyed()) dockWin.show();
+  });
+}
+
+let masterInterval = null;
+let tickCount = 0;
+
+let lastAppName = '';
+let lastActiveAppId = '';
+
+
+async function pollActiveApp() {
+  try {
+    if (!activeWinModule) {
+      activeWinModule = await import('active-win');
+    }
+    const activeWindow = await activeWinModule.activeWindow();
+    if (activeWindow && activeWindow.owner) {
+      const appName = activeWindow.owner.name;
+      if (appName && appName !== lastAppName) {
+        lastAppName = appName;
+        if (menuBarWin && !menuBarWin.isDestroyed()) {
+          menuBarWin.webContents.send('active-app-changed', appName);
+        }
+      }
+
+      // Determine current app ID for genie effect
+      let currentAppId = '';
+      if (activeWindow.owner.path) {
+        const exeName = path.basename(activeWindow.owner.path).toLowerCase();
+        
+        if (config && config.apps) {
+          for (const [key, appConfig] of Object.entries(config.apps)) {
+            if (appConfig.process && appConfig.process.toLowerCase() === exeName) {
+              currentAppId = key;
+              break;
+            }
+          }
+        }
+        
+        if (!currentAppId && fs.existsSync(appsJsonPath)) {
+          try {
+            const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+            const data = JSON.parse(raw);
+            const allApps = [...(data.apps || []), ...(data.custom || [])];
+            const match = allApps.find(a => a.exec && path.basename(a.exec).toLowerCase() === exeName);
+            if (match) {
+              currentAppId = match.id;
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (currentAppId !== lastActiveAppId) {
+        if (lastActiveAppId && dockWin && !dockWin.isDestroyed()) {
+          dockWin.webContents.send('play-genie', lastActiveAppId);
+        }
+        lastActiveAppId = currentAppId;
+      }
+    } else {
+      const defaultApp = process.platform === 'darwin' ? 'Finder' : 'Explorer';
+      if (lastAppName !== defaultApp) {
+        lastAppName = defaultApp;
+        if (menuBarWin && !menuBarWin.isDestroyed()) {
+          menuBarWin.webContents.send('active-app-changed', lastAppName);
+        }
+      }
+      if (lastActiveAppId && dockWin && !dockWin.isDestroyed()) {
+        dockWin.webContents.send('play-genie', lastActiveAppId);
+      }
+      lastActiveAppId = '';
+    }
+  } catch (err) {
+    const fallbackApp = process.platform === 'darwin' ? 'Finder' : 'Explorer';
+    if (lastAppName !== fallbackApp) {
+      lastAppName = fallbackApp;
+      if (menuBarWin && !menuBarWin.isDestroyed()) {
+        menuBarWin.webContents.send('active-app-changed', lastAppName);
+      }
+    }
+  }
+}
+
+function startMasterTimer() {
+  if (masterInterval) return;
+  
+  masterInterval = setInterval(() => {
+    tickCount++;
+    const isLowRam = settings.performance && settings.performance.lowRamMode;
+    
+    const activeAppThreshold = isLowRam ? 25 : 8; // 3s vs 1s
+    const processThreshold = isLowRam ? 250 : 66; // 30s vs 8s
+    const sysinfoThreshold = isLowRam ? 1000 : 250; // 2min vs 30s
+    
+    // 1. Menu Bar Notch reveal hover check (120ms)
+    if (menuBarWin && !menuBarWin.isDestroyed() && settings.hiding && settings.hiding.enabled) {
+      pollMenuBarHover();
+    }
+    
+    // 2. Dock reveal hover check (120ms)
+    if (dockWin && !dockWin.isDestroyed()) {
+      pollDockHover();
+    }
+    
+    // 3. Active Window App Check
+    if (tickCount % activeAppThreshold === 0) {
+      if (menuBarWin && !menuBarWin.isDestroyed() && menuBarState !== 'collapsed') {
+        pollActiveApp();
+      }
+    }
+    
+    // 4. Processes check (running dots)
+    if (tickCount % processThreshold === 0) {
+      if (dockWin && !dockWin.isDestroyed() && dockState !== 'collapsed') {
+        pollProcesses();
+      }
+    }
+    
+    // 5. System Data (wifi/bluetooth/battery) check
+    if (tickCount % sysinfoThreshold === 0) {
+      const ccOpen = ccWin && !ccWin.isDestroyed() && ccWin.isVisible();
+      const menuExpanded = menuBarState !== 'collapsed';
+      if (ccOpen || menuExpanded) {
+        pollSystemData();
+      }
+    }
+    
+    if (tickCount >= 10000) {
+      tickCount = 0;
+    }
+  }, 120);
+}
+
 // Create macOS Top Menu Bar Window
 let activeAppInterval;
 function createMenuBarWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width } = primaryDisplay.bounds;
+  const targetDisplay = getTargetDisplay();
+  const { x, y, width } = targetDisplay.bounds;
+  const startMinimized = settings.general && settings.general.startMinimizedToTray;
 
   menuBarWin = new BrowserWindow({
     width: width,
     height: 28,
-    x: 0,
-    y: 0,
+    x: x,
+    y: y,
+    show: !startMinimized,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -809,7 +1174,7 @@ function createMenuBarWindow() {
   });
 
   menuBarWin.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    console.log(`[MenuBar Console] ${message} (${sourceId}:${line})`);
+    debugLog(`[MenuBar Console] ${message} (${sourceId}:${line})`);
   });
 
   // Enable macOS menu bar vibrancy
@@ -830,122 +1195,29 @@ function createMenuBarWindow() {
     }
   });
 
-  // Polling active window name at max 1 check/second
-  let lastAppName = '';
-  let lastActiveAppId = '';
-  if (activeAppInterval) clearInterval(activeAppInterval);
-  activeAppInterval = setInterval(async () => {
-    try {
-      if (!activeWinModule) {
-        activeWinModule = await import('active-win');
-      }
-      const activeWindow = await activeWinModule.activeWindow();
-      if (activeWindow && activeWindow.owner) {
-        const appName = activeWindow.owner.name;
-        if (appName && appName !== lastAppName) {
-          lastAppName = appName;
-          if (menuBarWin) {
-            menuBarWin.webContents.send('active-app-changed', appName);
-          }
-        }
-
-        // Determine current app ID for genie effect
-        let currentAppId = '';
-        if (activeWindow.owner.path) {
-          const exeName = path.basename(activeWindow.owner.path).toLowerCase();
-          
-          if (config && config.apps) {
-            for (const [key, appConfig] of Object.entries(config.apps)) {
-              if (appConfig.process && appConfig.process.toLowerCase() === exeName) {
-                currentAppId = key;
-                break;
-              }
-            }
-          }
-          
-          if (!currentAppId && fs.existsSync(appsJsonPath)) {
-            try {
-              const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
-              const allApps = [...(data.apps || []), ...(data.custom || [])];
-              const match = allApps.find(a => a.exec && path.basename(a.exec).toLowerCase() === exeName);
-              if (match) {
-                currentAppId = match.id;
-              }
-            } catch (e) {}
-          }
-        }
-
-        if (currentAppId !== lastActiveAppId) {
-          if (lastActiveAppId && dockWin) {
-            dockWin.webContents.send('play-genie', lastActiveAppId);
-          }
-          lastActiveAppId = currentAppId;
-        }
-      } else {
-        const defaultApp = process.platform === 'darwin' ? 'Finder' : 'Explorer';
-        if (lastAppName !== defaultApp) {
-          lastAppName = defaultApp;
-          if (menuBarWin) {
-            menuBarWin.webContents.send('active-app-changed', lastAppName);
-          }
-        }
-        if (lastActiveAppId && dockWin) {
-          dockWin.webContents.send('play-genie', lastActiveAppId);
-        }
-        lastActiveAppId = '';
-      }
-    } catch (err) {
-      // Graceful fallback to prevent app crashes due to native permission or load errors
-      const fallbackApp = process.platform === 'darwin' ? 'Finder' : 'Explorer';
-      if (lastAppName !== fallbackApp) {
-        lastAppName = fallbackApp;
-        if (menuBarWin) {
-          menuBarWin.webContents.send('active-app-changed', lastAppName);
-        }
-      }
-    }
-  }, 1000);
-
-  menuBarWin.on('closed', () => {
-    menuBarWin = null;
-    if (activeAppInterval) {
-      clearInterval(activeAppInterval);
-      activeAppInterval = null;
-    }
-  });
+  // Active App polling is handled by the master timer.
 }
 
-// Create macOS Dock Window
-let pollInterval = null;
-
-function startProcessPolling() {
-  if (pollInterval) return;
-  pollProcesses();
-  pollInterval = setInterval(pollProcesses, 8000);
-}
-
-function stopProcessPolling() {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
-  }
-}
+function startProcessPolling() {}
+function stopProcessPolling() {}
 
 function createDockWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const targetDisplay = getTargetDisplay();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  const startMinimized = settings.general && settings.general.startMinimizedToTray;
   
   // Start with default width of 800px and height of 85px. Horizontally center it.
   const defaultWidth = 800;
   const defaultHeight = 85;
-  const x = Math.round((screenWidth - defaultWidth) / 2);
-  const y = screenHeight - defaultHeight;
+  const x = dx + Math.round((screenWidth - defaultWidth) / 2);
+  const y = dy + screenHeight - defaultHeight;
 
   dockWin = new BrowserWindow({
     width: defaultWidth,
     height: defaultHeight,
     x: x,
     y: y,
+    show: !startMinimized,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -991,11 +1263,91 @@ function createDockWindow() {
   });
 }
 
+let globalAppWindowsMap = {};
+
+function getOpenWindowsList() {
+  return new Promise((resolve) => {
+    const psCommand = `Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Collections.Generic;
+public class WindowLister {
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    public struct WindowInfo {
+        public string Title;
+        public uint ProcessId;
+    }
+    public static WindowInfo[] GetOpenWindows() {
+        var list = new List<WindowInfo>();
+        EnumWindows((hWnd, lParam) => {
+            if (IsWindowVisible(hWnd)) {
+                StringBuilder sb = new StringBuilder(256);
+                GetWindowText(hWnd, sb, 256);
+                string title = sb.ToString();
+                if (!string.IsNullOrEmpty(title)) {
+                    uint pid;
+                    GetWindowThreadProcessId(hWnd, out pid);
+                    list.Add(new WindowInfo { Title = title, ProcessId = pid });
+                }
+            }
+            return true;
+        }, IntPtr.Zero);
+        return list.ToArray();
+    }
+}
+"@; [WindowLister]::GetOpenWindows() | ConvertTo-Json -Compress`;
+
+    exec(`powershell -NoProfile -Command "${psCommand.replace(/"/g, '\\"')}"`, (err, stdout) => {
+      if (err) {
+        exec(`powershell -NoProfile -Command "Get-Process | Where-Object {$_.MainWindowHandle -ne 0} | Select-Object @{Name='Title';Expression={$_.MainWindowTitle}}, @{Name='ProcessId';Expression={$_.Id}} | ConvertTo-Json -Compress"`, (err2, stdout2) => {
+          if (err2) return resolve([]);
+          try {
+            const parsed = JSON.parse(stdout2);
+            resolve(Array.isArray(parsed) ? parsed : [parsed]);
+          } catch (e) {
+            resolve([]);
+          }
+        });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        resolve(Array.isArray(parsed) ? parsed : [parsed]);
+      } catch (e) {
+        resolve([]);
+      }
+    });
+  });
+}
+
 // Poll OS processes to find which mapped apps are running for the Dock
 function pollProcesses() {
   if (process.platform === 'win32') {
-    execFile('tasklist.exe', ['/NH', '/FO', 'CSV'], { maxBuffer: 1024 * 1024 * 2 }, (err, stdout) => {
+    execFile('tasklist.exe', ['/NH', '/FO', 'CSV'], { maxBuffer: 1024 * 1024 * 2 }, async (err, stdout) => {
       if (err || !stdout) return;
+
+      const lines = stdout.split('\r\n');
+      const processMap = {}; // pid -> exeName
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.split('","').map(p => p.replace(/"/g, '').trim().toLowerCase());
+        if (parts.length >= 2) {
+          const exeName = parts[0];
+          const pid = parseInt(parts[1]);
+          if (!isNaN(pid)) {
+            processMap[pid] = exeName;
+          }
+        }
+      }
 
       const output = stdout.toLowerCase();
       const runningPinnedAppIds = [];
@@ -1013,24 +1365,23 @@ function pollProcesses() {
       }
 
       // 2. Check all apps in apps.json (scanned + custom)
+      let allApps = [];
       if (fs.existsSync(appsJsonPath)) {
         try {
-          const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
-          const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
+          const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+          const appsData = JSON.parse(raw);
+          allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
           
           for (const app of allApps) {
             if (!app.exec) continue;
             const exeName = path.basename(app.exec).toLowerCase();
             if (output.includes(exeName)) {
-              // It is running!
-              // Is it pinned? Pinned apps are listed in config.pinned
               const isPinned = config.pinned && config.pinned.includes(app.id);
               if (isPinned) {
                 if (!runningPinnedAppIds.includes(app.id)) {
                   runningPinnedAppIds.push(app.id);
                 }
               } else {
-                // It's running but NOT pinned! Add to tempRunningApps!
                 const alreadyAdded = tempRunningApps.some(t => t.id === app.id);
                 if (!alreadyAdded) {
                   tempRunningApps.push({
@@ -1048,12 +1399,69 @@ function pollProcesses() {
         }
       }
 
-      if (dockWin) {
-        dockWin.webContents.send('process-update', {
-          runningPinned: runningPinnedAppIds,
-          tempRunning: tempRunningApps
-        });
-      }
+      // 3. Match windows to running apps
+      getOpenWindowsList().then(openWindows => {
+        const localAppWindowsMap = {};
+        const localAppWindowCounts = {};
+
+        const getAppIdForPid = (pid) => {
+          const exeName = processMap[pid];
+          if (!exeName) return null;
+
+          if (config && config.apps) {
+            for (const [appId, appConfig] of Object.entries(config.apps)) {
+              if (appConfig.process && appConfig.process.toLowerCase() === exeName) {
+                return appId;
+              }
+            }
+          }
+
+          for (const app of allApps) {
+            if (app.exec && path.basename(app.exec).toLowerCase() === exeName) {
+              return app.id;
+            }
+          }
+          return null;
+        };
+
+        for (const win of openWindows) {
+          const pid = win.ProcessId || win.pid;
+          const title = win.Title || win.title || '';
+          if (!pid) continue;
+
+          const appId = getAppIdForPid(pid);
+          if (appId) {
+            localAppWindowsMap[appId] = localAppWindowsMap[appId] || [];
+            const dup = localAppWindowsMap[appId].some(w => w.Title === title && w.Pid === pid);
+            if (!dup) {
+              localAppWindowsMap[appId].push({ Title: title, Pid: pid });
+            }
+          }
+        }
+
+        for (const appId of [...runningPinnedAppIds, ...tempRunningApps.map(t => t.id)]) {
+          localAppWindowCounts[appId] = localAppWindowsMap[appId] ? localAppWindowsMap[appId].length : 0;
+        }
+
+        globalAppWindowsMap = localAppWindowsMap;
+
+        if (settings.general && settings.general.smartOrdering) {
+          const counts = config.launchCounts || {};
+          tempRunningApps.sort((a, b) => {
+            const countA = counts[a.id] || 0;
+            const countB = counts[b.id] || 0;
+            return countB - countA;
+          });
+        }
+
+        if (dockWin && !dockWin.isDestroyed()) {
+          dockWin.webContents.send('process-update', {
+            runningPinned: runningPinnedAppIds,
+            tempRunning: tempRunningApps,
+            windowCounts: localAppWindowCounts
+          });
+        }
+      });
     });
   } else {
     const cmd = 'ps -ax -o comm';
@@ -1124,6 +1532,80 @@ ipcMain.on('set-dock-width', (event, dockWidth) => {
   }
 });
 
+let isDockContextMenuOpen = false;
+ipcMain.on('context-menu-state', (event, isOpen) => {
+  isDockContextMenuOpen = isOpen;
+});
+
+ipcMain.on('escape-pressed', () => {
+  forceCollapseAll();
+});
+
+ipcMain.on('refresh-app', async () => {
+  await loadConfig();
+  await loadSettings();
+  applySettings();
+  
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.webContents.send('config-changed', { config: config, appIconsMap: appIconsMap || {} });
+  }
+  
+  const windows = [menuBarWin, spotlightWin, ccWin, settingsWin];
+  for (const w of windows) {
+    if (w && !w.isDestroyed()) {
+      w.webContents.send('settings-changed', settings);
+    }
+  }
+  
+  notifyAppsUpdated();
+});
+
+ipcMain.on('focus-window', (event, pid) => {
+  if (pid) {
+    exec(`powershell -NoProfile -Command "$wshell = New-Object -ComObject WScript.Shell; $wshell.AppActivate(${pid})"`, (err) => {
+      if (err) console.error('Failed to focus window:', err);
+    });
+  }
+});
+
+function forceCollapseAll() {
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.webContents.send('close-context-menu');
+    isDockContextMenuOpen = false;
+    dockWin.webContents.send('set-collapse-state', true);
+    dockState = 'collapsed';
+    stopProcessPolling();
+    
+    const bounds = dockWin.getBounds();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { height: screenHeight } = primaryDisplay.bounds;
+    dockWin.setBounds({
+      x: bounds.x,
+      y: screenHeight - 85,
+      width: bounds.width,
+      height: 85
+    });
+  }
+  
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    menuBarWin.webContents.send('set-collapse-state', true);
+    menuBarState = 'collapsed';
+  }
+  
+  if (ccWin && !ccWin.isDestroyed()) {
+    ccWin.hide();
+  }
+  
+  if (spotlightWin && !spotlightWin.isDestroyed()) {
+    spotlightWin.hide();
+  }
+  
+  if (drawerWin && !drawerWin.isDestroyed() && isDrawerOpen) {
+    closeDrawer();
+  }
+}
+
+
 ipcMain.on('set-dock-height', (event, height) => {
   if (dockWin) {
     const bounds = dockWin.getBounds();
@@ -1140,12 +1622,13 @@ ipcMain.on('set-dock-height', (event, height) => {
   }
 });
 
-ipcMain.handle('get-config', () => {
-  loadConfig();
+ipcMain.handle('get-config', async () => {
+  await loadConfig();
   let appIconsMap = {};
   try {
     if (fs.existsSync(appsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
       const allApps = [...(data.apps || []), ...(data.custom || [])];
       for (const app of allApps) {
         if (app.iconPath) {
@@ -1157,18 +1640,14 @@ ipcMain.handle('get-config', () => {
   return { config, appIconsMap };
 });
 
-ipcMain.on('save-config', (event, pinned) => {
+ipcMain.on('save-config', async (event, pinned) => {
   config.pinned = pinned;
-  fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8', (err) => {
-    if (err) console.error(err);
-  });
+  await saveConfig();
 });
 
-ipcMain.on('save-auto-hide', (event, autoHide) => {
+ipcMain.on('save-auto-hide', async (event, autoHide) => {
   config.autoHide = autoHide;
-  fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8', (err) => {
-    if (err) console.error(err);
-  });
+  await saveConfig();
   
   dockAutoHide = autoHide;
   if (!dockAutoHide) {
@@ -1195,16 +1674,16 @@ ipcMain.handle('get-settings', () => {
   return settings;
 });
 
-ipcMain.on('save-settings', (event, newSettings) => {
+ipcMain.on('save-settings', async (event, newSettings) => {
   settings = newSettings;
-  saveSettings();
+  await saveSettings();
   applySettings();
 });
 
 ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
   if (!shortcut) {
     settings.shortcuts[type] = '';
-    saveSettings();
+    await saveSettings();
     registerGlobalShortcuts();
     return { success: true };
   }
@@ -1230,7 +1709,7 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
     if (success) {
       globalShortcut.unregister(shortcut);
       settings.shortcuts[type] = shortcut;
-      saveSettings();
+      await saveSettings();
       registerGlobalShortcuts();
       return { success: true };
     } else {
@@ -1241,7 +1720,7 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
   }
 });
 
-ipcMain.handle('restore-defaults', () => {
+ipcMain.handle('restore-defaults', async () => {
   settings = {
     general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true },
     appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
@@ -1252,7 +1731,7 @@ ipcMain.handle('restore-defaults', () => {
     },
     shortcuts: { toggleMenuBar: '', openSettings: '' }
   };
-  saveSettings();
+  await saveSettings();
   applySettings();
   registerGlobalShortcuts();
   return settings;
@@ -1268,7 +1747,7 @@ function notifyAppsUpdated() {
   }
 }
 
-ipcMain.handle('get-apps', () => {
+ipcMain.handle('get-apps', async () => {
   try {
     let appsList = [];
     let favorites = [];
@@ -1276,7 +1755,7 @@ ipcMain.handle('get-apps', () => {
 
     // 1. Load Drawer apps from apps.json
     if (fs.existsSync(appsJsonPath)) {
-      const raw = fs.readFileSync(appsJsonPath, 'utf8');
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
       const data = JSON.parse(raw);
       const scanned = data.apps || [];
       const custom = data.custom || [];
@@ -1286,7 +1765,7 @@ ipcMain.handle('get-apps', () => {
     }
 
     // 2. Load Pinned apps from config.json
-    loadConfig();
+    await loadConfig();
     if (config && config.apps) {
       for (const [appId, appConfig] of Object.entries(config.apps)) {
         const execPath = appConfig.exec || appConfig.win;
@@ -1320,9 +1799,10 @@ ipcMain.handle('get-apps', () => {
 ipcMain.handle('save-favorites', async (event, favorites) => {
   try {
     if (fs.existsSync(appsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
       data.favorites = favorites;
-      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      await fs.promises.writeFile(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
       notifyAppsUpdated();
       return true;
     }
@@ -1361,12 +1841,13 @@ ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
   const cachePath = getIconCachePath(exePath, ext);
 
   try {
-    fs.copyFileSync(selectedPath, cachePath);
+    await fs.promises.copyFile(selectedPath, cachePath);
     const iconUrl = `file://${cachePath.replace(/\\/g, '/')}`;
     
     // 1. Read and update apps.json
     if (fs.existsSync(appsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
       
       const updateEntry = (appEntry) => {
         if (appEntry.id === appId || (appEntry.exec && appEntry.exec.toLowerCase() === exePath.toLowerCase())) {
@@ -1378,12 +1859,12 @@ ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
       if (data.apps) data.apps.forEach(updateEntry);
       if (data.custom) data.custom.forEach(updateEntry);
 
-      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      await fs.promises.writeFile(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
       notifyAppsUpdated();
     }
 
     // 2. Read and update config.json
-    loadConfig();
+    await loadConfig();
     let configChanged = false;
     if (config && config.apps) {
       for (const [key, appConfig] of Object.entries(config.apps)) {
@@ -1396,7 +1877,7 @@ ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
       }
     }
     if (configChanged) {
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+      await saveConfig();
       broadcastConfigUpdate();
     }
 
@@ -1414,12 +1895,13 @@ ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
     const cachePath = getIconCachePath(exePath, '.png');
     
     // Save extracted image as PNG
-    fs.writeFileSync(cachePath, nativeImg.toPNG());
+    await fs.promises.writeFile(cachePath, nativeImg.toPNG());
     const iconUrl = `file://${cachePath.replace(/\\/g, '/')}`;
     
     // 1. Read and update apps.json
     if (fs.existsSync(appsJsonPath)) {
-      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
       
       const updateEntry = (appEntry) => {
         if (appEntry.id === appId || (appEntry.exec && appEntry.exec.toLowerCase() === exePath.toLowerCase())) {
@@ -1431,12 +1913,12 @@ ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
       if (data.apps) data.apps.forEach(updateEntry);
       if (data.custom) data.custom.forEach(updateEntry);
 
-      fs.writeFileSync(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      await fs.promises.writeFile(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
       notifyAppsUpdated();
     }
 
     // 2. Read and update config.json
-    loadConfig();
+    await loadConfig();
     let configChanged = false;
     if (config && config.apps) {
       for (const [key, appConfig] of Object.entries(config.apps)) {
@@ -1449,7 +1931,7 @@ ipcMain.handle('reset-app-icon', async (event, { appId, exePath }) => {
       }
     }
     if (configChanged) {
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+      await saveConfig();
       broadcastConfigUpdate();
     }
 
@@ -1483,7 +1965,8 @@ ipcMain.handle('select-custom-app', async () => {
   let existingData = { settings: { useDesktopCapture: true }, apps: [], custom: [] };
   try {
     if (fs.existsSync(appsJsonPath)) {
-      existingData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      existingData = JSON.parse(raw);
     }
   } catch (e) {}
 
@@ -1504,7 +1987,7 @@ ipcMain.handle('select-custom-app', async () => {
 
   existingData.custom = custom;
   try {
-    fs.writeFileSync(appsJsonPath, JSON.stringify(existingData, null, 2), 'utf8');
+    await fs.promises.writeFile(appsJsonPath, JSON.stringify(existingData, null, 2), 'utf8');
   } catch (e) {
     console.error('Failed to write apps.json after custom add:', e);
     return { added: false };
@@ -1521,64 +2004,7 @@ ipcMain.on('toggle-drawer', () => {
   }
 });
 
-// Helper to check if a registry protocol or local executable is available on Windows
-function isAppInstalled(appConfig) {
-  const name = appConfig.name.toLowerCase();
-  
-  if (name === 'finder' || name === 'launchpad' || name === 'system preferences' || name === 'trash' || name === 'app store') {
-    return true;
-  }
-  
-  if (name === 'notes') {
-    return fs.existsSync('C:\\Windows\\System32\\notepad.exe') || fs.existsSync('C:\\Windows\\notepad.exe');
-  }
 
-  if (name === 'safari') {
-    return fs.existsSync('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe') || 
-           fs.existsSync('C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe');
-  }
-
-  if (name === 'facetime') {
-    return true;
-  }
-
-  if (fs.existsSync(appsJsonPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
-      const allApps = [...(data.apps || []), ...(data.custom || [])];
-      
-      const processName = appConfig.process ? appConfig.process.toLowerCase() : '';
-      const execName = appConfig.win ? path.basename(appConfig.win).toLowerCase() : '';
-      
-      const match = allApps.some(app => {
-        if (!app.exec) return false;
-        const appExec = app.exec.toLowerCase();
-        return (processName && appExec.includes(processName)) || 
-               (execName && appExec.includes(execName));
-      });
-      
-      if (match) return true;
-    } catch (e) {}
-  }
-  
-  if (appConfig.win) {
-    if (appConfig.win.includes(':\\') || appConfig.win.includes(':/')) {
-      if (fs.existsSync(appConfig.win)) return true;
-    }
-    if (appConfig.win.endsWith(':') || appConfig.win.includes('://')) {
-      const protocol = appConfig.win.replace('://', '').replace(':', '');
-      try {
-        const { execSync } = require('child_process');
-        const stdout = execSync(`powershell -NoProfile -Command "Test-Path 'Registry::HKEY_CLASSES_ROOT\\${protocol}'"`, { encoding: 'utf8' });
-        if (stdout.trim().toLowerCase() === 'true') {
-          return true;
-        }
-      } catch (e) {}
-    }
-  }
-
-  return false;
-}
 
 // Helper to bring an already running window to the foreground on Windows
 function focusRunningApp(processName) {
@@ -1598,14 +2024,17 @@ function focusRunningApp(processName) {
       `}`
     ].join('\n');
     
-    fs.writeFileSync(tmpScript, psContent, 'utf8');
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpScript}"`, (err, stdout) => {
-      try { fs.unlinkSync(tmpScript); } catch(e) {}
-      if (!err && stdout && stdout.includes('SUCCESS')) {
-        resolve(true);
-      } else {
-        resolve(false);
-      }
+    fs.promises.writeFile(tmpScript, psContent, 'utf8').then(() => {
+      exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpScript}"`, async (err, stdout) => {
+        try { await fs.promises.unlink(tmpScript); } catch(e) {}
+        if (!err && stdout && stdout.includes('SUCCESS')) {
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      });
+    }).catch(() => {
+      resolve(false);
     });
   });
 }
@@ -1615,11 +2044,21 @@ ipcMain.on('hide-drawer', () => {
 });
 
 ipcMain.on('launch-app', async (event, appId) => {
+  if (appId) {
+    try {
+      config.launchCounts = config.launchCounts || {};
+      config.launchCounts[appId] = (config.launchCounts[appId] || 0) + 1;
+      await saveConfig(); // [FIX] Now properly defined — was previously undefined
+    } catch (err) {
+      console.error('Failed to persist launch count:', err);
+    }
+  }
   let appConfig = config && config.apps ? config.apps[appId] : null;
 
   if (!appConfig && fs.existsSync(appsJsonPath)) {
     try {
-      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const appsData = JSON.parse(raw);
       const allEntries = [...(appsData.apps || []), ...(appsData.custom || [])];
       const found = allEntries.find(a => a.id === appId);
       if (found) {
@@ -1704,27 +2143,20 @@ if (!isPrimaryInstance) {
     }
   });
 
-  app.whenReady().then(() => {
-    loadConfig();
-    loadSettings();
+  app.whenReady().then(async () => {
+    await loadConfig();
+    await loadSettings();
     ensureIconsFolder();
+    createTray();
+    if (settings.general && settings.general.checkForUpdatesAutomatically !== false) {
+      debugLog("[Update Check] Stub: Automatically checking for updates...");
+    }
     createMenuBarWindow();
     createDockWindow();
     createSettingsWindow();
     createDrawerWindow();
     registerGlobalShortcuts();
-    startCursorPolling(); // Starts menu bar hover polling
-    startDockCursorPolling(); // Starts dock hover polling
-    startSystemDataPolling(); // Starts WiFi, Bluetooth, Battery status polling
- 
-    // Perform slow startup scanning in background after 3 seconds
-    setTimeout(() => {
-      scanAndPopulateApps().then(() => {
-        notifyAppsUpdated();
-      }).catch(err => {
-        console.error('Background app scan failed:', err);
-      });
-    }, 3000);
+    startMasterTimer();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -1831,7 +2263,7 @@ function regenerateAppsJson() {
     JSON.stringify(output, null, 2),
     'utf8'
   );
-  console.log(`Successfully generated apps.json with ${appsList.length} applications!`);
+  debugLog(`Successfully generated apps.json with ${appsList.length} applications!`);
 }
 // regenerateAppsJson();
 */
@@ -1982,62 +2414,58 @@ let lastBluetoothOn = false;
 let lastBatteryPercent = 100;
 let lastBatteryIsCharging = false;
 
-function startSystemDataPolling() {
-  const si = require('systeminformation');
-  
-  const poll = async () => {
-    try {
-      let ssid = '';
-      try {
-        const wifi = await si.wifiConnections();
-        ssid = (wifi && wifi.length > 0) ? wifi[0].ssid : '';
-      } catch (e) {}
-
-      let bluetoothOn = false;
-      try {
-        bluetoothOn = await getBluetoothState();
-      } catch (e) {}
-      
-      let batteryPercent = lastBatteryPercent;
-      let batteryIsCharging = lastBatteryIsCharging;
-      
-      if (sysDataTick % 2 === 0) {
-        try {
-          const battery = await si.battery();
-          if (battery && battery.hasBattery) {
-            batteryPercent = battery.percent;
-            batteryIsCharging = battery.isCharging;
-          }
-        } catch (e) {}
-      }
-      
-      sysDataTick++;
-      
-      lastWifiSSID = ssid;
-      lastBluetoothOn = bluetoothOn;
-      lastBatteryPercent = batteryPercent;
-      lastBatteryIsCharging = batteryIsCharging;
-      
-      const payload = {
-        wifi: { ssid: lastWifiSSID, on: lastWifiSSID !== '' },
-        bluetooth: { on: lastBluetoothOn },
-        battery: { percent: lastBatteryPercent, isCharging: lastBatteryIsCharging }
-      };
-      
-      if (menuBarWin && !menuBarWin.isDestroyed()) {
-        menuBarWin.webContents.send('system-data-update', payload);
-      }
-      if (ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
-        ccWin.webContents.send('system-data-update', payload);
-      }
-    } catch (err) {
-      console.error('System data polling error:', err);
+let sysInfoMod = null;
+async function pollSystemData() {
+  try {
+    if (!sysInfoMod) {
+      sysInfoMod = require('systeminformation');
     }
-  };
-  
-  poll();
-  setInterval(poll, 30000);
+    
+    let ssid = '';
+    try {
+      const wifi = await sysInfoMod.wifiConnections();
+      ssid = (wifi && wifi.length > 0) ? wifi[0].ssid : '';
+    } catch (e) {}
+
+    let bluetoothOn = false;
+    try {
+      bluetoothOn = await getBluetoothState();
+    } catch (e) {}
+    
+    let batteryPercent = lastBatteryPercent;
+    let batteryIsCharging = lastBatteryIsCharging;
+    
+    try {
+      const battery = await sysInfoMod.battery();
+      if (battery && battery.hasBattery) {
+        batteryPercent = battery.percent;
+        batteryIsCharging = battery.isCharging;
+      }
+    } catch (e) {}
+    
+    lastWifiSSID = ssid;
+    lastBluetoothOn = bluetoothOn;
+    lastBatteryPercent = batteryPercent;
+    lastBatteryIsCharging = batteryIsCharging;
+    
+    const payload = {
+      wifi: { ssid: lastWifiSSID, on: lastWifiSSID !== '' },
+      bluetooth: { on: lastBluetoothOn },
+      battery: { percent: lastBatteryPercent, isCharging: lastBatteryIsCharging }
+    };
+    
+    if (menuBarWin && !menuBarWin.isDestroyed()) {
+      menuBarWin.webContents.send('system-data-update', payload);
+    }
+    if (ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
+      ccWin.webContents.send('system-data-update', payload);
+    }
+  } catch (err) {
+    console.error('System data polling error:', err);
+  }
 }
+
+function startSystemDataPolling() {}
 
 // IPC Handlers Registration
 ipcMain.on('toggle-control-center', (event, rect) => {
@@ -2118,7 +2546,8 @@ ipcMain.handle('spotlight-search', async (event, query) => {
   
   if (fs.existsSync(appsJsonPath)) {
     try {
-      const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const appsData = JSON.parse(raw);
       const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
       for (const app of allApps) {
         if (app.name && app.name.toLowerCase().includes(queryLower)) {
@@ -2173,14 +2602,19 @@ ipcMain.handle('export-settings', async () => {
   });
   if (result.canceled || !result.filePath) return { success: false };
   try {
+    let appsData = {};
+    if (fs.existsSync(appsJsonPath)) {
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      appsData = JSON.parse(raw);
+    }
     const backup = {
       type: 'macos-dock-backup',
       version: '1.0.0',
       settings: settings,
-      apps: fs.existsSync(appsJsonPath) ? JSON.parse(fs.readFileSync(appsJsonPath, 'utf8')) : {},
+      apps: appsData,
       config: config
     };
-    fs.writeFileSync(result.filePath, JSON.stringify(backup, null, 2), 'utf8');
+    await fs.promises.writeFile(result.filePath, JSON.stringify(backup, null, 2), 'utf8');
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
@@ -2195,7 +2629,7 @@ ipcMain.handle('import-settings', async () => {
   });
   if (result.canceled || !result.filePaths || result.filePaths.length === 0) return { success: false };
   try {
-    const raw = fs.readFileSync(result.filePaths[0], 'utf8');
+    const raw = await fs.promises.readFile(result.filePaths[0], 'utf8');
     const backup = JSON.parse(raw);
     if (backup.type !== 'macos-dock-backup' || !backup.settings || !backup.config) {
       return { success: false, error: 'Invalid settings backup schema.' };
@@ -2203,21 +2637,21 @@ ipcMain.handle('import-settings', async () => {
     
     const timestamp = Date.now();
     if (fs.existsSync(settingsPath)) {
-      fs.copyFileSync(settingsPath, `${settingsPath}.bak_${timestamp}`);
+      await fs.promises.copyFile(settingsPath, `${settingsPath}.bak_${timestamp}`);
     }
     if (fs.existsSync(appsJsonPath)) {
-      fs.copyFileSync(appsJsonPath, `${appsJsonPath}.bak_${timestamp}`);
+      await fs.promises.copyFile(appsJsonPath, `${appsJsonPath}.bak_${timestamp}`);
     }
     if (fs.existsSync(configPath)) {
-      fs.copyFileSync(configPath, `${configPath}.bak_${timestamp}`);
+      await fs.promises.copyFile(configPath, `${configPath}.bak_${timestamp}`);
     }
     
     settings = backup.settings;
     config = backup.config;
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
     if (backup.apps && Object.keys(backup.apps).length > 0) {
-      fs.writeFileSync(appsJsonPath, JSON.stringify(backup.apps, null, 2), 'utf8');
+      await fs.promises.writeFile(appsJsonPath, JSON.stringify(backup.apps, null, 2), 'utf8');
     }
     
     if (menuBarWin && !menuBarWin.isDestroyed()) menuBarWin.reload();
@@ -2232,80 +2666,100 @@ ipcMain.handle('import-settings', async () => {
   }
 });
 
-ipcMain.on('add-to-dock', (event, appId, appInfo) => {
-  loadConfig();
-  if (!config.pinned.includes(appId)) {
-    config.pinned.push(appId);
-  }
-  
-  config.apps = config.apps || {};
-  if (!config.apps[appId]) {
-    const exeName = path.basename(appInfo.exec || appInfo.win);
-    config.apps[appId] = {
-      name: appInfo.name,
-      win: exeName,
-      mac: '',
-      process: exeName
-    };
-  }
-  
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  broadcastConfigUpdate();
-});
-
-ipcMain.on('remove-from-dock', (event, appId) => {
-  loadConfig();
-  config.pinned = config.pinned.filter(id => id !== appId);
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  broadcastConfigUpdate();
-});
-
-ipcMain.on('keep-in-dock', (event, appId) => {
-  loadConfig();
-  if (!config.pinned.includes(appId)) {
-    config.pinned.push(appId);
-    
-    if (fs.existsSync(appsJsonPath)) {
-      try {
-        const appsData = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
-        const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
-        const app = allApps.find(a => a.id === appId);
-        if (app) {
-          config.apps = config.apps || {};
-          const exeName = path.basename(app.exec);
-          config.apps[appId] = {
-            name: app.name,
-            win: exeName,
-            mac: '',
-            process: exeName,
-            iconPath: app.iconPath || ''
-          };
-        }
-      } catch (e) {}
+ipcMain.on('add-to-dock', async (event, appId, appInfo) => {
+  try {
+    await loadConfig();
+    if (!config.pinned.includes(appId)) {
+      config.pinned.push(appId);
     }
+    
+    config.apps = config.apps || {};
+    if (!config.apps[appId]) {
+      const exeName = path.basename(appInfo.exec || appInfo.win);
+      config.apps[appId] = {
+        name: appInfo.name,
+        win: exeName,
+        mac: '',
+        process: exeName
+      };
+    }
+    
+    await saveConfig(); // [FIX] Replaced raw fs.writeFileSync with saveConfig()
+    await broadcastConfigUpdate();
+  } catch (err) {
+    console.error('Failed to add to dock:', err);
   }
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  broadcastConfigUpdate();
 });
 
-ipcMain.on('set-badge', (event, appId, count) => {
-  loadConfig();
-  config.badges = config.badges || {};
-  if (count <= 0) {
-    delete config.badges[appId];
-  } else {
-    config.badges[appId] = count;
+ipcMain.on('remove-from-dock', async (event, appId) => {
+  try {
+    await loadConfig();
+    config.pinned = config.pinned.filter(id => id !== appId);
+    await saveConfig(); // [FIX] Replaced raw fs.writeFileSync with saveConfig()
+    await broadcastConfigUpdate();
+  } catch (err) {
+    console.error('Failed to remove from dock:', err);
   }
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-  broadcastConfigUpdate();
 });
 
-function broadcastConfigUpdate() {
+ipcMain.on('keep-in-dock', async (event, appId) => {
+  try {
+    await loadConfig();
+    if (!config.pinned.includes(appId)) {
+      config.pinned.push(appId);
+      
+      if (fs.existsSync(appsJsonPath)) {
+        try {
+          const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+          const appsData = JSON.parse(raw);
+          const allApps = [...(appsData.apps || []), ...(appsData.custom || [])];
+          const app = allApps.find(a => a.id === appId);
+          if (app) {
+            config.apps = config.apps || {};
+            const exeName = path.basename(app.exec);
+            config.apps[appId] = {
+              name: app.name,
+              win: exeName,
+              mac: '',
+              process: exeName,
+              iconPath: app.iconPath || ''
+            };
+          }
+        } catch (e) {
+          console.error('Failed to read apps.json for keep-in-dock:', e);
+        }
+      }
+    }
+    await saveConfig(); // [FIX] Replaced raw fs.writeFileSync with saveConfig()
+    await broadcastConfigUpdate();
+  } catch (err) {
+    console.error('Failed to keep in dock:', err);
+  }
+});
+
+ipcMain.on('set-badge', async (event, appId, count) => {
+  try {
+    await loadConfig();
+    config.badges = config.badges || {};
+    if (count <= 0) {
+      delete config.badges[appId];
+    } else {
+      config.badges[appId] = count;
+    }
+    await saveConfig(); // [FIX] Replaced raw fs.writeFileSync with saveConfig()
+    await broadcastConfigUpdate();
+  } catch (err) {
+    console.error('Failed to set badge:', err);
+  }
+});
+
+async function broadcastConfigUpdate() {
   if (dockWin && !dockWin.isDestroyed()) {
     let appIconsMap = {};
     try {
       if (fs.existsSync(appsJsonPath)) {
-        const data = JSON.parse(fs.readFileSync(appsJsonPath, 'utf8'));
+        const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+        const data = JSON.parse(raw);
         const allApps = [...(data.apps || []), ...(data.custom || [])];
         for (const app of allApps) {
           if (app.iconPath) {

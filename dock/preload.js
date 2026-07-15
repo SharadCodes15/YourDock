@@ -18,5 +18,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setBadge: (appId, count) => ipcRenderer.send('set-badge', appId, count),
   onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, data) => callback(data)),
   onPlayGenie: (callback) => ipcRenderer.on('play-genie', (_event, appId) => callback(appId)),
-  setDockHeight: (height) => ipcRenderer.send('set-dock-height', height)
+  setDockHeight: (height) => ipcRenderer.send('set-dock-height', height),
+  pressEscape: () => ipcRenderer.send('escape-pressed'),
+  onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config'),
+  getOpenWindows: (appId) => ipcRenderer.invoke('get-open-windows', appId),
+  focusWindow: (pid) => ipcRenderer.send('focus-window', pid),
+  contextMenuState: (isOpen) => ipcRenderer.send('context-menu-state', isOpen),
+  onCloseContextMenu: (callback) => ipcRenderer.on('close-context-menu', () => callback())
 });
+

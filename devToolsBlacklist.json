@@ -1,0 +1,49 @@
+{
+  "_comment": "Keywords and executable names to filter from the Start Menu scan. Case-insensitive. Edit freely.",
+  "nameKeywords": [
+    "uninstall", "remove", "readme", "help", "changelog", "release notes",
+    "setup", "install", "updater", "update", "uninst", "license", "eula",
+    "documentation", "manual", "website", "web site", "support", "about",
+    "repair", "diagnostic", "troubleshoot", "debug", "crash", "report",
+    "configuration", "config tool", "command prompt", "powershell",
+    "accessibility", "narrator", "magnify", "osk", "on-screen keyboard",
+    "compatibility", "migration", "administrative tools"
+  ],
+  "devToolKeywords": [
+    "node.js", "nodejs", "npm", "npx", "pip", "python", "java ",
+    "jdk", "jre", "java control panel", "javaws",
+    "git bash", "git gui", "git cmd",
+    "docker", "docker desktop",
+    "visual studio build tools", "vcvarsall", "developer command prompt",
+    "developer powershell", "msbuild",
+    ".net sdk", "dotnet", "nuget",
+    "windows sdk", "windows kits",
+    "visual c++ redistributable", "vcredist", "directx",
+    "mingw", "msys2", "cygwin",
+    "ruby", "gem", "rails",
+    "rustup", "cargo",
+    "go programming", "golang",
+    "perl", "strawberry perl",
+    "cmake", "make", "nmake",
+    "wsl", "windows subsystem",
+    "android studio sdk", "adb", "android sdk",
+    "driver", "device manager",
+    "redistributable", "runtime"
+  ],
+  "exeBlacklist": [
+    "cmd.exe", "powershell.exe", "pwsh.exe",
+    "python.exe", "pythonw.exe", "python3.exe",
+    "node.exe", "npm.cmd", "npx.cmd",
+    "pip.exe", "pip3.exe",
+    "java.exe", "javaw.exe", "javaws.exe",
+    "git.exe", "git-bash.exe", "git-cmd.exe",
+    "ruby.exe", "irb.exe",
+    "rustup.exe", "cargo.exe",
+    "go.exe",
+    "perl.exe",
+    "cmake.exe", "make.exe",
+    "dotnet.exe",
+    "wsl.exe", "bash.exe",
+    "conhost.exe", "wt.exe"
+  ]
+}

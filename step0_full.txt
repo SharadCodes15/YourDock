@@ -1,0 +1,37 @@
+<USER_REQUEST>
+Add the following refinements to the existing Electron dock/menu-bar/drawer/settings app. Do NOT change existing icon layout, magnification, favorites sidebar, drawer grid, or core launch logic — these are behavioral/visual refinements layered on top of what's already built.
+
+======================
+1) CONTEXT MENU POSITION — ABOVE ICON
+======================
+- The existing right-click context menu (Open/Options/Show in Finder/Quit/Remove from Dock/Keep in Dock/Set Badge Count) currently opens at cursor position — change it to always anchor directly ABOVE the clicked icon (bottom edge of menu sits ~8px above the icon's top edge, horizontally centered on the icon).
+- If the icon is near a screen edge (leftmost/rightmost few icons), clamp the menu's horizontal position so it doesn't clip off-screen — shift left/right just enough to stay fully visible, don't change vertical anchor logic.
+
+======================
+2) UNIFIED CLOSE/HIDE BEHAVIOR
+======================
+- Cursor-leave rule: if the cursor leaves BOTH the dock's bounds AND the open context menu's bounds (check both rects, not just one) for 400ms, close the context menu first, then if auto-hide is enabled, hide the dock immediately after (chain the two, don't require a second separate leave event).
+- Escape key: pressing Esc should ALWAYS hide the dock and close any open menu/popover, regardless of current state (menu open, dock expanded, dock mid-animation, cursor still hovering, auto-hide disabled or enabled). This is a hard override — register a single global 'Escape' handler that force-runs the hide sequence unconditionally, don't rely on state checks that could skip it. If auto-hide is OFF, Esc still visually collapses the dock this one time (user can re-summon it by re-triggering the reveal zone).
+- Apply the identical cursor-leave + Esc logic to the menu bar's dropdowns and Control Center popover for consistency (reuse one shared close-on-escape module rather than duplicating per-window).
+
+======================
+3) GLASS LOOK (
+<truncated 5628 bytes>
+ow RAM Mode" toggle (from Performance settings): when enabled, disables magnification hover-effect calculations, drops all polling intervals to their slowest acceptable rate (battery/wifi checks to 2min, cursor-hotspot polls stay as-is since they're needed for core show/hide), and disables the genie/badge animations — keeps the app functional but leaner for low-spec machines.
+- Icon cache (already built) continues to prevent redundant extraction — verify cached PNGs are reused correctly and not silently re-extracted on every Drawer/Settings open.
+
+PERFORMANCE NOTES (apply globally):
+- All new IPC channels additive, no renamed/removed existing handlers.
+- No new frameworks introduced anywhere in this pass.
+- Test that Esc-hide and cursor-leave-hide work correctly even when multiple popovers (menu bar dropdown + Control Center + dock context menu) could theoretically be open — only one should realistically be open at a time, but the close-all logic should be safe to call redundantly without errors.
+
+Output: updates to dock renderer/main.js (context menu positioning, cursor-leave+Esc handling, window grouping, smart ordering, low-RAM guards), shared closeOnEscape.js module (reused across dock/menubar/control-center), theme.css / theme-variables.js (CSS custom property system), updates to settings.html (Performance category, expanded Appearance category, refresh button), and settings.json schema additions (theme presets array, lowRamMode flag, autoArrangeByUsage flag). Must not break any dock, menu bar, drawer, control center, or settings functionality built previously.
+
+also app laucher show change tab on scroll
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-15T12:45:28+05:30.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.5 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

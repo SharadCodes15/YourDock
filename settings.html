@@ -33,6 +33,19 @@
       }
     }
 
+    body.dark-theme {
+      --bg-color: #1e1e1e;
+      --sidebar-bg: #2d2d2d;
+      --sidebar-border: #181818;
+      --text-color: #dddddd;
+      --text-muted: #999999;
+      --panel-bg: #252526;
+      --accent-color: #007aff;
+      --hover-bg: rgba(255, 255, 255, 0.08);
+      --selected-bg: rgba(255, 255, 255, 0.15);
+      --border-color: rgba(255, 255, 255, 0.1);
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -427,6 +440,16 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" /><line x1="6" y1="8" x2="6.01" y2="8"/><line x1="10" y1="8" x2="10.01" y2="8"/><line x1="14" y1="8" x2="14.01" y2="8"/><line x1="18" y1="8" x2="18.01" y2="8"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/><line x1="14" y1="12" x2="14.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></svg>
       <span>Shortcuts</span>
     </div>
+    <div class="sidebar-item" data-panel="performance">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/>
+        <line x1="6" y1="6" x2="6" y2="18"/>
+        <line x1="10" y1="6" x2="10" y2="18"/>
+        <line x1="14" y1="6" x2="14" y2="18"/>
+        <line x1="18" y1="6" x2="18" y2="18"/>
+      </svg>
+      <span>Performance</span>
+    </div>
     <div class="sidebar-item" data-panel="about">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       <span>About</span>
@@ -456,6 +479,38 @@
         <input type="checkbox" id="gen-dock">
       </div>
 
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Start Minimized to Tray</div>
+          <div class="setting-desc">Hide windows at startup and run in the system tray.</div>
+        </div>
+        <input type="checkbox" id="gen-start-minimized">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Smart Ordering in Dock</div>
+          <div class="setting-desc">Automatically sort running apps in the Dock by launch frequency.</div>
+        </div>
+        <input type="checkbox" id="gen-smart-ordering">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Hide Developer Tools & Utilities</div>
+          <div class="setting-desc">Hide dev runtimes (Node, Python, Git, etc.) from the Drawer scan. Manual .exe additions are unaffected.</div>
+        </div>
+        <input type="checkbox" id="gen-hide-devtools">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Check for Updates Automatically</div>
+          <div class="setting-desc">Automatically check for new versions of the app.</div>
+        </div>
+        <input type="checkbox" id="gen-check-updates">
+      </div>
+
       <div class="section-title">Clock & Date</div>
 
       <div class="setting-row">
@@ -482,6 +537,10 @@
         </div>
         <input type="checkbox" id="gen-date">
       </div>
+
+      <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; justify-content: center;">
+        <button id="gen-refresh-app" class="btn-primary" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">Refresh App</button>
+      </div>
     </div>
 
     <!-- APPEARANCE PANEL -->
@@ -490,59 +549,55 @@
 
       <div class="setting-row">
         <div>
-          <div class="setting-label">Theme</div>
-          <div class="setting-desc">Customize the appearance of the menu bar.</div>
+          <div class="setting-label">Theme / Preset</div>
+          <div class="setting-desc">Select active look or custom preset.</div>
         </div>
-        <div class="radio-group">
-          <label class="radio-option">
-            <input type="radio" name="app-theme" id="app-theme-light" value="light">
-            <span>Light</span>
-          </label>
-          <label class="radio-option">
-            <input type="radio" name="app-theme" id="app-theme-dark" value="dark">
-            <span>Dark</span>
-          </label>
-          <label class="radio-option">
-            <input type="radio" name="app-theme" id="app-theme-auto" value="auto" checked>
-            <span>Auto</span>
-          </label>
-        </div>
+        <select id="app-theme-select" style="min-width: 140px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="auto">Auto</option>
+          <optgroup label="Custom Presets" id="app-presets-group">
+            <!-- Dynamic presets go here -->
+          </optgroup>
+        </select>
       </div>
 
       <div class="setting-row">
         <div>
-          <div class="setting-label">Blur Intensity</div>
-          <div class="setting-desc">Set background blur intensity of the bar.</div>
+          <div class="setting-label">Glass Intensity</div>
+          <div class="setting-desc">Adjust background blur and opacity preset.</div>
         </div>
-        <div class="slider-container">
-          <input type="range" id="app-blur" min="0" max="30" value="20">
-          <span class="slider-value" id="app-blur-val">20px</span>
-        </div>
+        <select id="app-glass-intensity" style="min-width: 140px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+          <option value="Subtle">Subtle (Low blur)</option>
+          <option value="Standard">Standard</option>
+          <option value="Heavy">Heavy (High blur)</option>
+        </select>
       </div>
 
       <div class="setting-row">
         <div>
-          <div class="setting-label">Menu Bar Opacity</div>
-          <div class="setting-desc">Adjust the transparency of the menu bar.</div>
+          <div class="setting-label">Corner Roundness</div>
+          <div class="setting-desc">Set border corner radius.</div>
         </div>
         <div class="slider-container">
-          <input type="range" id="app-opacity" min="30" max="100" value="85">
-          <span class="slider-value" id="app-opacity-val">85%</span>
+          <input type="range" id="app-corner-radius" min="8" max="24" value="12">
+          <span class="slider-value" id="app-corner-radius-val">12px</span>
         </div>
       </div>
 
       <div class="setting-row">
         <div>
           <div class="setting-label">Accent Color</div>
-          <div class="setting-desc">Hover highlight color of menu items.</div>
+          <div class="setting-desc">Highlight color for interactive items.</div>
         </div>
-        <div class="color-picker">
-          <div class="color-swatch" style="background-color: #007aff;" data-color="#007aff"></div>
-          <div class="color-swatch" style="background-color: #5856d6;" data-color="#5856d6"></div>
-          <div class="color-swatch" style="background-color: #ff2d55;" data-color="#ff2d55"></div>
-          <div class="color-swatch" style="background-color: #ff3b30;" data-color="#ff3b30"></div>
-          <div class="color-swatch" style="background-color: #ff9500;" data-color="#ff9500"></div>
-          <div class="color-swatch" style="background-color: #34c759;" data-color="#34c759"></div>
+        <input type="color" id="app-accent-picker" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+
+      <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
+        <div style="font-weight: 600; font-size: 13px;">Save Current as Preset</div>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <input type="text" id="app-preset-name" placeholder="Preset Name" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--panel-bg); color: var(--text-color); outline: none; font-size: 13px;">
+          <button id="app-preset-save" class="btn-primary" style="padding: 6px 14px; font-size: 12.5px; border-radius: 4px; border: none; font-weight: 500; cursor: pointer; color: white;">Save</button>
         </div>
       </div>
     </div>
@@ -557,6 +612,16 @@
           <div class="setting-desc">Hide when windows are fullscreen/maximized.</div>
         </div>
         <input type="checkbox" id="hide-master">
+      </div>
+
+      <div class="setting-row" id="row-monitor-override" style="display: none;">
+        <div>
+          <div class="setting-label">Display Monitor Override</div>
+          <div class="setting-desc">Select which monitor the Menu Bar and Dock should appear on.</div>
+        </div>
+        <select id="hide-monitor-select" style="min-width: 140px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+          <!-- Populated dynamically -->
+        </select>
       </div>
 
       <div class="section-title" style="margin-top: 15px;">Dock Settings</div>
@@ -676,6 +741,31 @@
       <div class="shortcut-error" id="short-settings-error">Conflict detected. Try another shortcut.</div>
     </div>
 
+    <!-- PERFORMANCE PANEL -->
+    <div class="panel" id="panel-performance">
+      <h2>Performance</h2>
+      
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Low RAM Mode</div>
+          <div class="setting-desc">Disable animations and slow down polling to save memory and CPU.</div>
+        </div>
+        <input type="checkbox" id="perf-low-ram">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">App Memory Usage</div>
+          <div class="setting-desc">Total RAM usage of all application processes.</div>
+        </div>
+        <div style="font-weight: 600; font-size: 14px;" id="perf-ram-usage">Retrieving...</div>
+      </div>
+
+      <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; justify-content: center; gap: 12px;">
+        <button id="perf-clear-cache" class="btn-danger" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">Clear Icon Cache</button>
+      </div>
+    </div>
+
     <!-- ABOUT PANEL -->
     <div class="panel" id="panel-about">
       <h2>About</h2>
@@ -704,6 +794,7 @@
 
   </div>
 
+  <script src="closeOnEscape.js"></script>
   <script>
     let currentSettings = {};
     let activeKeyCaptureId = null;
@@ -765,27 +856,38 @@
       // General Bindings
       document.getElementById('gen-login').checked = currentSettings.general.launchAtLogin;
       document.getElementById('gen-dock').checked = currentSettings.general.showInDock;
+      document.getElementById('gen-start-minimized').checked = currentSettings.general.startMinimizedToTray || false;
+      document.getElementById('gen-check-updates').checked = currentSettings.general.checkForUpdatesAutomatically !== false;
+      document.getElementById('gen-smart-ordering').checked = currentSettings.general.smartOrdering || false;
+      document.getElementById('gen-hide-devtools').checked = currentSettings.general.hideDevTools !== false; // default ON
       document.getElementById('gen-clock-12').checked = currentSettings.general.clockFormat12h;
       document.getElementById('gen-clock-24').checked = !currentSettings.general.clockFormat12h;
       document.getElementById('gen-date').checked = currentSettings.general.showDate;
 
-      // Appearance Bindings
-      const themeVal = currentSettings.appearance.theme;
-      document.getElementById(`app-theme-${themeVal}`).checked = true;
-      document.getElementById('app-blur').value = currentSettings.appearance.blurIntensity;
-      document.getElementById('app-blur-val').textContent = `${currentSettings.appearance.blurIntensity}px`;
-      document.getElementById('app-opacity').value = Math.round(currentSettings.appearance.opacity * 100);
-      document.getElementById('app-opacity-val').textContent = `${Math.round(currentSettings.appearance.opacity * 100)}%`;
-
-      // Select active accent colorSwatch
-      const colorPresets = document.querySelectorAll('.color-swatch');
-      colorPresets.forEach(swatch => {
-        if (swatch.getAttribute('data-color') === currentSettings.appearance.accentColor) {
-          swatch.classList.add('active');
-        } else {
-          swatch.classList.remove('active');
+      // Monitor Override Binding
+      window.settingsAPI.getDisplays().then(displays => {
+        if (displays && displays.length > 1) {
+          const row = document.getElementById('row-monitor-override');
+          row.style.display = '';
+          const select = document.getElementById('hide-monitor-select');
+          select.innerHTML = '<option value="primary">Primary Display</option>';
+          displays.forEach((d, index) => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.textContent = `Monitor ${index + 1} (${d.bounds.width}x${d.bounds.height})${d.isPrimary ? ' (Primary)' : ''}`;
+            select.appendChild(opt);
+          });
+          select.value = currentSettings.general.displayMonitor || 'primary';
         }
-      });
+      }).catch(err => console.error('Failed to load displays:', err));
+
+      // Appearance Bindings
+      updatePresetDropdown();
+      document.getElementById('app-theme-select').value = currentSettings.appearance.theme || 'light';
+      document.getElementById('app-glass-intensity').value = currentSettings.appearance.glassIntensity || 'Standard';
+      document.getElementById('app-corner-radius').value = currentSettings.appearance.cornerRadius || 12;
+      document.getElementById('app-corner-radius-val').textContent = `${currentSettings.appearance.cornerRadius || 12}px`;
+      document.getElementById('app-accent-picker').value = currentSettings.appearance.accentColor || '#007aff';
 
       // Hiding Bindings
       document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
@@ -812,6 +914,14 @@
       // Shortcuts Binding
       document.getElementById('short-toggle').value = currentSettings.shortcuts.toggleMenuBar || '';
       document.getElementById('short-settings').value = currentSettings.shortcuts.openSettings || '';
+
+      // Performance Bindings
+      document.getElementById('perf-low-ram').checked = (currentSettings.performance && currentSettings.performance.lowRamMode) || false;
+      window.settingsAPI.getRamUsage().then(mb => {
+        document.getElementById('perf-ram-usage').textContent = `${mb} MB`;
+      }).catch(err => {
+        document.getElementById('perf-ram-usage').textContent = 'Error';
+      });
     }
 
     // Toggle grey-out for hiding sub options
@@ -844,6 +954,52 @@
       triggerSave();
     });
 
+    document.getElementById('gen-start-minimized').addEventListener('change', (e) => {
+      currentSettings.general.startMinimizedToTray = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('perf-low-ram').addEventListener('change', (e) => {
+      currentSettings.performance = currentSettings.performance || {};
+      currentSettings.performance.lowRamMode = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('perf-clear-cache').addEventListener('click', async () => {
+      const confirm = window.confirm("Are you sure you want to clear the icon cache? Icons will be re-extracted on next refresh.");
+      if (confirm) {
+        const res = await window.settingsAPI.clearIconCache();
+        if (res && res.success) {
+          alert("Icon cache cleared successfully!");
+          window.settingsAPI.refreshApp();
+        } else {
+          alert("Failed to clear icon cache.");
+        }
+      }
+    });
+
+    document.getElementById('gen-check-updates').addEventListener('change', (e) => {
+      currentSettings.general.checkForUpdatesAutomatically = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-smart-ordering').addEventListener('change', (e) => {
+      currentSettings.general.smartOrdering = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-hide-devtools').addEventListener('change', (e) => {
+      currentSettings.general.hideDevTools = e.target.checked;
+      triggerSave();
+      // Trigger an app re-scan so the filter takes effect immediately
+      if (window.settingsAPI.refreshApp) window.settingsAPI.refreshApp();
+    });
+
+    document.getElementById('hide-monitor-select').addEventListener('change', (e) => {
+      currentSettings.general.displayMonitor = e.target.value;
+      triggerSave();
+    });
+
     document.querySelectorAll('input[name="gen-clock"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         currentSettings.general.clockFormat12h = (e.target.value === '12');
@@ -856,36 +1012,125 @@
       triggerSave();
     });
 
+    document.getElementById('gen-refresh-app').addEventListener('click', () => {
+      window.settingsAPI.refreshApp();
+      alert("Application configuration refreshed!");
+    });
+
+    function updatePresetDropdown() {
+      const select = document.getElementById('app-theme-select');
+      const group = document.getElementById('app-presets-group');
+      if (!group) return;
+      group.innerHTML = '';
+      
+      const presets = currentSettings.themePresets || [];
+      presets.forEach(preset => {
+        const opt = document.createElement('option');
+        opt.value = preset.name;
+        opt.textContent = preset.name;
+        group.appendChild(opt);
+      });
+    }
+
+    function resetPresetSelection() {
+      const select = document.getElementById('app-theme-select');
+      if (!select) return;
+      const val = select.value;
+      if (val !== 'light' && val !== 'dark' && val !== 'auto') {
+        const presets = currentSettings.themePresets || [];
+        const matched = presets.find(p => p.name === val);
+        select.value = matched ? matched.theme : 'auto';
+        currentSettings.appearance.theme = select.value;
+      }
+    }
+
     // Appearance Event Handlers
-    document.querySelectorAll('input[name="app-theme"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        currentSettings.appearance.theme = e.target.value;
-        triggerSave();
-      });
-    });
-
-    const blurSlider = document.getElementById('app-blur');
-    blurSlider.addEventListener('input', (e) => {
-      document.getElementById('app-blur-val').textContent = `${e.target.value}px`;
-      currentSettings.appearance.blurIntensity = parseInt(e.target.value);
+    document.getElementById('app-theme-select').addEventListener('change', (e) => {
+      const val = e.target.value;
+      const presets = currentSettings.themePresets || [];
+      const matched = presets.find(p => p.name === val);
+      if (matched) {
+        currentSettings.appearance.theme = matched.theme;
+        currentSettings.appearance.accentColor = matched.accentColor;
+        currentSettings.appearance.glassIntensity = matched.glassIntensity;
+        currentSettings.appearance.cornerRadius = matched.cornerRadius;
+        
+        document.getElementById('app-glass-intensity').value = matched.glassIntensity;
+        document.getElementById('app-corner-radius').value = matched.cornerRadius;
+        document.getElementById('app-corner-radius-val').textContent = `${matched.cornerRadius}px`;
+        document.getElementById('app-accent-picker').value = matched.accentColor;
+      }
+      currentSettings.appearance.theme = val;
       triggerSave();
     });
 
-    const opacitySlider = document.getElementById('app-opacity');
-    opacitySlider.addEventListener('input', (e) => {
-      document.getElementById('app-opacity-val').textContent = `${e.target.value}%`;
-      currentSettings.appearance.opacity = parseFloat(e.target.value) / 100;
+    document.getElementById('app-glass-intensity').addEventListener('change', (e) => {
+      currentSettings.appearance.glassIntensity = e.target.value;
+      resetPresetSelection();
       triggerSave();
     });
 
-    const colorPresets = document.querySelectorAll('.color-swatch');
-    colorPresets.forEach(swatch => {
-      swatch.addEventListener('click', () => {
-        colorPresets.forEach(s => s.classList.remove('active'));
-        swatch.classList.add('active');
-        currentSettings.appearance.accentColor = swatch.getAttribute('data-color');
-        triggerSave();
-      });
+    const cornerRadiusSlider = document.getElementById('app-corner-radius');
+    cornerRadiusSlider.addEventListener('input', (e) => {
+      document.getElementById('app-corner-radius-val').textContent = `${e.target.value}px`;
+      currentSettings.appearance.cornerRadius = parseInt(e.target.value);
+      resetPresetSelection();
+      triggerSave();
+    });
+
+    document.getElementById('app-accent-picker').addEventListener('input', (e) => {
+      currentSettings.appearance.accentColor = e.target.value;
+      resetPresetSelection();
+      triggerSave();
+    });
+
+    document.getElementById('app-preset-save').addEventListener('click', () => {
+      const nameInput = document.getElementById('app-preset-name');
+      const name = nameInput.value.trim();
+      if (!name) {
+        alert("Please enter a preset name.");
+        return;
+      }
+      
+      if (name === 'light' || name === 'dark' || name === 'auto') {
+        alert("Preset name cannot be a system theme name.");
+        return;
+      }
+      
+      currentSettings.themePresets = currentSettings.themePresets || [];
+      
+      let resolvedTheme = currentSettings.appearance.theme;
+      if (resolvedTheme !== 'light' && resolvedTheme !== 'dark' && resolvedTheme !== 'auto') {
+        // Look at underlying theme of active preset
+        const matched = currentSettings.themePresets.find(p => p.name === resolvedTheme);
+        resolvedTheme = matched ? matched.theme : 'dark';
+      }
+      if (resolvedTheme === 'auto') {
+        resolvedTheme = 'dark'; // Fallback
+      }
+      
+      const newPreset = {
+        name: name,
+        theme: resolvedTheme,
+        accentColor: currentSettings.appearance.accentColor || '#007aff',
+        glassIntensity: currentSettings.appearance.glassIntensity || 'Standard',
+        cornerRadius: currentSettings.appearance.cornerRadius || 12
+      };
+      
+      const existingIdx = currentSettings.themePresets.findIndex(p => p.name === name);
+      if (existingIdx !== -1) {
+        currentSettings.themePresets[existingIdx] = newPreset;
+      } else {
+        currentSettings.themePresets.push(newPreset);
+      }
+      
+      nameInput.value = '';
+      updatePresetDropdown();
+      document.getElementById('app-theme-select').value = name;
+      currentSettings.appearance.theme = name;
+      
+      triggerSave();
+      alert(`Preset "${name}" saved successfully!`);
     });
 
     // Hiding Event Handlers
@@ -1230,6 +1475,51 @@
       fallback.style.background = 'linear-gradient(135deg, #007aff, #0056b3)';
       fallback.textContent = app.name ? app.name.charAt(0) : '?';
       return fallback;
+    }
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    if (window.settingsAPI.onThemeChanged) {
+      window.settingsAPI.onThemeChanged(applyThemeConfig);
+      window.settingsAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
     }
 
     // Init

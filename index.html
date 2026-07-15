@@ -35,10 +35,10 @@
       align-items: center;
       height: 28px;
       width: 100%;
-      background: rgba(255, 255, 255, 0.65);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.65));
+      backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%) brightness(1.05);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
       padding: 0 12px;
       position: fixed;
       top: 0;
@@ -128,13 +128,13 @@
       position: absolute;
       top: 25px;
       left: 0;
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      border-top: 1px solid rgba(255, 255, 255, 0.45);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-      border-radius: 6px;
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.88));
+      backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-radius: var(--corner-radius, 6px);
       min-width: 190px;
       padding: 5px 0;
       z-index: 10000;
@@ -655,8 +655,8 @@
       color: #dfdfe0;
     }
     body.dark-theme .menu-bar {
-      background: rgba(30, 30, 30, 0.65);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(30, 30, 30, var(--glass-opacity, 0.65));
+      border-bottom: 1px solid rgba(0, 0, 0, 0.25);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
     }
     body.dark-theme .menu-item {
@@ -666,10 +666,10 @@
       background-color: var(--accent-color-translucent);
     }
     body.dark-theme .dropdown-menu {
-      background: rgba(30, 30, 30, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-top: 1px solid rgba(255, 255, 255, 0.25);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      background: rgba(30, 30, 30, var(--glass-opacity, 0.85));
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     }
     body.dark-theme .dropdown-item {
       color: #dfdfe0;
@@ -1078,6 +1078,7 @@
     </div>
   </div>
 
+  <script src="closeOnEscape.js"></script>
   <script>
     // State management
     let activeDropdown = null;
@@ -1255,37 +1256,13 @@
     function applySettings(settings) {
       currentSettings = settings;
 
-      // 1. Theme
-      if (settings.appearance.theme === 'dark') {
-        document.body.classList.add('dark-theme');
-      } else if (settings.appearance.theme === 'light') {
-        document.body.classList.remove('dark-theme');
-      } else if (settings.appearance.theme === 'auto') {
-        if (darkThemeMediaQuery.matches) {
-          document.body.classList.add('dark-theme');
-        } else {
-          document.body.classList.remove('dark-theme');
-        }
-      }
-
-      // 2. Opacity
-      const bar = document.querySelector('.menu-bar');
-      bar.style.opacity = settings.appearance.opacity;
-
-      // 3. Blur
-      bar.style.backdropFilter = `blur(${settings.appearance.blurIntensity}px)`;
-      bar.style.webkitBackdropFilter = `blur(${settings.appearance.blurIntensity}px)`;
-
-      // 4. Accent Color
-      applyAccentColor(settings.appearance.accentColor);
-
-      // 5. Clock and Date updates
+      // 1. Clock and Date updates
       updateClock();
 
-      // 6. Menu Items ordering and visibility
+      // 2. Menu Items ordering and visibility
       applyMenuItemsSettings(settings.menuItems);
 
-      // 7. Hiding Mode class and Pill Width variables
+      // 3. Hiding Mode class and Pill Width variables
       if (settings.hiding.mode === 'fully-hide') {
         document.body.classList.add('mode-fully-hide');
       } else {
@@ -1348,6 +1325,56 @@
     window.electronAPI.getSettings().then(settings => {
       applySettings(settings);
     });
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      
+      let blurVal = '20px';
+      let opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') {
+        blurVal = '8px';
+        opacityVal = '0.60';
+      } else if (themeData.glassIntensity === 'Heavy') {
+        blurVal = '40px';
+        opacityVal = '0.95';
+      }
+      
+      const bar = document.querySelector('.menu-bar');
+      if (bar) {
+        bar.style.opacity = opacityVal;
+      }
+      
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
+      
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.substring(0, 2), 16);
+          g = parseInt(hex.substring(2, 4), 16);
+          b = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+    }
+
+    if (window.electronAPI.onThemeChanged) {
+      window.electronAPI.onThemeChanged(applyThemeConfig);
+      window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
+    }
 
     // Apple Settings click
     document.getElementById('apple-settings').addEventListener('click', (e) => {
@@ -1556,6 +1583,7 @@
       const menuBar = document.getElementById('menu-bar');
       if (collapsed) {
         menuBar.classList.add('collapsed');
+        closeAllDropdowns();
       } else {
         menuBar.classList.remove('collapsed');
       }
