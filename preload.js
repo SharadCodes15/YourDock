@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showAbout: () => ipcRenderer.send('show-about'),
   showForceQuit: () => ipcRenderer.send('show-force-quit'),
   refreshApps: () => ipcRenderer.invoke('refresh-apps'),
-  closeWelcome: () => ipcRenderer.send('close-welcome')
+  closeWelcome: () => ipcRenderer.send('close-welcome'),
+  // added manually
+  onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', (_event, value) => callback(value))
 });
-
