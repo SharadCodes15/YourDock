@@ -25,11 +25,14 @@ function initializePaths() {
     fs.mkdirSync(iconsCacheDir, { recursive: true });
   }
 
-  // Source paths for default templates (relative to app folder)
-  const defaultSettingsSrc = path.join(__dirname, 'settings.json');
-  const defaultAppsSrc = path.join(__dirname, 'dock', 'apps.json');
-  const defaultConfigSrc = path.join(__dirname, 'dock', 'config.json');
-  const defaultBlacklistSrc = path.join(__dirname, 'devToolsBlacklist.json');
+  // Source paths for default templates (relative to app folder or resources folder if packaged)
+  const isPackaged = app.isPackaged;
+  const baseDir = isPackaged ? process.resourcesPath : __dirname;
+
+  const defaultSettingsSrc = path.join(baseDir, 'settings.json');
+  const defaultAppsSrc = path.join(baseDir, 'dock', 'apps.json');
+  const defaultConfigSrc = path.join(baseDir, 'dock', 'config.json');
+  const defaultBlacklistSrc = path.join(baseDir, 'devToolsBlacklist.json');
 
   // Copy if not exists in userData
   if (!fs.existsSync(settingsPath) && fs.existsSync(defaultSettingsSrc)) {

@@ -715,8 +715,8 @@ function pollDockHover() {
     return;
   }
 
-  // Mode 2: Direct Hide when apps are open (always visible on empty desktop)
-  if (mode === 'direct-app-open' && !activeAppOnScreen) {
+  // If no app is on screen, then don't hide the dock (keep expanded in all auto-hiding modes)
+  if (!activeAppOnScreen) {
     if (dockState !== 'expanded') {
       dockState = 'expanded';
       dockWin.webContents.send('set-collapse-state', false);
@@ -1686,9 +1686,7 @@ function startMasterTimer() {
     
     // 3. Active Window App Check
     if (tickCount % activeAppThreshold === 0) {
-      if (menuBarWin && !menuBarWin.isDestroyed() && menuBarState !== 'collapsed') {
-        pollActiveApp();
-      }
+      pollActiveApp();
     }
     
     // 4. Processes check (running dots)
@@ -1720,13 +1718,13 @@ function createMenuBarWindow() {
     const targetDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) || getTargetDisplay();
     const { x: displayX, y: displayY, width: displayWidth } = targetDisplay.bounds;
     const startMinimized = settings.general && settings.general.startMinimizedToTray;
-    const safeWidth = Math.max(240, Math.min(displayWidth, displayWidth - 40));
+    const safeWidth = displayWidth;
 
     menuBarWin = new BrowserWindow({
       width: safeWidth,
       height: 28,
-      x: displayX + 20,
-      y: displayY + 20,
+      x: displayX,
+      y: displayY,
       show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
       frame: false,
       transparent: true,
@@ -2206,11 +2204,12 @@ function forceCollapseAll() {
     const bounds = dockWin.getBounds();
     const targetDisplay = getTargetDisplay();
     const { y: dy, height: screenHeight } = targetDisplay.bounds;
+    const thickness = getDockThickness();
     dockWin.setBounds({
       x: bounds.x,
-      y: dy + screenHeight - 115,
+      y: dy + screenHeight - thickness,
       width: bounds.width,
-      height: 115
+      height: thickness
     });
   }
   
@@ -2240,7 +2239,9 @@ ipcMain.on('set-dock-height', (event, height) => {
     const { y: dy, height: screenHeight } = targetDisplay.bounds;
     
     let actualHeight = height;
-    if (height === 85) actualHeight = 115;
+    if (height === 115 || height === 85) {
+      actualHeight = getDockThickness();
+    }
     
     const y = dy + screenHeight - actualHeight;
     

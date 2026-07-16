@@ -513,6 +513,13 @@
       return 'island';
     }
 
+    function getDockThickness() {
+      const sizePreset = (appConfig.general && appConfig.general.dockSize) || 'medium';
+      if (sizePreset === 'small') return 90;
+      if (sizePreset === 'large') return 140;
+      return 115;
+    }
+
     function applyCasingStyles() {
       const container = document.getElementById('dock-container');
       
@@ -627,12 +634,14 @@
       if (isTemp) {
         img.src = data.iconPath || 'icons/preferences.svg';
         img.onerror = () => {
+          img.onerror = null;
           img.src = 'icons/preferences.svg';
         };
       } else {
         const customIcon = appIconsMap && appIconsMap[appId];
         img.src = customIcon || `icons/${appId}.svg`;
         img.onerror = () => {
+          img.onerror = null;
           img.src = 'icons/preferences.svg';
         };
       }
@@ -1002,7 +1011,7 @@
           let left = clientX - menuWidth / 2;
           left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, left));
           ctxMenu.style.left = `${left}px`;
-          ctxMenu.style.top = `${clientY + (300 - 115) - menuHeight - 12}px`;
+          ctxMenu.style.top = `${clientY + (300 - getDockThickness()) - menuHeight - 12}px`;
         }
       }
     }
@@ -1010,7 +1019,7 @@
     function closeContextMenu() {
       selectedCtxAppId = null;
       ctxMenu.style.display = 'none';
-      window.electronAPI.setDockHeight(115);
+      window.electronAPI.setDockHeight(getDockThickness());
       window.electronAPI.contextMenuState(false);
       checkMouseIgnore();
     }
