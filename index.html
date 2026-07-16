@@ -1112,6 +1112,13 @@
 
   <script src="closeOnEscape.js"></script>
   <script>
+    console.log('[renderer] menu bar script starting');
+    window.addEventListener('error', (event) => {
+      console.log('[renderer] uncaught error', event.error || event.message);
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      console.log('[renderer] unhandled rejection', event.reason);
+    });
     // State management
     let activeDropdown = null;
     let isSpotlightExpanded = false;

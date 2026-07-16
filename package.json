@@ -23,6 +23,8 @@
   "build": {
     "appId": "com.sharadcodes.macdock",
     "productName": "macOS Dock and Menu Bar",
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
     "directories": {
       "output": "dist"
     },

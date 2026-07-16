@@ -1320,6 +1320,10 @@ function createWelcomeWindow() {
 
   welcomeWin.loadFile(path.join(__dirname, 'welcome.html'));
 
+  welcomeWin.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.log('[window] welcome did-fail-load', errorCode, errorDescription);
+  });
+
   welcomeWin.once('ready-to-show', () => {
     welcomeWin.center();
     welcomeWin.show();
@@ -1502,40 +1506,46 @@ function closeDrawer() {
 let tray = null;
 function createTray() {
   if (tray) return;
-  
-  const trayIconBase64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABJElEQVQ4y2P8//8/AyUYSAu4rihJ+N/QyGf959cfhszETBwMTAwM/wz1fNf/uC4jK+C2/C8j4/8M1NnAwMDA8O/Pf0ZWRqIEN4CBIOPvn/+MzDSwAGQASyNDwv/ffxiZKW4AWyPDf7D4f5qegY2BYcK1X6/PGBj+M+AyALmBbM3t/xV1zAxsa/8xMTAwMDBIqdgwTND8/4cBzX/mCbd//V7x7z8jA1wB35V/GQyMfzPQsAGmsYxM/xkYf+d/N7tSwszExMCwfPcfRj+/Pwxsa/6DxdkYGBj+MzLw3fxz4Vf2r3/M+GzBNeHaL7B4DQMTA8O/f//gCv6d+ZPxL04DGBgY/jH9O/33/M9sXF4EmwECDIz/z//Mxu9FmAEAw156yOchLpIAAAAASUVORK5CYII=';
-  const img = nativeImage.createFromBuffer(Buffer.from(trayIconBase64, 'base64'));
-  
-  tray = new Tray(img);
-  tray.setToolTip('macOS Dock & Menu Bar');
-  
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open Drawer', click: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); } },
-    { label: 'Open Settings', click: () => showSettingsWindow() },
-    { type: 'separator' },
-    { label: 'Quit', click: () => {
-        app.isQuitting = true;
-        app.quit();
-      }
-    }
-  ]);
-  
-  tray.setContextMenu(contextMenu);
-  
-  tray.on('click', () => {
-    if (dockWin && !dockWin.isDestroyed()) {
-      if (dockWin.isVisible()) {
-        dockWin.hide();
-      } else {
-        dockWin.show();
-        if (dockState === 'collapsed') {
-          dockWin.webContents.send('set-collapse-state', true);
-        } else {
-          dockWin.webContents.send('set-collapse-state', false);
+  console.log('[startup] creating tray');
+
+  try {
+    const trayIconBase64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAABJElEQVQ4y2P8//8/AyUYSAu4rihJ+N/QyGf959cfhszETBwMTAwM/wz1fNf/uC4jK+C2/C8j4/8M1NnAwMDA8O/Pf0ZWRqIEN4CBIOPvn/+MzDSwAGQASyNDwv/ffxiZKW4AWyPDf7D4f5qegY2BYcK1X6/PGBj+M+AyALmBbM3t/xV1zAxsa/8xMTAwMDBIqdgwTND8/4cBzX/mCbd//V7x7z8jA1wB35V/GQyMfzPQsAGmsYxM/xkYf+d/N7tSwszExMCwfPcfRj+/Pwxsa/6DxdkYGBj+MzLw3fxz4Vf2r3/M+GzBNeHaL7B4DQMTA8O/f//gCv6d+ZPxL04DGBgY/jH9O/33/M9sXF4EmwECDIz/z//Mxu9FmAEAw156yOchLpIAAAAASUVORK5CYII=';
+    const img = nativeImage.createFromBuffer(Buffer.from(trayIconBase64, 'base64'));
+
+    tray = new Tray(img);
+    tray.setToolTip('macOS Dock & Menu Bar');
+
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Open Drawer', click: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); } },
+      { label: 'Open Settings', click: () => showSettingsWindow() },
+      { type: 'separator' },
+      { label: 'Quit', click: () => {
+          app.isQuitting = true;
+          app.quit();
         }
       }
-    }
-  });
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+      if (dockWin && !dockWin.isDestroyed()) {
+        if (dockWin.isVisible()) {
+          dockWin.hide();
+        } else {
+          dockWin.show();
+          if (dockState === 'collapsed') {
+            dockWin.webContents.send('set-collapse-state', true);
+          } else {
+            dockWin.webContents.send('set-collapse-state', false);
+          }
+        }
+      }
+    });
+  } catch (err) {
+    console.error('[startup] failed to create tray', err);
+    logErrorToFile(err, true);
+  }
 }
 
 let masterInterval = null;
@@ -1564,11 +1574,19 @@ function isAnyAppOnScreen(activeWindow) {
 
 async function pollActiveApp() {
   try {
+    let activeWindow = null;
     if (!activeWinModule) {
-      activeWinModule = await import('active-win');
+      try {
+        activeWinModule = await import('active-win');
+      } catch (err) {
+        activeWinModule = null;
+      }
     }
-    const activeWindow = await activeWinModule.activeWindow();
-    
+    if (activeWinModule) {
+      const activeWinFn = activeWinModule.default || activeWinModule;
+      activeWindow = await activeWinFn();
+    }
+
     const prevAppOnScreen = activeAppOnScreen;
     activeAppOnScreen = isAnyAppOnScreen(activeWindow);
     if (prevAppOnScreen !== activeAppOnScreen) {
@@ -1698,35 +1716,41 @@ function startMasterTimer() {
 // Create macOS Top Menu Bar Window
 let activeAppInterval;
 function createMenuBarWindow() {
-  const targetDisplay = getTargetDisplay();
-  const { x, y, width } = targetDisplay.bounds;
-  const startMinimized = settings.general && settings.general.startMinimizedToTray;
+  try {
+    const targetDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) || getTargetDisplay();
+    const { x: displayX, y: displayY, width: displayWidth } = targetDisplay.bounds;
+    const startMinimized = settings.general && settings.general.startMinimizedToTray;
+    const safeWidth = Math.max(240, Math.min(displayWidth, displayWidth - 40));
 
-  menuBarWin = new BrowserWindow({
-    width: width,
-    height: 28,
-    x: x,
-    y: y,
-    show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    hasShadow: false,
-    titleBarStyle: 'hidden',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
+    menuBarWin = new BrowserWindow({
+      width: safeWidth,
+      height: 28,
+      x: displayX + 20,
+      y: displayY + 20,
+      show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      hasShadow: false,
+      titleBarStyle: 'hidden',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+
+  menuBarWin.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`[renderer][menuBar] ${message} (${sourceId}:${line})`);
   });
 
-  menuBarWin.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    debugLog(`[MenuBar Console] ${message} (${sourceId}:${line})`);
+  menuBarWin.webContents.on('render-process-gone', (_event, details) => {
+    console.log('[renderer][menuBar] render process gone', details);
   });
 
   // Enable macOS menu bar vibrancy
@@ -1739,6 +1763,25 @@ function createMenuBarWindow() {
 
   menuBarWin.loadFile('index.html');
 
+  menuBarWin.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.log('[window] menuBar did-fail-load', errorCode, errorDescription);
+  });
+
+  menuBarWin.webContents.on('did-finish-load', () => {
+    if (!menuBarWin || menuBarWin.isDestroyed()) return;
+    setTimeout(() => {
+      if (!menuBarWin || menuBarWin.isDestroyed()) return;
+      console.log('[window] menuBar bounds before show', menuBarWin.getBounds());
+      menuBarWin.show();
+      menuBarWin.focus();
+      console.log('[window] menuBar visible', menuBarWin.isVisible(), 'bounds', menuBarWin.getBounds());
+      applySettings();
+      if (menuBarState === 'collapsed') {
+        menuBarWin.webContents.send('set-collapse-state', true);
+      }
+    }, 80);
+  });
+
   menuBarWin.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
@@ -1750,65 +1793,86 @@ function createMenuBarWindow() {
     menuBarWin = null;
   });
 
-  // Set initial state to collapsed when loaded
-  menuBarWin.webContents.on('did-finish-load', () => {
-    applySettings();
-    if (menuBarState === 'collapsed') {
-      menuBarWin.webContents.send('set-collapse-state', true);
-    }
-  });
-
   // Active App polling is handled by the master timer.
+  } catch (err) {
+    console.error('[startup] failed to create menu bar window', err);
+    logErrorToFile(err, true);
+  }
 }
 
 function startProcessPolling() {}
 function stopProcessPolling() {}
 
 function createDockWindow() {
-  const startMinimized = settings.general && settings.general.startMinimizedToTray;
-  const bounds = getDockDimensions();
+  try {
+    const startMinimized = settings.general && settings.general.startMinimizedToTray;
+    const targetDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) || getTargetDisplay();
+    const { x: displayX, y: displayY, width: displayWidth, height: displayHeight } = targetDisplay.bounds;
+    const baseBounds = getDockDimensions();
+    const dockWidth = Math.max(240, Math.min(baseBounds.width, displayWidth - 40));
+    const dockX = displayX + Math.round((displayWidth - dockWidth) / 2);
+    const dockY = displayY + displayHeight - 90;
 
-  dockWin = new BrowserWindow({
-    width: bounds.width,
-    height: bounds.height,
-    x: bounds.x,
-    y: bounds.y,
-    show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    hasShadow: false,
-    titleBarStyle: 'hidden',
-    webPreferences: {
-      preload: path.join(__dirname, 'dock', 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
+    dockWin = new BrowserWindow({
+      width: dockWidth,
+      height: baseBounds.height,
+      x: dockX,
+      y: dockY,
+      show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      hasShadow: false,
+      titleBarStyle: 'hidden',
+      webPreferences: {
+        preload: path.join(__dirname, 'dock', 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
 
   dockWin.loadFile(path.join(__dirname, 'dock', 'index.html'));
+
+  dockWin.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`[renderer][dock] ${message} (${sourceId}:${line})`);
+  });
+
+  dockWin.webContents.on('render-process-gone', (_event, details) => {
+    console.log('[renderer][dock] render process gone', details);
+  });
+
+  dockWin.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.log('[window] dock did-fail-load', errorCode, errorDescription);
+  });
+
+  dockWin.webContents.on('did-finish-load', () => {
+    if (!dockWin || dockWin.isDestroyed()) return;
+    setTimeout(() => {
+      if (!dockWin || dockWin.isDestroyed()) return;
+      console.log('[window] dock bounds before show', dockWin.getBounds());
+      dockWin.show();
+      dockWin.focus();
+      console.log('[window] dock visible', dockWin.isVisible(), 'bounds', dockWin.getBounds());
+      if (dockAutoHide && dockState === 'collapsed') {
+        dockWin.webContents.send('set-collapse-state', true);
+        stopProcessPolling();
+      } else {
+        dockState = 'expanded';
+        dockWin.webContents.send('set-collapse-state', false);
+        startProcessPolling();
+      }
+    }, 80);
+  });
 
   dockWin.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
       dockWin.hide();
-    }
-  });
-
-  // Set initial state to collapsed when loaded (if autoHide enabled)
-  dockWin.webContents.on('did-finish-load', () => {
-    if (dockAutoHide && dockState === 'collapsed') {
-      dockWin.webContents.send('set-collapse-state', true);
-      stopProcessPolling();
-    } else {
-      dockState = 'expanded';
-      dockWin.webContents.send('set-collapse-state', false);
-      startProcessPolling();
     }
   });
 
@@ -1824,6 +1888,10 @@ function createDockWindow() {
     dockWin = null;
     stopProcessPolling();
   });
+  } catch (err) {
+    console.error('[startup] failed to create dock window', err);
+    logErrorToFile(err, true);
+  }
 }
 
 let globalAppWindowsMap = {};
@@ -2821,6 +2889,7 @@ const additionalData = { myKey: 'macos-top-bar-and-dock' };
 const isPrimaryInstance = app.requestSingleInstanceLock(additionalData);
 
 if (!isPrimaryInstance) {
+  console.log('[startup] refusing second instance');
   app.quit();
 } else {
   app.on('second-instance', () => {
@@ -2835,6 +2904,7 @@ if (!isPrimaryInstance) {
   });
 
   app.whenReady().then(async () => {
+    console.log('[startup] app ready');
     const isFirstRun = !fs.existsSync(configPaths.settingsPath);
     showWindowsOnStartup = true;
     configPaths.initializePaths();
@@ -2882,6 +2952,7 @@ if (!isPrimaryInstance) {
 
 app.isQuitting = false;
 app.on('before-quit', () => {
+  console.log('[shutdown] before-quit');
   app.isQuitting = true;
   stopCursorPolling();
   stopDockCursorPolling();
@@ -2889,6 +2960,7 @@ app.on('before-quit', () => {
 });
 
 app.on('window-all-closed', () => {
+  console.log('[shutdown] window-all-closed');
   if (process.platform !== 'darwin') {
     if (tray) {
       return;
