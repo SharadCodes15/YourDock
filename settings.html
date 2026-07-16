@@ -511,6 +511,48 @@
         <input type="checkbox" id="gen-check-updates">
       </div>
 
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Dock Position</div>
+          <div class="setting-desc">Position the dock on Bottom, Left, or Right edge.</div>
+        </div>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-position" value="bottom" id="gen-dock-pos-bottom" checked>
+            <span>Bottom</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-position" value="left" id="gen-dock-pos-left">
+            <span>Left</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-position" value="right" id="gen-dock-pos-right">
+            <span>Right</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Dock Size Preset</div>
+          <div class="setting-desc">Choose from Small, Medium, or Large dock layout.</div>
+        </div>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-size" value="small" id="gen-dock-size-small">
+            <span>Small</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-size" value="medium" id="gen-dock-size-medium" checked>
+            <span>Medium</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="gen-dock-size" value="large" id="gen-dock-size-large">
+            <span>Large</span>
+          </label>
+        </div>
+      </div>
+
       <div class="section-title">Clock & Date</div>
 
       <div class="setting-row">
@@ -593,6 +635,14 @@
         <input type="color" id="app-accent-picker" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
       </div>
 
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Reduce Motion</div>
+          <div class="setting-desc">Disable all app-wide CSS transitions and animations.</div>
+        </div>
+        <input type="checkbox" id="app-reduce-motion">
+      </div>
+
       <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
         <div style="font-weight: 600; font-size: 13px;">Save Current as Preset</div>
         <div style="display: flex; gap: 8px; width: 100%;">
@@ -625,12 +675,17 @@
       </div>
 
       <div class="section-title" style="margin-top: 15px;">Dock Settings</div>
-      <div class="setting-row">
+      <div class="setting-row" id="row-dock-hide-mode">
         <div>
-          <div class="setting-label">Enable Dock Auto-Hide</div>
-          <div class="setting-desc">Automatically hide the Dock when not in use.</div>
+          <div class="setting-label">Dock Hiding Mode</div>
+          <div class="setting-desc">Configure when and how the Dock hides.</div>
         </div>
-        <input type="checkbox" id="hide-dock">
+        <select id="hide-dock-mode" style="min-width: 175px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+          <option value="none">Always Visible</option>
+          <option value="island">Dynamic Island (Collapse to Pill)</option>
+          <option value="direct-always">Direct Hide (Always Hide Completely)</option>
+          <option value="direct-app-open">Direct Hide (Only when apps are open)</option>
+        </select>
       </div>
 
       <div id="hiding-options">
@@ -739,6 +794,18 @@
         </div>
       </div>
       <div class="shortcut-error" id="short-settings-error">Conflict detected. Try another shortcut.</div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Open Application Drawer</div>
+          <div class="setting-desc">Global shortcut to toggle fullscreen drawer.</div>
+        </div>
+        <div class="shortcut-wrapper">
+          <input type="text" id="short-drawer" class="shortcut-input" placeholder="Click to record..." readonly>
+          <button id="short-drawer-clear">Clear</button>
+        </div>
+      </div>
+      <div class="shortcut-error" id="short-drawer-error">Conflict detected. Try another shortcut.</div>
     </div>
 
     <!-- PERFORMANCE PANEL -->
@@ -762,7 +829,8 @@
       </div>
 
       <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; justify-content: center; gap: 12px;">
-        <button id="perf-clear-cache" class="btn-danger" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">Clear Icon Cache</button>
+        <button id="perf-clear-cache" class="btn-danger" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white; background: #8e8e93;">Clear Icon Cache</button>
+        <button id="perf-view-logs" class="btn-primary" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">View Error Log</button>
       </div>
     </div>
 
@@ -864,6 +932,14 @@
       document.getElementById('gen-clock-24').checked = !currentSettings.general.clockFormat12h;
       document.getElementById('gen-date').checked = currentSettings.general.showDate;
 
+      // Dock Position Binding
+      const dockPosVal = currentSettings.general.dockPosition || 'bottom';
+      document.getElementById(`gen-dock-pos-${dockPosVal}`).checked = true;
+
+      // Dock Size Binding
+      const dockSizeVal = currentSettings.general.dockSize || 'medium';
+      document.getElementById(`gen-dock-size-${dockSizeVal}`).checked = true;
+
       // Monitor Override Binding
       window.settingsAPI.getDisplays().then(displays => {
         if (displays && displays.length > 1) {
@@ -888,13 +964,22 @@
       document.getElementById('app-corner-radius').value = currentSettings.appearance.cornerRadius || 12;
       document.getElementById('app-corner-radius-val').textContent = `${currentSettings.appearance.cornerRadius || 12}px`;
       document.getElementById('app-accent-picker').value = currentSettings.appearance.accentColor || '#007aff';
+      document.getElementById('app-reduce-motion').checked = currentSettings.appearance.reduceMotion || false;
 
       // Hiding Bindings
       document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
       
       // Dock Hiding Binding
       window.settingsAPI.getDockConfig().then(dockCfg => {
-        document.getElementById('hide-dock').checked = dockCfg.autoHide !== false;
+        let activeMode = 'island';
+        if (dockCfg.hidingMode) {
+          activeMode = dockCfg.hidingMode;
+        } else if (dockCfg.autoHide === false) {
+          activeMode = 'none';
+        } else if (dockCfg.hideMode === 'fully-hide') {
+          activeMode = 'direct-always';
+        }
+        document.getElementById('hide-dock-mode').value = activeMode;
       }).catch(err => console.error(err));
       
       const hideModeVal = currentSettings.hiding.mode;
@@ -914,6 +999,7 @@
       // Shortcuts Binding
       document.getElementById('short-toggle').value = currentSettings.shortcuts.toggleMenuBar || '';
       document.getElementById('short-settings').value = currentSettings.shortcuts.openSettings || '';
+      document.getElementById('short-drawer').value = currentSettings.shortcuts.openDrawer || '';
 
       // Performance Bindings
       document.getElementById('perf-low-ram').checked = (currentSettings.performance && currentSettings.performance.lowRamMode) || false;
@@ -1140,8 +1226,8 @@
       triggerSave();
     });
 
-    document.getElementById('hide-dock').addEventListener('change', (e) => {
-      window.settingsAPI.saveAutoHide(e.target.checked);
+    document.getElementById('hide-dock-mode').addEventListener('change', (e) => {
+      window.settingsAPI.saveDockHidingMode(e.target.value);
     });
 
     document.querySelectorAll('input[name="hide-mode"]').forEach(radio => {
@@ -1257,15 +1343,39 @@
       triggerSave();
     }
 
+    // General Event Handlers: Position and Size
+    document.querySelectorAll('input[name="gen-dock-position"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentSettings.general.dockPosition = e.target.value;
+        triggerSave();
+      });
+    });
+
+    document.querySelectorAll('input[name="gen-dock-size"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentSettings.general.dockSize = e.target.value;
+        triggerSave();
+      });
+    });
+
+    // Appearance: Reduce Motion
+    document.getElementById('app-reduce-motion').addEventListener('change', (e) => {
+      currentSettings.appearance.reduceMotion = e.target.checked;
+      triggerSave();
+    });
+
     // Shortcuts Key Capturing
     const toggleInput = document.getElementById('short-toggle');
     const settingsInput = document.getElementById('short-settings');
+    const drawerInput = document.getElementById('short-drawer');
 
     toggleInput.addEventListener('click', () => startShortcutCapture('short-toggle', 'toggleMenuBar'));
     settingsInput.addEventListener('click', () => startShortcutCapture('short-settings', 'openSettings'));
+    drawerInput.addEventListener('click', () => startShortcutCapture('short-drawer', 'openDrawer'));
 
     document.getElementById('short-toggle-clear').addEventListener('click', () => clearShortcut('short-toggle', 'toggleMenuBar'));
     document.getElementById('short-settings-clear').addEventListener('click', () => clearShortcut('short-settings', 'openSettings'));
+    document.getElementById('short-drawer-clear').addEventListener('click', () => clearShortcut('short-drawer', 'openDrawer'));
 
     function startShortcutCapture(inputId, settingKey) {
       stopShortcutCapture();

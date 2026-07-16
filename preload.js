@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowAction: (action) => ipcRenderer.invoke('window-action', action),
   appleAction: (action) => ipcRenderer.send('apple-action', action),
   showAbout: () => ipcRenderer.send('show-about'),
-  showForceQuit: () => ipcRenderer.send('show-force-quit')
+  showForceQuit: () => ipcRenderer.send('show-force-quit'),
+  refreshApps: () => ipcRenderer.invoke('refresh-apps'),
+  closeWelcome: () => ipcRenderer.send('close-welcome')
 });
 

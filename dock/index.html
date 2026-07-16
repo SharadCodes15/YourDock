@@ -37,8 +37,147 @@
       border-radius: var(--corner-radius, 20px);
       padding: 6px 10px;
       margin-bottom: 6px;
-      transition: transform 0.25s ease-out, background 0.25s ease-out, border-radius 0.25s ease-out, box-shadow 0.25s ease-out, padding 0.25s ease-out;
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), background 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), padding 0.28s cubic-bezier(0.16, 1, 0.3, 1);
       transform-origin: bottom center;
+      --icon-size: 48px;
+    }
+
+    /* Positions styling */
+    body.position-bottom {
+      justify-content: center;
+      align-items: flex-end;
+    }
+    body.position-left {
+      justify-content: flex-start;
+      align-items: center;
+    }
+    body.position-right {
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    /* Vertical Dock container overrides */
+    body.position-left .dock-container, body.position-right .dock-container {
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 0;
+    }
+    body.position-left .dock-container {
+      margin-left: 6px;
+      transform-origin: center left;
+    }
+    body.position-right .dock-container {
+      margin-right: 6px;
+      transform-origin: center right;
+    }
+
+    body.position-left .dock-container.collapsed {
+      width: 28px !important;
+      height: 180px !important;
+      margin-left: 0 !important;
+      transform: translateX(-22px) !important;
+      border-radius: 0 12px 12px 0 !important;
+    }
+    body.position-right .dock-container.collapsed {
+      width: 28px !important;
+      height: 180px !important;
+      margin-right: 0 !important;
+      transform: translateX(22px) !important;
+      border-radius: 12px 0 0 12px !important;
+    }
+
+    body.position-left .dock-items, body.position-right .dock-items {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    body.position-left .dock-item {
+      transform-origin: center left;
+    }
+    body.position-right .dock-item {
+      transform-origin: center right;
+    }
+
+    body.position-left .divider, body.position-right .divider {
+      width: 40px;
+      height: 1px;
+      margin: 8px 4px;
+      align-self: center;
+    }
+
+    /* Running Dot Indicator positioning for Left/Right */
+    body.position-left .dot-indicator {
+      bottom: auto;
+      left: -7px;
+      top: 50%;
+      transform: translateY(-50%);
+      flex-direction: column;
+    }
+    body.position-right .dot-indicator {
+      bottom: auto;
+      right: -7px;
+      left: auto;
+      top: 50%;
+      transform: translateY(-50%);
+      flex-direction: column;
+    }
+
+    /* Tooltip positioning for Left/Right */
+    body.position-left .tooltip {
+      top: 50%;
+      left: calc(100% + 12px);
+      transform: translateY(-50%) scale(0.9);
+      transform-origin: center left;
+    }
+    body.position-left .dock-item:hover .tooltip {
+      transform: translateY(-50%) scale(1);
+    }
+
+    body.position-right .tooltip {
+      top: 50%;
+      right: calc(100% + 12px);
+      left: auto;
+      transform: translateY(-50%) scale(0.9);
+      transform-origin: center right;
+    }
+    body.position-right .dock-item:hover .tooltip {
+      transform: translateY(-50%) scale(1);
+    }
+
+    /* Sizing presets */
+    .dock-container.size-small {
+      --icon-size: 36px;
+    }
+    .dock-container.size-medium {
+      --icon-size: 48px;
+    }
+    .dock-container.size-large {
+      --icon-size: 64px;
+    }
+
+    /* Accessibility: Reduce Motion Support */
+    body.reduce-motion *, body.reduce-motion::before, body.reduce-motion::after {
+      animation-delay: -1ms !important;
+      animation-duration: -1ms !important;
+      animation-iteration-count: 1 !important;
+      background-attachment: initial !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }
+
+    /* Arrange Pulse Highlight Animation */
+    @keyframes arrangePulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 0, 122, 255), 0);
+      }
+      50% {
+        box-shadow: 0 0 14px 6px rgba(var(--accent-rgb, 0, 122, 255), 0.85);
+        transform: scale(1.18);
+      }
+    }
+    .arrange-pulse .dock-icon {
+      animation: arrangePulse 0.8s ease-in-out;
     }
 
     body.dark-theme .dock-container {
@@ -70,7 +209,7 @@
       display: flex;
       align-items: flex-end;
       height: 100%;
-      transition: opacity 0.2s ease-out;
+      transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     /* Pinned and Trash items wrapper */
@@ -80,8 +219,8 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-end;
-      width: 48px;
-      height: 48px;
+      width: var(--icon-size, 48px);
+      height: var(--icon-size, 48px);
       margin: 0 6px;
       /* Cubic Bezier for authentic macOS magnification ease */
       transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), margin 0.12s cubic-bezier(0.16, 1, 0.3, 1);
@@ -171,7 +310,7 @@
       white-space: nowrap;
       opacity: 0;
       transform: scale(0.9);
-      transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
+      transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       z-index: 1000;
     }
 
@@ -216,7 +355,7 @@
       z-index: 99999;
       color: #1d1d1f;
       font-size: 12.5px;
-      transition: opacity 0.1s;
+      transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     body.dark-theme .context-menu {
@@ -293,6 +432,29 @@
     .genie .icon-container {
       animation: genie 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
+
+    /* Direct Hide Mode overrides for collapsed Dock */
+    .dock-container.collapsed.dock-direct-hide {
+      width: var(--icon-size, 48px) !important;
+      height: var(--icon-size, 48px) !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      pointer-events: none !important;
+      padding: 0 !important;
+    }
+    
+    body.position-bottom .dock-container.collapsed.dock-direct-hide {
+      transform: translateY(180px) !important;
+    }
+    body.position-left .dock-container.collapsed.dock-direct-hide {
+      transform: translateX(-180px) !important;
+    }
+    body.position-right .dock-container.collapsed.dock-direct-hide {
+      transform: translateX(180px) !important;
+    }
   </style>
 </head>
 <body>
@@ -328,6 +490,7 @@
     let runningApps = [];
     let tempRunningApps = [];
     let mouseX = 0;
+    let mouseY = 0;
     let isHovered = false;
     let ticking = false;
     let autoHideTimeout = null;
@@ -336,6 +499,43 @@
     // Magnification constants
     const R = 110; // Radius of influence
     const maxScale = 1.38;
+
+    function getDockHidingMode() {
+      if (appConfig && appConfig.hidingMode) {
+        return appConfig.hidingMode;
+      }
+      if (appConfig && appConfig.autoHide === false) {
+        return 'none';
+      }
+      if (appConfig && appConfig.hideMode === 'fully-hide') {
+        return 'direct-always';
+      }
+      return 'island';
+    }
+
+    function applyCasingStyles() {
+      const container = document.getElementById('dock-container');
+      
+      document.body.classList.remove('position-bottom', 'position-left', 'position-right');
+      container.classList.remove('size-small', 'size-medium', 'size-large');
+      document.body.classList.remove('reduce-motion');
+      container.classList.remove('dock-direct-hide');
+      
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      document.body.classList.add(`position-${position}`);
+      
+      const sizePreset = (appConfig.general && appConfig.general.dockSize) || 'medium';
+      container.classList.add(`size-${sizePreset}`);
+      
+      if (appConfig.appearance && appConfig.appearance.reduceMotion) {
+        document.body.classList.add('reduce-motion');
+      }
+
+      const mode = getDockHidingMode();
+      if (mode === 'direct-always' || mode === 'direct-app-open') {
+        container.classList.add('dock-direct-hide');
+      }
+    }
 
     // Load initial layout config
     async function loadDock() {
@@ -347,6 +547,8 @@
       // Update checkmark in custom context menu
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
+      
+      applyCasingStyles();
       
       // Set initial collapsed class based on config to prevent race conditions
       const container = document.getElementById('dock-container');
@@ -472,6 +674,10 @@
       item.appendChild(tooltip);
 
       // Hook up interactions
+      if (pulsedAppIds.has(appId)) {
+        item.classList.add('arrange-pulse');
+      }
+
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         closeContextMenu();
@@ -511,7 +717,12 @@
     function updateDockWidth() {
       const container = document.getElementById('dock-container');
       const rect = container.getBoundingClientRect();
-      window.electronAPI.setDockWidth(rect.width + 24); // Add padding safety
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      if (position === 'bottom') {
+        window.electronAPI.setDockWidth(rect.width + 24);
+      } else {
+        window.electronAPI.setDockWidth(rect.height + 24);
+      }
     }
 
     // Drag-and-drop implementation
@@ -576,6 +787,7 @@
 
     dockContainer.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
+      mouseY = e.clientY;
       isHovered = true;
       if (!ticking) {
         window.requestAnimationFrame(() => {
@@ -600,30 +812,49 @@
       }
       if (!isHovered || draggedElement) return;
 
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
       const items = document.querySelectorAll('.dock-item');
       items.forEach(item => {
         const rect = item.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const d = Math.abs(mouseX - center);
+        let d = 0;
+        if (position === 'bottom') {
+          const center = rect.left + rect.width / 2;
+          d = Math.abs(mouseX - center);
+        } else {
+          const center = rect.top + rect.height / 2;
+          d = Math.abs(mouseY - center);
+        }
 
         if (d < R) {
           const ratio = d / R;
-          // Smooth cosine curve
           const scale = 1.0 + (maxScale - 1.0) * Math.cos(ratio * Math.PI / 2);
           item.style.transform = `scale(${scale})`;
-          item.style.margin = `0 ${(scale - 1) * 10 + 6}px`;
+          if (position === 'bottom') {
+            item.style.margin = `0 ${(scale - 1) * 10 + 6}px`;
+          } else {
+            item.style.margin = `${(scale - 1) * 10 + 6}px 0`;
+          }
         } else {
           item.style.transform = 'scale(1)';
-          item.style.margin = '0 6px';
+          if (position === 'bottom') {
+            item.style.margin = '0 6px';
+          } else {
+            item.style.margin = '6px 0';
+          }
         }
       });
     }
 
     function resetMagnification() {
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
       const items = document.querySelectorAll('.dock-item');
       items.forEach(item => {
         item.style.transform = 'scale(1)';
-        item.style.margin = '0 6px';
+        if (position === 'bottom') {
+          item.style.margin = '0 6px';
+        } else {
+          item.style.margin = '6px 0';
+        }
       });
     }
 
@@ -856,16 +1087,34 @@
     });
 
     let runningAppsData = {};
+    let previousTempIds = [];
+    let pulsedAppIds = new Set();
+
     // Handle incoming process list updates from Main process
     window.electronAPI.onProcessUpdate((data) => {
       runningAppsData = data;
+      let newTempApps = [];
       if (Array.isArray(data)) {
         runningApps = data;
         tempRunningApps = [];
       } else {
         runningApps = data.runningPinned || [];
-        tempRunningApps = data.tempRunning || [];
+        newTempApps = data.tempRunning || [];
       }
+      
+      const newTempIds = newTempApps.map(app => app.id);
+      pulsedAppIds.clear();
+      
+      if (previousTempIds.length > 0 && newTempIds.length === previousTempIds.length) {
+        for (let i = 0; i < newTempIds.length; i++) {
+          if (newTempIds[i] !== previousTempIds[i]) {
+            pulsedAppIds.add(newTempIds[i]);
+          }
+        }
+      }
+      
+      previousTempIds = newTempIds;
+      tempRunningApps = newTempApps;
       renderDock();
     });
 
@@ -876,6 +1125,7 @@
       autoHide = appConfig.autoHide !== false;
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
+      applyCasingStyles();
       renderDock();
     });
 
@@ -896,10 +1146,16 @@
     // Listen for collapse state changes (Dynamic Island notch mode)
     window.electronAPI.onSetCollapseState((collapsed) => {
       const container = document.getElementById('dock-container');
-      if (collapsed) {
-        container.classList.add('collapsed');
-      } else {
+      const mode = getDockHidingMode();
+      
+      if (mode === 'none') {
         container.classList.remove('collapsed');
+      } else {
+        if (collapsed) {
+          container.classList.add('collapsed');
+        } else {
+          container.classList.remove('collapsed');
+        }
       }
       // Update dock width instantly to avoid clipping
       updateDockWidth();
@@ -954,6 +1210,17 @@
       window.electronAPI.onThemeChanged(applyThemeConfig);
       window.electronAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
     }
+
+    window.electronAPI.onSettingsChanged((newSettings) => {
+      appConfig.general = newSettings.general;
+      appConfig.appearance = newSettings.appearance;
+      autoHide = appConfig.autoHide !== false;
+      document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
+      document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
+      applyCasingStyles();
+      updateDockWidth();
+      resetMagnification();
+    });
 
     // Startup Init
     loadDock();

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onAppsUpdated: (callback) => ipcRenderer.on('apps-updated', () => callback()),
   getDockConfig: () => ipcRenderer.invoke('get-config'),
   saveAutoHide: (autoHide) => ipcRenderer.send('save-auto-hide', autoHide),
+  saveDockHidingMode: (mode) => ipcRenderer.send('save-dock-hiding-mode', mode),
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   importSettings: () => ipcRenderer.invoke('import-settings'),
   pressEscape: () => ipcRenderer.send('escape-pressed'),
@@ -20,6 +21,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getDisplays: () => ipcRenderer.invoke('get-displays'),
   getRamUsage: () => ipcRenderer.invoke('get-ram-usage'),
   clearIconCache: () => ipcRenderer.invoke('clear-icon-cache'),
-  refreshApp: () => ipcRenderer.send('refresh-app')
+  refreshApp: () => ipcRenderer.send('refresh-app'),
+  openErrorLog: () => ipcRenderer.send('open-error-log')
 });
 

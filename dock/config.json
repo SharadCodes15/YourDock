@@ -5,7 +5,8 @@
     "safari",
     "mail",
     "appstore",
-    "preferences"
+    "preferences",
+    "brave"
   ],
   "autoHide": false,
   "apps": {
@@ -50,16 +51,24 @@
       "win": "explorer.exe shell:RecycleBinFolder",
       "mac": "",
       "process": "explorer.exe"
+    },
+    "brave": {
+      "name": "Brave",
+      "win": "brave.exe",
+      "mac": "",
+      "process": "brave.exe"
     }
   },
   "launchCounts": {
     "safari": 2,
-    "antigravity": 3,
+    "antigravity": 4,
     "trash": 1,
     "visualstudiocode": 2,
     "finder": 6,
     "mail": 1,
     "preferences": 1,
-    "microsoftedge": 1
+    "microsoftedge": 1,
+    "brave": 1,
+    "googlechrome": 2
   }
 }

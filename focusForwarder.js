@@ -57,56 +57,66 @@ function refocusAndExecute(callback) {
   `.replace(/\r?\n/g, ' ').trim();
 
   return new Promise((resolve) => {
-    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
-      if (err) {
-        console.error('Failed to refocus window via PowerShell:', err);
-        return resolve({ success: false, reason: 'error', error: err.message });
-      }
-
-      // Wait 100ms for focus switch to settle before running callback
-      setTimeout(async () => {
-        try {
-          await callback();
-          resolve({ success: true });
-        } catch (callbackErr) {
-          console.error('Focus Forwarder callback failed:', callbackErr);
-          resolve({ success: false, reason: 'callback_error', error: callbackErr.message });
+    try {
+      exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
+        if (err) {
+          console.error('Failed to refocus window via PowerShell:', err);
+          return resolve({ success: false, reason: 'error', error: err.message });
         }
-      }, 100);
-    });
+
+        // Wait 100ms for focus switch to settle before running callback
+        setTimeout(async () => {
+          try {
+            await callback();
+            resolve({ success: true });
+          } catch (callbackErr) {
+            console.error('Focus Forwarder callback failed:', callbackErr);
+            resolve({ success: false, reason: 'callback_error', error: callbackErr.message });
+          }
+        }, 100);
+      });
+    } catch (execErr) {
+      console.error('exec call threw error in refocusAndExecute:', execErr);
+      resolve({ success: false, reason: 'exec_error', error: execErr.message });
+    }
   });
 }
 
 // Map key string to nut-js Key constant
 function mapKeyString(keyStr) {
-  const { Key } = require('@nut-tree-fork/nut-js');
-  const k = keyStr.toLowerCase();
-  switch (k) {
-    case 'ctrl':
-    case 'control': return Key.LeftControl;
-    case 'shift': return Key.LeftShift;
-    case 'alt': return Key.LeftAlt;
-    case 'n': return Key.N;
-    case 'o': return Key.O;
-    case 's': return Key.S;
-    case 'p': return Key.P;
-    case 'w': return Key.W;
-    case 'z': return Key.Z;
-    case 'y': return Key.Y;
-    case 'x': return Key.X;
-    case 'c': return Key.C;
-    case 'v': return Key.V;
-    case 'a': return Key.A;
-    case 'f': return Key.F;
-    case 'f1': return Key.F1;
-    case 'plus':
-    case 'equal': return Key.Equal;
-    case 'minus': return Key.Minus;
-    case '0': return Key.Num0;
-    default:
-      const matchName = Object.keys(Key).find(name => name.toLowerCase() === k);
-      if (matchName) return Key[matchName];
-      return null;
+  try {
+    const { Key } = require('@nut-tree-fork/nut-js');
+    const k = keyStr.toLowerCase();
+    switch (k) {
+      case 'ctrl':
+      case 'control': return Key.LeftControl;
+      case 'shift': return Key.LeftShift;
+      case 'alt': return Key.LeftAlt;
+      case 'n': return Key.N;
+      case 'o': return Key.O;
+      case 's': return Key.S;
+      case 'p': return Key.P;
+      case 'w': return Key.W;
+      case 'z': return Key.Z;
+      case 'y': return Key.Y;
+      case 'x': return Key.X;
+      case 'c': return Key.C;
+      case 'v': return Key.V;
+      case 'a': return Key.A;
+      case 'f': return Key.F;
+      case 'f1': return Key.F1;
+      case 'plus':
+      case 'equal': return Key.Equal;
+      case 'minus': return Key.Minus;
+      case '0': return Key.Num0;
+      default:
+        const matchName = Object.keys(Key).find(name => name.toLowerCase() === k);
+        if (matchName) return Key[matchName];
+        return null;
+    }
+  } catch (err) {
+    console.error('Failed to require @nut-tree-fork/nut-js in mapKeyString:', err);
+    return null;
   }
 }
 
@@ -197,13 +207,18 @@ async function performWindowAction(action) {
   psScript = psScript.replace(/\r?\n/g, ' ').trim();
 
   return new Promise((resolve) => {
-    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
-      if (err) {
-        console.error(`Failed to perform ${action} on window via PowerShell:`, err);
-        return resolve({ success: false, reason: 'error', error: err.message });
-      }
-      resolve({ success: true });
-    });
+    try {
+      exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
+        if (err) {
+          console.error(`Failed to perform ${action} on window via PowerShell:`, err);
+          return resolve({ success: false, reason: 'error', error: err.message });
+        }
+        resolve({ success: true });
+      });
+    } catch (execErr) {
+      console.error(`exec call threw error in performWindowAction:`, execErr);
+      resolve({ success: false, reason: 'exec_error', error: execErr.message });
+    }
   });
 }
 

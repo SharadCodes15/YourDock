@@ -4,22 +4,85 @@ const fs = require('node:fs');
 const { exec, execFile } = require('node:child_process');
 const crypto = require('crypto');
 const focusForwarder = require('./focusForwarder');
+const appScanner = require('./appscanner');
+const configPaths = require('./configPaths');
+const { shouldShowWindowsAtStartup } = require('./startupVisibility');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
 function debugLog(...args) { if (DEBUG) console.log('[DEBUG]', ...args); }
 
+// Global error logging setup
+const logsDir = path.join(__dirname, 'logs');
+const errorLogPath = path.join(logsDir, 'error.log');
+
+function logErrorToFile(error, isFatal = false) {
+  try {
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    const timestamp = new Date().toISOString();
+    const stack = error instanceof Error ? error.stack : String(error);
+    const logMessage = `[${timestamp}] [${isFatal ? 'FATAL' : 'ERROR'}] ${stack}\n\n`;
+    fs.appendFileSync(errorLogPath, logMessage, 'utf8');
+  } catch (err) {
+    console.error('Failed to write to error.log:', err);
+  }
+}
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  logErrorToFile(error, true);
+  dialog.showErrorBox(
+    'Fatal Uncaught Exception',
+    `An unexpected error occurred: ${error.message || error}\n\nThis window won't crash, but the application state may be unstable. Details have been logged to logs/error.log.`
+  );
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logErrorToFile(reason, false);
+});
+
+// Monkey-patch ipcMain to catch and log errors in all IPC handlers systematically
+const originalOn = ipcMain.on.bind(ipcMain);
+ipcMain.on = (channel, listener) => {
+  originalOn(channel, async (event, ...args) => {
+    try {
+      await listener(event, ...args);
+    } catch (err) {
+      console.error(`IPC error in channel "${channel}":`, err);
+      logErrorToFile(err, false);
+    }
+  });
+};
+
+const originalHandle = ipcMain.handle.bind(ipcMain);
+ipcMain.handle = (channel, handler) => {
+  originalHandle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...args);
+    } catch (err) {
+      console.error(`IPC error in handle "${channel}":`, err);
+      logErrorToFile(err, false);
+      throw err;
+    }
+  });
+};
+
 let menuBarWin;
 let dockWin;
 let config = {};
-const configPath = path.join(__dirname, 'dock', 'config.json');
+const configPath = configPaths.configPath;
 
 // Settings management
 let settings = {};
-const settingsPath = path.join(__dirname, 'settings.json');
+const settingsPath = configPaths.settingsPath;
 let settingsWin = null;
 let aboutWin = null;
 let forceQuitWin = null;
+let welcomeWin = null;
+let showWindowsOnStartup = true;
 let globalProcessMap = {};
 
 // Cache dynamically loaded modules
@@ -64,10 +127,10 @@ let drawerWin = null;
 let isDrawerOpen = false;
 let cachedScreenshot = null;
 let lastCaptureTime = 0;
-const appsJsonPath = path.join(__dirname, 'dock', 'apps.json');
+const appsJsonPath = configPaths.appsJsonPath;
 
 // [FIX] Load blacklist from editable JSON config instead of hardcoding — allows user customization
-const devToolsBlacklistPath = path.join(__dirname, 'devToolsBlacklist.json');
+const devToolsBlacklistPath = configPaths.devToolsBlacklistPath;
 let devToolsBlacklist = { nameKeywords: [], devToolKeywords: [], exeBlacklist: [] };
 try {
   if (fs.existsSync(devToolsBlacklistPath)) {
@@ -157,52 +220,7 @@ if (-not $results) {
           let parsed = JSON.parse(output);
           if (!Array.isArray(parsed)) parsed = [parsed];
 
-          const seenExePaths = new Set();
-          const apps = [];
-
-          for (const entry of parsed) {
-            if (!entry || !entry.name || !entry.target) continue;
-
-            const nameLower = entry.name.toLowerCase();
-            const targetLower = (entry.target || '').toLowerCase();
-
-            // Base blacklist filter (always applied — junk entries like uninstall/readme/help)
-            const isBlacklisted = APP_BLACKLIST.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
-            if (isBlacklisted) continue;
-
-            // [FIX] Multi-signal dev-tool filtering — only when hideDevTools setting is ON (default true)
-            const hideDevTools = !(settings.general && settings.general.hideDevTools === false);
-            if (hideDevTools) {
-              // Signal 1: Dev-tool name/path keyword match
-              const isDevTool = DEV_TOOL_KEYWORDS.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
-              if (isDevTool) continue;
-
-              // Signal 2: Target exe is a known console/runtime executable
-              const exeBasename = path.basename(targetLower);
-              const isBlacklistedExe = EXE_BLACKLIST.includes(exeBasename);
-              if (isBlacklistedExe) continue;
-            }
-
-            // Must have a real executable target (skip URLs, empty targets, folders)
-            if (!entry.target || (!targetLower.endsWith('.exe') && !targetLower.endsWith('.msc') && !targetLower.endsWith('.cmd') && !targetLower.endsWith('.bat'))) continue;
-
-            // De-duplicate by target exe path (case-insensitive)
-            const dedupeKey = targetLower.replace(/\\/g, '/');
-            if (seenExePaths.has(dedupeKey)) continue;
-            seenExePaths.add(dedupeKey);
-
-            const id = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '') || `app_${apps.length}`;
-
-            apps.push({
-              id: id,
-              name: entry.name,
-              icon: '',
-              exec: entry.target
-            });
-          }
-
-          // Sort alphabetically by name
-          apps.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+          const apps = appScanner.processScannedApps(parsed, settings, devToolsBlacklist);
 
           debugLog(`Start Menu scan: found ${apps.length} apps (after filtering).`);
           resolve(apps);
@@ -221,7 +239,7 @@ if (-not $results) {
 
 function getIconCachePath(exePath, extension = '.png') {
   const hash = crypto.createHash('md5').update(exePath.toLowerCase()).digest('hex');
-  return path.join(__dirname, 'dock', 'icons-cache', `${hash}${extension}`);
+  return path.join(configPaths.iconsCacheDir, `${hash}${extension}`);
 }
 
 let isAppsScanned = false;
@@ -365,25 +383,48 @@ let dockCursorPollInterval = null;
 let consecutiveDockHotspotPolls = 0;
 let dockLeaveTimeout = null;
 
+function getDockHidingMode() {
+  if (config && config.hidingMode) {
+    return config.hidingMode;
+  }
+  if (config && config.autoHide === false) {
+    return 'none';
+  }
+  if (config && config.hideMode === 'fully-hide') {
+    return 'direct-always';
+  }
+  return 'island';
+}
+
 // Read dock config file or write default if missing
 async function loadConfig() {
   try {
     if (fs.existsSync(configPath)) {
       const rawData = await fs.promises.readFile(configPath, 'utf8');
       config = JSON.parse(rawData);
+      let needsSave = false;
       if (config.autoHide === undefined) {
         config.autoHide = true;
+        needsSave = true;
+      }
+      if (config.hideMode === undefined) {
+        config.hideMode = 'collapsed';
+        needsSave = true;
+      }
+      if (needsSave) {
         await saveConfig();
       }
     } else {
       // Fallback defaults
       config = {
         pinned: ["finder", "launchpad", "safari", "mail", "appstore", "preferences"],
-        autoHide: true // default true
+        autoHide: true,
+        hideMode: 'collapsed'
       };
       await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
     }
-    dockAutoHide = config.autoHide !== false; // default to true
+    const mode = getDockHidingMode();
+    dockAutoHide = (mode !== 'none');
     dockState = dockAutoHide ? 'collapsed' : 'expanded'; // Set initial state correctly
   } catch (err) {
     console.error('Error loading config:', err);
@@ -401,11 +442,11 @@ async function saveConfig() {
 
 // Generate placeholder SVG icons inside /dock/icons
 function ensureIconsFolder() {
-  const iconsDir = path.join(__dirname, 'dock', 'icons');
+  const iconsDir = configPaths.iconsDir;
   if (!fs.existsSync(iconsDir)) {
     fs.mkdirSync(iconsDir, { recursive: true });
   }
-  const iconsCacheDir = path.join(__dirname, 'dock', 'icons-cache');
+  const iconsCacheDir = configPaths.iconsCacheDir;
   if (!fs.existsSync(iconsCacheDir)) {
     fs.mkdirSync(iconsCacheDir, { recursive: true });
   }
@@ -486,6 +527,14 @@ function pollMenuBarHover() {
   checkControlCenterCursor();
   
   if (!menuBarWin || menuBarWin.isDestroyed()) return;
+
+  if (!activeAppOnScreen) {
+    if (menuBarState !== 'expanded') {
+      menuBarState = 'expanded';
+      menuBarWin.webContents.send('set-collapse-state', false);
+    }
+    return;
+  }
 
   // Check if auto-hide is enabled globally
   if (!settings.hiding || !settings.hiding.enabled) {
@@ -570,10 +619,95 @@ function pollMenuBarHover() {
 function startCursorPolling() {}
 function stopCursorPolling() {}
 
+function isAnyOverlayOpen() {
+  const ccOpen = ccWin && !ccWin.isDestroyed() && ccWin.isVisible();
+  const spotlightOpen = spotlightWin && !spotlightWin.isDestroyed() && spotlightWin.isVisible();
+  const drawerOpen = drawerWin && !drawerWin.isDestroyed() && isDrawerOpen;
+  return isDockContextMenuOpen || ccOpen || spotlightOpen || drawerOpen;
+}
+
+function getDockThickness() {
+  const sizePreset = (settings.general && settings.general.dockSize) || 'medium';
+  if (sizePreset === 'small') return 90;
+  if (sizePreset === 'large') return 140;
+  return 115;
+}
+
+function isCursorInDockBounds(cursorPoint, thickness) {
+  if (!dockWin || dockWin.isDestroyed()) return false;
+  const primaryDisplay = getTargetDisplay();
+  const displayBounds = primaryDisplay.bounds;
+  const screenWidth = displayBounds.width;
+  const screenHeight = displayBounds.height;
+  const dockBounds = dockWin.getBounds();
+  
+  const position = (settings.general && settings.general.dockPosition) || 'bottom';
+  
+  if (position === 'bottom') {
+    return (
+      cursorPoint.x >= dockBounds.x &&
+      cursorPoint.x <= dockBounds.x + dockBounds.width &&
+      cursorPoint.y >= displayBounds.y + screenHeight - thickness &&
+      cursorPoint.y <= displayBounds.y + screenHeight
+    );
+  } else if (position === 'left') {
+    return (
+      cursorPoint.x >= displayBounds.x &&
+      cursorPoint.x <= displayBounds.x + thickness &&
+      cursorPoint.y >= dockBounds.y &&
+      cursorPoint.y <= dockBounds.y + dockBounds.height
+    );
+  } else if (position === 'right') {
+    return (
+      cursorPoint.x >= displayBounds.x + screenWidth - thickness &&
+      cursorPoint.x <= displayBounds.x + screenWidth &&
+      cursorPoint.y >= dockBounds.y &&
+      cursorPoint.y <= dockBounds.y + dockBounds.height
+    );
+  }
+  return false;
+}
+
+function getDockDimensions(customWidth = null, customHeight = null) {
+  const targetDisplay = getTargetDisplay();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  
+  const position = (settings.general && settings.general.dockPosition) || 'bottom';
+  const thickness = getDockThickness();
+
+  let w = 800;
+  let h = thickness;
+  let x = dx + Math.round((screenWidth - w) / 2);
+  let y = dy + screenHeight - h;
+
+  if (position === 'bottom') {
+    if (customWidth !== null) w = Math.round(customWidth);
+    h = thickness;
+    x = dx + Math.round((screenWidth - w) / 2);
+    y = dy + screenHeight - h;
+  } else if (position === 'left') {
+    w = thickness;
+    h = customHeight !== null ? Math.round(customHeight) : 600;
+    x = dx;
+    y = dy + Math.round((screenHeight - h) / 2);
+  } else if (position === 'right') {
+    w = thickness;
+    h = customHeight !== null ? Math.round(customHeight) : 600;
+    x = dx + screenWidth - w;
+    y = dy + Math.round((screenHeight - h) / 2);
+  }
+
+  return { x, y, width: w, height: h };
+}
+
 // Cursor polling for reveal when Dock is collapsed (Dynamic Island mode for Dock)
 function pollDockHover() {
   if (!dockWin || dockWin.isDestroyed()) return;
-  if (!dockAutoHide) {
+
+  const mode = getDockHidingMode();
+
+  // Mode 1: Always visible
+  if (mode === 'none') {
     if (dockState !== 'expanded') {
       dockState = 'expanded';
       dockWin.webContents.send('set-collapse-state', false);
@@ -581,24 +715,53 @@ function pollDockHover() {
     return;
   }
 
+  // Mode 2: Direct Hide when apps are open (always visible on empty desktop)
+  if (mode === 'direct-app-open' && !activeAppOnScreen) {
+    if (dockState !== 'expanded') {
+      dockState = 'expanded';
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+    return;
+  }
+
+  // Auto-hiding logic for island, direct-always, and direct-app-open (when app is open)
   const primaryDisplay = getTargetDisplay();
   const displayBounds = primaryDisplay.bounds;
   const cursorPoint = screen.getCursorScreenPoint();
+  const screenWidth = displayBounds.width;
   const screenHeight = displayBounds.height;
+  const position = (settings.general && settings.general.dockPosition) || 'bottom';
 
   if (dockState === 'collapsed') {
-    // 1. Hotspot Expand Detection (Center bottom ±100px wide, y >= bottom 15px of screen)
-    const screenWidth = displayBounds.width;
-    const centerX = displayBounds.x + Math.round(screenWidth / 2);
-    const inHotspot = (
-      cursorPoint.x >= centerX - 100 &&
-      cursorPoint.x <= centerX + 100 &&
-      cursorPoint.y >= displayBounds.y + screenHeight - 15
-    );
+    // 1. Hotspot Expand Detection
+    let inHotspot = false;
+    if (position === 'bottom') {
+      const centerX = displayBounds.x + Math.round(screenWidth / 2);
+      inHotspot = (
+        cursorPoint.x >= centerX - 120 &&
+        cursorPoint.x <= centerX + 120 &&
+        cursorPoint.y >= displayBounds.y + screenHeight - 15
+      );
+    } else if (position === 'left') {
+      const centerY = displayBounds.y + Math.round(screenHeight / 2);
+      inHotspot = (
+        cursorPoint.y >= centerY - 120 &&
+        cursorPoint.y <= centerY + 120 &&
+        cursorPoint.x >= displayBounds.x &&
+        cursorPoint.x <= displayBounds.x + 15
+      );
+    } else if (position === 'right') {
+      const centerY = displayBounds.y + Math.round(screenHeight / 2);
+      inHotspot = (
+        cursorPoint.y >= centerY - 120 &&
+        cursorPoint.y <= centerY + 120 &&
+        cursorPoint.x >= displayBounds.x + screenWidth - 15 &&
+        cursorPoint.x <= displayBounds.x + screenWidth
+      );
+    }
 
     if (inHotspot) {
       consecutiveDockHotspotPolls++;
-      // Debounce: require cursor in hotspot for 1 poll cycle (2 consecutive checks)
       if (consecutiveDockHotspotPolls >= 2) {
         dockState = 'expanded';
         consecutiveDockHotspotPolls = 0;
@@ -613,43 +776,30 @@ function pollDockHover() {
     }
   } else {
     // 2. Leave-Bounds Collapse Detection
-    const dockBounds = dockWin.getBounds();
-    const currentHeight = isDockContextMenuOpen ? 300 : 85;
-    const isWithinDock = (
-      cursorPoint.x >= dockBounds.x &&
-      cursorPoint.x <= dockBounds.x + dockBounds.width &&
-      cursorPoint.y >= displayBounds.y + screenHeight - currentHeight &&
-      cursorPoint.y <= displayBounds.y + screenHeight
-    );
+    if (isAnyOverlayOpen()) {
+      if (dockLeaveTimeout) {
+        clearTimeout(dockLeaveTimeout);
+        dockLeaveTimeout = null;
+      }
+      return;
+    }
+
+    const currentThickness = isDockContextMenuOpen ? 300 : getDockThickness();
+    const isWithinDock = isCursorInDockBounds(cursorPoint, currentThickness);
 
     if (!isWithinDock) {
       if (!dockLeaveTimeout) {
         dockLeaveTimeout = setTimeout(() => {
-          // Double check cursor after 400ms debounce
           const checkCursor = screen.getCursorScreenPoint();
-          const checkBounds = dockWin.getBounds();
-          const stillOutside = !(
-            checkCursor.x >= checkBounds.x &&
-            checkCursor.x <= checkBounds.x + checkBounds.width &&
-            checkCursor.y >= displayBounds.y + screenHeight - currentHeight &&
-            checkCursor.y <= displayBounds.y + screenHeight
-          );
+          const stillOutside = !isCursorInDockBounds(checkCursor, currentThickness);
 
-          if (stillOutside) {
+          if (stillOutside && !isAnyOverlayOpen()) {
             if (isDockContextMenuOpen) {
               isDockContextMenuOpen = false;
               dockWin.webContents.send('close-context-menu');
-              dockWin.setBounds({
-                x: checkBounds.x,
-                y: displayBounds.y + screenHeight - 85,
-                width: checkBounds.width,
-                height: 85
-              });
             }
-            if (dockAutoHide) {
-              dockState = 'collapsed';
-              dockWin.webContents.send('set-collapse-state', true); // Collapse back to pill
-            }
+            dockState = 'collapsed';
+            dockWin.webContents.send('set-collapse-state', true); // Collapse visually
           }
           dockLeaveTimeout = null;
         }, 400);
@@ -693,6 +843,20 @@ function registerGlobalShortcuts() {
     }
   }
 
+  if (settings.shortcuts && settings.shortcuts.openDrawer) {
+    try {
+      globalShortcut.register(settings.shortcuts.openDrawer, () => {
+        if (isDrawerOpen) {
+          closeDrawer();
+        } else {
+          openDrawer();
+        }
+      });
+    } catch (err) {
+      console.error('Failed to register openDrawer shortcut:', err);
+    }
+  }
+
   // Register Spotlight search shortcut
   try {
     globalShortcut.register('CommandOrControl+Space', () => {
@@ -733,6 +897,9 @@ function createSettingsWindow() {
   });
 
   settingsWin.on('closed', () => {
+    if (settingsWin) {
+      try { settingsWin.removeAllListeners(); } catch (err) {}
+    }
     settingsWin = null;
   });
 }
@@ -741,9 +908,15 @@ function showSettingsWindow() {
   ensureAppsScanned();
   if (!settingsWin) {
     createSettingsWindow();
+    settingsWin.once('ready-to-show', () => {
+      settingsWin.center();
+      settingsWin.show();
+    });
+  } else {
+    settingsWin.center();
+    settingsWin.show();
+    settingsWin.focus();
   }
-  settingsWin.center();
-  settingsWin.show();
 }
 
 
@@ -819,7 +992,7 @@ ipcMain.handle('get-displays', () => {
 });
 
 function clearIconCache() {
-  const cacheDir = path.join(__dirname, 'dock', 'icons-cache');
+  const cacheDir = configPaths.iconsCacheDir;
   if (fs.existsSync(cacheDir)) {
     const files = fs.readdirSync(cacheDir);
     for (const file of files) {
@@ -842,6 +1015,51 @@ ipcMain.handle('get-ram-usage', () => {
     totalKb += m.memory.workingSetSize;
   }
   return Math.round(totalKb / 1024);
+});
+
+ipcMain.handle('get-open-windows', async (event, appId) => {
+  try {
+    let procName = '';
+    if (config && config.apps && config.apps[appId]) {
+      procName = (config.apps[appId].process || '').toLowerCase();
+    }
+    if (!procName) {
+      if (fs.existsSync(appsJsonPath)) {
+        try {
+          const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+          const data = JSON.parse(raw);
+          const allApps = [...(data.apps || []), ...(data.custom || [])];
+          const match = allApps.find(a => a.id === appId);
+          if (match && match.exec) {
+            procName = path.basename(match.exec).toLowerCase();
+          }
+        } catch (e) {}
+      }
+    }
+    if (!procName) {
+      procName = `${appId.toLowerCase()}.exe`;
+    }
+
+    const openWindows = await getOpenWindowsList();
+    const result = [];
+    
+    for (const win of openWindows) {
+      const pid = win.ProcessId || win.pid;
+      if (!pid) continue;
+      const exeName = globalProcessMap ? globalProcessMap[pid] : null;
+      if (exeName && exeName.toLowerCase() === procName) {
+        result.push({
+          Title: win.Title || 'Untitled Window',
+          Pid: pid
+        });
+      }
+    }
+    
+    return result;
+  } catch (err) {
+    console.error('Failed to get open windows for appId:', appId, err);
+    return [];
+  }
 });
 
 ipcMain.handle('get-about-info', async () => {
@@ -1030,6 +1248,9 @@ function createAboutWindow() {
   });
 
   aboutWin.on('closed', () => {
+    if (aboutWin) {
+      try { aboutWin.removeAllListeners(); } catch (err) {}
+    }
     aboutWin = null;
   });
 }
@@ -1037,9 +1258,15 @@ function createAboutWindow() {
 function showAboutWindow() {
   if (!aboutWin) {
     createAboutWindow();
+    aboutWin.once('ready-to-show', () => {
+      aboutWin.center();
+      aboutWin.show();
+    });
+  } else {
+    aboutWin.center();
+    aboutWin.show();
+    aboutWin.focus();
   }
-  aboutWin.center();
-  aboutWin.show();
 }
 
 function createForceQuitWindow() {
@@ -1068,16 +1295,60 @@ function createForceQuitWindow() {
   });
 
   forceQuitWin.on('closed', () => {
+    if (forceQuitWin) {
+      try { forceQuitWin.removeAllListeners(); } catch (err) {}
+    }
     forceQuitWin = null;
+  });
+}
+
+function createWelcomeWindow() {
+  if (welcomeWin) return;
+  welcomeWin = new BrowserWindow({
+    width: 440,
+    height: 380,
+    frame: true,
+    resizable: false,
+    show: false,
+    title: 'Welcome to macOS Dock & Menu Bar',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  welcomeWin.loadFile(path.join(__dirname, 'welcome.html'));
+
+  welcomeWin.once('ready-to-show', () => {
+    welcomeWin.center();
+    welcomeWin.show();
+  });
+
+  welcomeWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      welcomeWin.hide();
+    }
+  });
+
+  welcomeWin.on('closed', () => {
+    welcomeWin = null;
   });
 }
 
 function showForceQuitWindow() {
   if (!forceQuitWin) {
     createForceQuitWindow();
+    forceQuitWin.once('ready-to-show', () => {
+      forceQuitWin.center();
+      forceQuitWin.show();
+    });
+  } else {
+    forceQuitWin.center();
+    forceQuitWin.show();
+    forceQuitWin.focus();
   }
-  forceQuitWin.center();
-  forceQuitWin.show();
 }
 
 // Apply settings state to system (e.g. skipTaskbar, opacity, launchAtLogin, etc.)
@@ -1094,7 +1365,9 @@ function applySettings() {
   // 2. Launch at Login
   const launch = settings.general && settings.general.launchAtLogin;
   app.setLoginItemSettings({
-    openAtLogin: launch
+    openAtLogin: launch,
+    path: app.getPath('exe'),
+    args: []
   });
 
   // 3. Opacity
@@ -1104,6 +1377,13 @@ function applySettings() {
   // 4. Auto-Hide behavior
   const autoHideEnabled = settings.hiding && settings.hiding.enabled;
   menuBarState = autoHideEnabled ? 'collapsed' : 'expanded';
+
+  // Reposition and update dock dimensions immediately
+  if (dockWin && !dockWin.isDestroyed()) {
+    const bounds = getDockDimensions();
+    dockWin.setBounds(bounds);
+    dockWin.webContents.send('settings-changed', settings);
+  }
 }
 
 // Get desktop screenshot as data URL using desktopCapturer
@@ -1164,16 +1444,15 @@ function createDrawerWindow() {
   });
 
   drawerWin.on('closed', () => {
+    if (drawerWin) {
+      try { drawerWin.removeAllListeners(); } catch (err) {}
+    }
     drawerWin = null;
   });
 }
 
 async function openDrawer() {
   ensureAppsScanned();
-  if (!drawerWin) {
-    createDrawerWindow();
-  }
-
   let screenshotUrl = '';
   let useCapture = true;
 
@@ -1191,7 +1470,16 @@ async function openDrawer() {
     screenshotUrl = await getScreenshotDataUrl();
   }
 
-  if (drawerWin) {
+  if (!drawerWin) {
+    createDrawerWindow();
+    drawerWin.once('ready-to-show', () => {
+      if (drawerWin) {
+        drawerWin.webContents.send('open-drawer', screenshotUrl);
+        drawerWin.show();
+        isDrawerOpen = true;
+      }
+    });
+  } else {
     drawerWin.webContents.send('open-drawer', screenshotUrl);
     drawerWin.show();
     isDrawerOpen = true;
@@ -1222,26 +1510,8 @@ function createTray() {
   tray.setToolTip('macOS Dock & Menu Bar');
   
   const contextMenu = Menu.buildFromTemplate([
+    { label: 'Open Drawer', click: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); } },
     { label: 'Open Settings', click: () => showSettingsWindow() },
-    { label: 'Show Menu Bar & Dock', click: () => {
-        if (menuBarWin && !menuBarWin.isDestroyed()) {
-          menuBarWin.show();
-          if (menuBarState === 'collapsed') {
-            menuBarWin.webContents.send('set-collapse-state', true);
-          } else {
-            menuBarWin.webContents.send('set-collapse-state', false);
-          }
-        }
-        if (dockWin && !dockWin.isDestroyed()) {
-          dockWin.show();
-          if (dockState === 'collapsed') {
-            dockWin.webContents.send('set-collapse-state', true);
-          } else {
-            dockWin.webContents.send('set-collapse-state', false);
-          }
-        }
-      }
-    },
     { type: 'separator' },
     { label: 'Quit', click: () => {
         app.isQuitting = true;
@@ -1252,9 +1522,19 @@ function createTray() {
   
   tray.setContextMenu(contextMenu);
   
-  tray.on('double-click', () => {
-    if (menuBarWin && !menuBarWin.isDestroyed()) menuBarWin.show();
-    if (dockWin && !dockWin.isDestroyed()) dockWin.show();
+  tray.on('click', () => {
+    if (dockWin && !dockWin.isDestroyed()) {
+      if (dockWin.isVisible()) {
+        dockWin.hide();
+      } else {
+        dockWin.show();
+        if (dockState === 'collapsed') {
+          dockWin.webContents.send('set-collapse-state', true);
+        } else {
+          dockWin.webContents.send('set-collapse-state', false);
+        }
+      }
+    }
   });
 }
 
@@ -1263,7 +1543,24 @@ let tickCount = 0;
 
 let lastAppName = '';
 let lastActiveAppId = '';
+let activeAppOnScreen = true;
 
+function isAnyAppOnScreen(activeWindow) {
+  if (!activeWindow) return false;
+  if (!activeWindow.owner) return false;
+  const ownerName = (activeWindow.owner.name || '').toLowerCase();
+  const title = (activeWindow.title || '').toLowerCase();
+
+  if (ownerName === 'explorer.exe') {
+    if (!title || title === 'program manager' || title === 'start' || title === 'taskbar') {
+      return false;
+    }
+  }
+  if (ownerName === 'searchhost.exe' || ownerName === 'shellexperiencehost.exe' || ownerName === 'conhost.exe') {
+    return false;
+  }
+  return true;
+}
 
 async function pollActiveApp() {
   try {
@@ -1271,6 +1568,14 @@ async function pollActiveApp() {
       activeWinModule = await import('active-win');
     }
     const activeWindow = await activeWinModule.activeWindow();
+    
+    const prevAppOnScreen = activeAppOnScreen;
+    activeAppOnScreen = isAnyAppOnScreen(activeWindow);
+    if (prevAppOnScreen !== activeAppOnScreen) {
+      pollMenuBarHover();
+      pollDockHover();
+    }
+
     if (activeWindow) {
       focusForwarder.updateLastFocusedWindow(activeWindow);
     }
@@ -1402,7 +1707,7 @@ function createMenuBarWindow() {
     height: 28,
     x: x,
     y: y,
-    show: !startMinimized,
+    show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -1434,6 +1739,17 @@ function createMenuBarWindow() {
 
   menuBarWin.loadFile('index.html');
 
+  menuBarWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      menuBarWin.hide();
+    }
+  });
+
+  menuBarWin.on('closed', () => {
+    menuBarWin = null;
+  });
+
   // Set initial state to collapsed when loaded
   menuBarWin.webContents.on('did-finish-load', () => {
     applySettings();
@@ -1449,22 +1765,15 @@ function startProcessPolling() {}
 function stopProcessPolling() {}
 
 function createDockWindow() {
-  const targetDisplay = getTargetDisplay();
-  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
   const startMinimized = settings.general && settings.general.startMinimizedToTray;
-  
-  // Start with default width of 800px and height of 85px. Horizontally center it.
-  const defaultWidth = 800;
-  const defaultHeight = 85;
-  const x = dx + Math.round((screenWidth - defaultWidth) / 2);
-  const y = dy + screenHeight - defaultHeight;
+  const bounds = getDockDimensions();
 
   dockWin = new BrowserWindow({
-    width: defaultWidth,
-    height: defaultHeight,
-    x: x,
-    y: y,
-    show: !startMinimized,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
+    show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -1483,6 +1792,13 @@ function createDockWindow() {
   });
 
   dockWin.loadFile(path.join(__dirname, 'dock', 'index.html'));
+
+  dockWin.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      dockWin.hide();
+    }
+  });
 
   // Set initial state to collapsed when loaded (if autoHide enabled)
   dockWin.webContents.on('did-finish-load', () => {
@@ -1766,17 +2082,14 @@ ipcMain.on('set-window-height', (event, height) => {
 // IPC handler to dynamically resize dock width and keep it centered at the bottom (Dock)
 ipcMain.on('set-dock-width', (event, dockWidth) => {
   if (dockWin) {
-    const targetDisplay = getTargetDisplay();
-    const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
-    const x = dx + Math.round((screenWidth - dockWidth) / 2);
-    const y = dy + screenHeight - 85;
-    
-    dockWin.setBounds({
-      x: x,
-      y: y,
-      width: Math.round(dockWidth),
-      height: 85
-    });
+    const position = (settings.general && settings.general.dockPosition) || 'bottom';
+    if (position === 'bottom') {
+      const bounds = getDockDimensions(dockWidth, null);
+      dockWin.setBounds(bounds);
+    } else {
+      const bounds = getDockDimensions(null, dockWidth);
+      dockWin.setBounds(bounds);
+    }
   }
 });
 
@@ -1794,9 +2107,7 @@ ipcMain.on('refresh-app', async () => {
   await loadSettings();
   applySettings();
   
-  if (dockWin && !dockWin.isDestroyed()) {
-    dockWin.webContents.send('config-changed', { config: config, appIconsMap: appIconsMap || {} });
-  }
+  await broadcastConfigUpdate();
   
   const windows = [menuBarWin, spotlightWin, ccWin, settingsWin];
   for (const w of windows) {
@@ -1829,9 +2140,9 @@ function forceCollapseAll() {
     const { y: dy, height: screenHeight } = targetDisplay.bounds;
     dockWin.setBounds({
       x: bounds.x,
-      y: dy + screenHeight - 85,
+      y: dy + screenHeight - 115,
       width: bounds.width,
-      height: 85
+      height: 115
     });
   }
   
@@ -1859,13 +2170,17 @@ ipcMain.on('set-dock-height', (event, height) => {
     const bounds = dockWin.getBounds();
     const targetDisplay = getTargetDisplay();
     const { y: dy, height: screenHeight } = targetDisplay.bounds;
-    const y = dy + screenHeight - height;
+    
+    let actualHeight = height;
+    if (height === 85) actualHeight = 115;
+    
+    const y = dy + screenHeight - actualHeight;
     
     dockWin.setBounds({
       x: bounds.x,
       y: y,
       width: bounds.width,
-      height: height
+      height: actualHeight
     });
   }
 });
@@ -1895,6 +2210,11 @@ ipcMain.on('save-config', async (event, pinned) => {
 
 ipcMain.on('save-auto-hide', async (event, autoHide) => {
   config.autoHide = autoHide;
+  if (!autoHide) {
+    config.hidingMode = 'none';
+  } else {
+    config.hidingMode = 'island';
+  }
   await saveConfig();
   
   dockAutoHide = autoHide;
@@ -1910,6 +2230,31 @@ ipcMain.on('save-auto-hide', async (event, autoHide) => {
       dockWin.webContents.send('set-collapse-state', true);
     }
     stopProcessPolling();
+  }
+});
+
+ipcMain.on('save-dock-hiding-mode', async (event, mode) => {
+  config.hidingMode = mode;
+  config.autoHide = (mode !== 'none');
+  await saveConfig();
+  
+  dockAutoHide = (mode !== 'none');
+  if (!dockAutoHide) {
+    dockState = 'expanded';
+    if (dockWin) {
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+    startProcessPolling();
+  } else {
+    dockState = 'collapsed';
+    if (dockWin) {
+      dockWin.webContents.send('set-collapse-state', true);
+    }
+    stopProcessPolling();
+  }
+
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.webContents.send('config-changed', { config });
   }
 });
 
@@ -1951,6 +2296,8 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
         }
       } else if (type === 'openSettings') {
         showSettingsWindow();
+      } else if (type === 'openDrawer') {
+        if (isDrawerOpen) closeDrawer(); else openDrawer();
       }
     });
 
@@ -2000,11 +2347,12 @@ ipcMain.handle('get-apps', async () => {
     let appsList = [];
     let favorites = [];
     let settingsData = {};
+    let data = {};
 
     // 1. Load Drawer apps from apps.json
     if (fs.existsSync(appsJsonPath)) {
       const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
-      const data = JSON.parse(raw);
+      data = JSON.parse(raw);
       const scanned = data.apps || [];
       const custom = data.custom || [];
       favorites = data.favorites || [];
@@ -2036,12 +2384,13 @@ ipcMain.handle('get-apps', async () => {
     return {
       settings: settingsData,
       apps: appsList,
-      favorites: favorites
+      favorites: favorites,
+      folders: data.folders || []
     };
   } catch (err) {
     console.error('Failed to read apps in get-apps:', err);
   }
-  return { apps: [], favorites: [] };
+  return { apps: [], favorites: [], folders: [] };
 });
 
 ipcMain.handle('save-favorites', async (event, favorites) => {
@@ -2058,6 +2407,35 @@ ipcMain.handle('save-favorites', async (event, favorites) => {
     console.error('Failed to save favorites:', err);
   }
   return false;
+});
+
+ipcMain.handle('save-folders', async (event, folders) => {
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
+      data.folders = folders;
+      await fs.promises.writeFile(appsJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      notifyAppsUpdated();
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to save folders:', err);
+  }
+  return false;
+});
+
+ipcMain.handle('get-folders', async () => {
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
+      return data.folders || [];
+    }
+  } catch (err) {
+    console.error('Failed to get folders:', err);
+  }
+  return [];
 });
 
 ipcMain.handle('refresh-apps', async () => {
@@ -2287,6 +2665,38 @@ function focusRunningApp(processName) {
   });
 }
 
+ipcMain.on('close-welcome', () => {
+  if (welcomeWin && !welcomeWin.isDestroyed()) {
+    welcomeWin.hide();
+  }
+  showWindowsOnStartup = true;
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    menuBarWin.show();
+  }
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.show();
+  }
+  // Initialize other windows and listeners
+  createSettingsWindow();
+  createDrawerWindow();
+  registerGlobalShortcuts();
+  startMasterTimer();
+});
+
+ipcMain.on('open-error-log', () => {
+  const logPath = path.join(app.getPath('userData'), 'logs', 'error.log');
+  if (fs.existsSync(logPath)) {
+    shell.openPath(logPath).catch(err => console.error(err));
+  } else {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Error Log',
+      message: 'No error log found.',
+      detail: 'The error log file has not been created yet because no errors have occurred.'
+    });
+  }
+});
+
 ipcMain.on('hide-drawer', () => {
   closeDrawer();
 });
@@ -2369,8 +2779,41 @@ ipcMain.on('show-in-finder', (event, appId) => {
   }
 });
 
-ipcMain.on('quit-app', () => {
-  app.quit();
+ipcMain.on('quit-app', async (event, appId) => {
+  if (appId) {
+    try {
+      let procName = '';
+      if (config && config.apps && config.apps[appId]) {
+        procName = (config.apps[appId].process || '').toLowerCase();
+      }
+      if (!procName) {
+        if (fs.existsSync(appsJsonPath)) {
+          try {
+            const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+            const data = JSON.parse(raw);
+            const allApps = [...(data.apps || []), ...(data.custom || [])];
+            const match = allApps.find(a => a.id === appId);
+            if (match && match.exec) {
+              procName = path.basename(match.exec).toLowerCase();
+            }
+          } catch (e) {}
+        }
+      }
+      if (!procName) {
+        procName = `${appId.toLowerCase()}.exe`;
+      }
+
+      exec(`taskkill /IM "${procName}"`, (err, stdout, stderr) => {
+        if (err) {
+          debugLog(`Graceful quit failed for ${procName}, trying force quit or skip...`);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to quit app:', appId, err);
+    }
+  } else {
+    app.quit();
+  }
 });
 
 // Single instance enforcement for the integrated app
@@ -2392,6 +2835,21 @@ if (!isPrimaryInstance) {
   });
 
   app.whenReady().then(async () => {
+    const isFirstRun = !fs.existsSync(configPaths.settingsPath);
+    showWindowsOnStartup = true;
+    configPaths.initializePaths();
+    if (DEBUG) {
+      try {
+        process.getProcessMemoryInfo().then(info => {
+          debugLog(`Initial RAM usage: Private=${Math.round(info.private / 1024)} KB, ResidentSet=${Math.round(info.residentSet / 1024)} KB`);
+        }).catch(err => {
+          debugLog('Failed to get initial RAM usage:', err);
+        });
+      } catch (err) {
+        debugLog('Failed to call process.getProcessMemoryInfo:', err);
+      }
+    }
+
     await loadConfig();
     await loadSettings();
     ensureIconsFolder();
@@ -2403,10 +2861,15 @@ if (!isPrimaryInstance) {
     }
     createMenuBarWindow();
     createDockWindow();
-    createSettingsWindow();
-    createDrawerWindow();
-    registerGlobalShortcuts();
-    startMasterTimer();
+
+    if (isFirstRun) {
+      createWelcomeWindow();
+    } else {
+      createSettingsWindow();
+      createDrawerWindow();
+      registerGlobalShortcuts();
+      startMasterTimer();
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -2427,6 +2890,9 @@ app.on('before-quit', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    if (tray) {
+      return;
+    }
     app.quit();
   }
 });
@@ -2550,6 +3016,13 @@ function createControlCenterWindow() {
   });
 
   ccWin.on('closed', () => {
+    if (ccLeaveTimeout) {
+      clearTimeout(ccLeaveTimeout);
+      ccLeaveTimeout = null;
+    }
+    if (ccWin) {
+      try { ccWin.removeAllListeners(); } catch (err) {}
+    }
     ccWin = null;
   });
 }
@@ -2721,16 +3194,25 @@ function startSystemDataPolling() {}
 ipcMain.on('toggle-control-center', (event, rect) => {
   if (!ccWin) {
     createControlCenterWindow();
-  }
-  
-  if (ccWin.isVisible()) {
-    ccWin.hide();
+    ccWin.once('ready-to-show', () => {
+      if (ccWin) {
+        const x = Math.round(rect.right - 290);
+        const y = Math.round(rect.bottom + 4);
+        ccWin.setBounds({ x, y, width: 290, height: 350 });
+        ccWin.show();
+        ccWin.focus();
+      }
+    });
   } else {
-    const x = Math.round(rect.right - 290);
-    const y = Math.round(rect.bottom + 4);
-    ccWin.setBounds({ x, y, width: 290, height: 350 });
-    ccWin.show();
-    ccWin.focus();
+    if (ccWin.isVisible()) {
+      ccWin.hide();
+    } else {
+      const x = Math.round(rect.right - 290);
+      const y = Math.round(rect.bottom + 4);
+      ccWin.setBounds({ x, y, width: 290, height: 350 });
+      ccWin.show();
+      ccWin.focus();
+    }
   }
 });
 

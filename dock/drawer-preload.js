@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('drawerAPI', {
   removeFromDock: (appId) => ipcRenderer.send('remove-from-dock', appId),
   pressEscape: () => ipcRenderer.send('escape-pressed'),
   onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
-  getThemeConfig: () => ipcRenderer.invoke('get-theme-config')
+  getThemeConfig: () => ipcRenderer.invoke('get-theme-config'),
+  saveFolders: (folders) => ipcRenderer.invoke('save-folders', folders),
+  getFolders: () => ipcRenderer.invoke('get-folders')
 });
 

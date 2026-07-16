@@ -412,6 +412,54 @@
     .context-menu-item:hover {
       background: #007aff;
     }
+
+    /* Folders Styling */
+    .folder-tile {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      padding: 8px;
+      gap: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      margin-bottom: 8px;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .folder-tile:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .folder-mini-icon {
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+    .folder-mini-icon-fallback {
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+    }
+
+    /* Accessibility: Reduce Motion Support */
+    body.reduce-motion *, body.reduce-motion::before, body.reduce-motion::after {
+      animation-delay: -1ms !important;
+      animation-duration: -1ms !important;
+      animation-iteration-count: 1 !important;
+      background-attachment: initial !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }
   </style>
 </head>
 <body>
@@ -455,6 +503,16 @@
     <div class="context-menu" id="context-menu">
       <div class="context-menu-item" id="menu-toggle-fav">Add to Favorites</div>
       <div class="context-menu-item" id="menu-toggle-dock">Add to Dock</div>
+    </div>
+
+    <!-- Folder Overlay Modal -->
+    <div id="folder-overlay" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(25px); z-index: 10000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);">
+      <div id="folder-box" style="width: 540px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 24px; padding: 30px; display: flex; flex-direction: column; align-items: center; transform: scale(0.9); transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);">
+        <input type="text" id="folder-title" style="background: transparent; border: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.4); color: white; font-size: 24px; font-weight: 600; text-align: center; margin-bottom: 25px; outline: none; width: 80%;" title="Change folder name">
+        <div id="folder-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-height: 300px; overflow-y: auto; width: 100%; justify-items: center; align-items: center; padding: 10px;">
+          <!-- Folder apps go here -->
+        </div>
+      </div>
     </div>
   </div>
 
@@ -516,11 +574,15 @@
     let draggedItem = null;
     let draggedIndex = null;
 
+    let folders = [];
+    let draggedApp = null;
+
     // Fetch and populate apps list
     async function loadApps() {
       const data = await window.drawerAPI.getApps();
       allApps = data.apps || [];
       favoritesList = data.favorites || [];
+      folders = data.folders || [];
       filteredApps = [...allApps];
       renderPages();
       renderFavorites();
@@ -635,9 +697,22 @@
       currentPageIndex = 0;
       pagesTrack.style.transform = `translateX(0)`;
 
-      // Include the "+" add-app tile only when not searching
       const isSearching = searchInput.value.trim() !== '';
-      const totalItems = filteredApps.length + (isSearching ? 0 : 1); // +1 for add tile
+
+      // Find all app paths that are inside folders so we exclude them from the main grid
+      const folderPaths = new Set();
+      folders.forEach(f => {
+        if (Array.isArray(f.apps)) {
+          f.apps.forEach(p => folderPaths.add(p));
+        }
+      });
+
+      const gridApps = filteredApps.filter(app => !folderPaths.has(app.exec));
+      
+      // Combine folder items and non-foldered grid apps
+      const itemsToRender = isSearching ? filteredApps : [...folders.map((f, idx) => ({ isFolder: true, index: idx, ...f })), ...gridApps];
+
+      const totalItems = itemsToRender.length + (isSearching ? 0 : 1); // +1 for add tile
       const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
       for (let p = 0; p < totalPages; p++) {
@@ -645,51 +720,141 @@
         pageGrid.className = 'page-grid';
 
         const startIdx = p * itemsPerPage;
-        const endIdx = Math.min(startIdx + itemsPerPage, filteredApps.length);
-        const pageApps = filteredApps.slice(startIdx, endIdx);
+        const endIdx = Math.min(startIdx + itemsPerPage, itemsToRender.length);
+        const pageItems = itemsToRender.slice(startIdx, endIdx);
 
-        pageApps.forEach(app => {
+        pageItems.forEach(itemData => {
           const item = document.createElement('div');
           item.className = 'app-item';
-          item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.drawerAPI.launchApp(app.id);
-            closeDrawer();
-          });
 
-          // Right-click to show context menu
-          item.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            showContextMenu(e, app);
-          });
+          if (itemData.isFolder) {
+            // Folder item rendering
+            item.addEventListener('click', (e) => {
+              e.stopPropagation();
+              openFolderModal(itemData.index);
+            });
 
-          // Check if custom icon exists
-          const iconSrc = app.iconPath || app.icon;
-          if (iconSrc) {
-            const img = document.createElement('img');
-            img.className = 'app-icon';
-            img.src = iconSrc;
-            img.alt = app.name;
-            // Fallback if image fails to load
-            img.onerror = () => {
-              img.replaceWith(createFallbackIcon(app));
-            };
-            item.appendChild(img);
+            // Drag and drop target to add apps to folders
+            item.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              item.style.border = '2px dashed var(--accent-color)';
+              item.style.borderRadius = '16px';
+            });
+            item.addEventListener('dragleave', () => {
+              item.style.border = 'none';
+            });
+            item.addEventListener('drop', (e) => {
+              e.stopPropagation();
+              item.style.border = 'none';
+              if (draggedApp) {
+                addAppToFolder(itemData.index, draggedApp.exec);
+              }
+            });
+
+            // Stacked folder icons (up to 4 icons in a 2x2 grid)
+            const folderTile = document.createElement('div');
+            folderTile.className = 'folder-tile';
+            
+            const firstApps = (itemData.apps || []).slice(0, 4);
+            firstApps.forEach(exePath => {
+              const app = allApps.find(a => a.exec === exePath);
+              if (!app) return;
+              
+              const iconSrc = app.iconPath || app.icon;
+              if (iconSrc) {
+                const img = document.createElement('img');
+                img.className = 'folder-mini-icon';
+                img.src = iconSrc;
+                folderTile.appendChild(img);
+              } else {
+                const fallback = document.createElement('div');
+                fallback.className = 'folder-mini-icon-fallback';
+                fallback.style.background = getGradientForApp(app.id);
+                fallback.textContent = app.name ? app.name.charAt(0) : '?';
+                folderTile.appendChild(fallback);
+              }
+            });
+
+            // Pad folders with blank squares if less than 4 apps
+            for (let i = firstApps.length; i < 4; i++) {
+              const blank = document.createElement('div');
+              blank.style.background = 'rgba(255,255,255,0.05)';
+              blank.style.borderRadius = '4px';
+              folderTile.appendChild(blank);
+            }
+
+            item.appendChild(folderTile);
+
+            const label = document.createElement('div');
+            label.className = 'app-label';
+            label.textContent = itemData.name;
+            item.appendChild(label);
           } else {
-            item.appendChild(createFallbackIcon(app));
-          }
+            // Normal app item rendering
+            item.setAttribute('draggable', 'true');
+            item.addEventListener('dragstart', (e) => {
+              draggedApp = itemData;
+              e.dataTransfer.setData('text/plain', itemData.exec);
+              e.dataTransfer.effectAllowed = 'move';
+            });
+            item.addEventListener('dragend', () => {
+              draggedApp = null;
+            });
+            item.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              if (draggedApp && draggedApp.exec !== itemData.exec) {
+                item.style.border = '2px dashed var(--accent-color)';
+                item.style.borderRadius = '16px';
+              }
+            });
+            item.addEventListener('dragleave', () => {
+              item.style.border = 'none';
+            });
+            item.addEventListener('drop', (e) => {
+              e.stopPropagation();
+              item.style.border = 'none';
+              if (draggedApp && draggedApp.exec !== itemData.exec) {
+                createFolderWithApps([draggedApp.exec, itemData.exec]);
+              }
+            });
 
-          const label = document.createElement('div');
-          label.className = 'app-label';
-          label.textContent = app.name;
-          item.appendChild(label);
+            item.addEventListener('click', (e) => {
+              e.stopPropagation();
+              window.drawerAPI.launchApp(itemData.id);
+              closeDrawer();
+            });
+
+            item.addEventListener('contextmenu', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              showContextMenu(e, itemData);
+            });
+
+            const iconSrc = itemData.iconPath || itemData.icon;
+            if (iconSrc) {
+              const img = document.createElement('img');
+              img.className = 'app-icon';
+              img.src = iconSrc;
+              img.alt = itemData.name;
+              img.onerror = () => {
+                img.replaceWith(createFallbackIcon(itemData));
+              };
+              item.appendChild(img);
+            } else {
+              item.appendChild(createFallbackIcon(itemData));
+            }
+
+            const label = document.createElement('div');
+            label.className = 'app-label';
+            label.textContent = itemData.name;
+            item.appendChild(label);
+          }
 
           pageGrid.appendChild(item);
         });
 
         // Append "+" add-app tile at the end of the last page (when not searching)
-        if (!isSearching && p === totalPages - 1 && pageApps.length < itemsPerPage) {
+        if (!isSearching && p === totalPages - 1 && pageItems.length < itemsPerPage) {
           const addTile = document.createElement('div');
           addTile.className = 'add-app-tile';
           addTile.addEventListener('click', async (e) => {
@@ -715,7 +880,6 @@
 
         pagesTrack.appendChild(pageGrid);
 
-        // Render Page Dot
         if (totalPages > 1) {
           const dot = document.createElement('div');
           dot.className = `dot ${p === 0 ? 'active' : ''}`;
@@ -987,27 +1151,137 @@
       document.documentElement.style.setProperty('--glass-opacity', opacityVal);
       document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
       
-      let r = 0, g = 122, b = 255;
-      const color = themeData.accentColor;
-      if (color && color.startsWith('#')) {
-        const hex = color.substring(1);
-        if (hex.length === 3) {
-          r = parseInt(hex[0] + hex[0], 16);
-          g = parseInt(hex[1] + hex[1], 16);
-          b = parseInt(hex[2] + hex[2], 16);
-        } else if (hex.length === 6) {
-          r = parseInt(hex.substring(0, 2), 16);
-          g = parseInt(hex.substring(2, 4), 16);
-          b = parseInt(hex.substring(4, 6), 16);
-        }
+      if (themeData.reduceMotion) {
+        document.body.classList.add('reduce-motion');
+      } else {
+        document.body.classList.remove('reduce-motion');
       }
-      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
     }
 
     if (window.drawerAPI.onThemeChanged) {
       window.drawerAPI.onThemeChanged(applyThemeConfig);
       window.drawerAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
     }
+
+    async function saveFoldersList() {
+      await window.drawerAPI.saveFolders(folders);
+      await loadApps();
+    }
+
+    function createFolderWithApps(exePaths) {
+      const defaultName = "New Folder";
+      folders.push({
+        name: defaultName,
+        apps: exePaths
+      });
+      saveFoldersList();
+    }
+
+    function addAppToFolder(folderIdx, exePath) {
+      if (!folders[folderIdx].apps.includes(exePath)) {
+        folders[folderIdx].apps.push(exePath);
+        saveFoldersList();
+      }
+    }
+
+    function removeAppFromFolder(folderIdx, exePath) {
+      folders[folderIdx].apps = folders[folderIdx].apps.filter(p => p !== exePath);
+      if (folders[folderIdx].apps.length === 0) {
+        folders.splice(folderIdx, 1);
+      }
+      saveFoldersList();
+    }
+
+    function openFolderModal(folderIdx) {
+      const folder = folders[folderIdx];
+      if (!folder) return;
+      const overlay = document.getElementById('folder-overlay');
+      const box = document.getElementById('folder-box');
+      const titleInput = document.getElementById('folder-title');
+      const grid = document.getElementById('folder-grid');
+      
+      titleInput.value = folder.name;
+      titleInput.setAttribute('data-folder-idx', folderIdx);
+      
+      grid.innerHTML = '';
+      
+      folder.apps.forEach(exePath => {
+        const app = allApps.find(a => a.exec === exePath);
+        if (!app) return;
+        
+        const item = document.createElement('div');
+        item.className = 'app-item';
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.drawerAPI.launchApp(app.id);
+          closeDrawer();
+        });
+        
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (confirm(`Remove ${app.name} from folder?`)) {
+            removeAppFromFolder(folderIdx, exePath);
+            if (!folders[folderIdx]) {
+              closeFolderModal();
+            } else {
+              openFolderModal(folderIdx);
+            }
+          }
+        });
+        
+        const iconSrc = app.iconPath || app.icon;
+        if (iconSrc) {
+          const img = document.createElement('img');
+          img.className = 'app-icon';
+          img.src = iconSrc;
+          img.onerror = () => {
+            img.replaceWith(createFallbackIcon(app));
+          };
+          item.appendChild(img);
+        } else {
+          item.appendChild(createFallbackIcon(app));
+        }
+        
+        const label = document.createElement('div');
+        label.className = 'app-label';
+        label.textContent = app.name;
+        item.appendChild(label);
+        
+        grid.appendChild(item);
+      });
+      
+      overlay.style.display = 'flex';
+      setTimeout(() => {
+        overlay.style.opacity = '1';
+        box.style.transform = 'scale(1)';
+      }, 10);
+    }
+
+    function closeFolderModal() {
+      const overlay = document.getElementById('folder-overlay');
+      const box = document.getElementById('folder-box');
+      overlay.style.opacity = '0';
+      box.style.transform = 'scale(0.9)';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 240);
+    }
+
+    document.getElementById('folder-title').addEventListener('change', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-folder-idx'));
+      const newName = e.target.value.trim();
+      if (newName && folders[idx]) {
+        folders[idx].name = newName;
+        saveFoldersList();
+      }
+    });
+
+    document.getElementById('folder-overlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('folder-overlay')) {
+        closeFolderModal();
+      }
+    });
 
     // Initial load
     loadApps();

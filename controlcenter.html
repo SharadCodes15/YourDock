@@ -276,6 +276,17 @@
       text-overflow: ellipsis;
       margin-top: 1px;
     }
+
+    /* Accessibility: Reduce Motion Support */
+    body.reduce-motion *, body.reduce-motion::before, body.reduce-motion::after {
+      animation-delay: -1ms !important;
+      animation-duration: -1ms !important;
+      animation-iteration-count: 1 !important;
+      background-attachment: initial !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }
   </style>
 </head>
 <body>
@@ -577,7 +588,11 @@
           b = parseInt(hex.substring(4, 6), 16);
         }
       }
-      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+      if (themeData.reduceMotion) {
+        document.body.classList.add('reduce-motion');
+      } else {
+        document.body.classList.remove('reduce-motion');
+      }
     }
 
     if (window.ccAPI.onThemeChanged) {
