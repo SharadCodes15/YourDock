@@ -2412,6 +2412,10 @@ ipcMain.handle('get-config', async () => {
         }
       }
     }
+    // Merge icon overrides from config.json (pinned app custom icons)
+    if (config.iconOverrides) {
+      Object.assign(appIconsMap, config.iconOverrides);
+    }
   } catch (e) {}
   return { config, appIconsMap };
 });
@@ -2485,6 +2489,52 @@ ipcMain.on('save-auto-hide', async (event, autoHide) => {
     }
     stopProcessPolling();
   }
+});
+
+ipcMain.handle('set-dock-app-icon', async (event, { appId }) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    if (result.canceled || result.filePaths.length === 0) return { success: false, error: 'Cancelled' };
+    if (!config.iconOverrides) config.iconOverrides = {};
+    config.iconOverrides[appId] = result.filePaths[0];
+    await saveConfig();
+    // Notify dock
+    if (dockWin && !dockWin.isDestroyed()) {
+      dockWin.webContents.send('config-updated', config);
+      dockWin.webContents.send('config-changed', { config });
+    }
+    return { success: true, path: result.filePaths[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('reset-dock-app-icon', async (event, appId) => {
+  if (config.iconOverrides && config.iconOverrides[appId]) {
+    delete config.iconOverrides[appId];
+    await saveConfig();
+    if (dockWin && !dockWin.isDestroyed()) {
+      dockWin.webContents.send('config-updated', config);
+      dockWin.webContents.send('config-changed', { config });
+    }
+  }
+  return { success: true };
+});
+
+ipcMain.handle('set-dock-icon-size', async (event, size) => {
+  config.iconSize = size;
+  await saveConfig();
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.webContents.send('config-updated', config);
+    dockWin.webContents.send('config-changed', { config });
+  }
+  return { success: true };
 });
 
 ipcMain.on('save-dock-hiding-mode', async (event, mode) => {

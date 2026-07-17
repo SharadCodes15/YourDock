@@ -74,6 +74,7 @@
       "dock/preload.js",
       "dock/index.html",
       "dock/main.js",
+      "dock/icons/**/*",
       "!dock/icons-cache/**/*",
       "!tests/**/*",
       "!logs/**/*"
@@ -83,6 +84,7 @@
       "settings.json",
       "experimental-flags.json",
       "README-EXPERIMENTAL.md",
+      "dock/icons/**/*",
       "dock/apps.json",
       "dock/config.json"
     ]

@@ -792,6 +792,13 @@
       const sizePreset = (appConfig.general && appConfig.general.dockSize) || 'medium';
       container.classList.add(`size-${sizePreset}`);
       
+      // Apply custom icon size override if set
+      if (appConfig.iconSize && appConfig.iconSize > 0) {
+        document.documentElement.style.setProperty('--icon-size', appConfig.iconSize + 'px');
+      } else {
+        document.documentElement.style.removeProperty('--icon-size');
+      }
+      
       if (isReduceMotion) {
         document.body.classList.add('reduce-motion');
       }

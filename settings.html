@@ -880,8 +880,28 @@
       <h2>App Icons</h2>
       <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Customize icons for your applications.</p>
       
-      <div id="app-icons-list-container" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 420px; padding-right: 5px;">
+      <div class="section-title">Dock Icon Size</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Icon Size (px)</div>
+          <div class="setting-desc">Override the default dock icon size. Set by the Small/Medium/Large preset by default.</div>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="app-dock-icon-size" min="24" max="96" value="48">
+          <span class="slider-value" id="app-dock-icon-size-val">48px</span>
+        </div>
+      </div>
+
+      <div class="section-title">Scanned App Icons</div>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">Override icons for apps found during Start Menu scan.</p>
+      <div id="app-icons-list-container" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 300px; padding-right: 5px;">
         <!-- Loaded dynamically when tab is clicked -->
+      </div>
+
+      <div class="section-title" style="margin-top: 15px;">Dock Pinned App Icons</div>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">Set a custom image file for each pinned dock app.</p>
+      <div id="dock-icons-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Populated dynamically -->
       </div>
     </div>
 
@@ -1088,9 +1108,11 @@
         // Stop shortcut record if switching tabs
         stopShortcutCapture();
 
-        // Lazy render App Icons list
+        // Lazy render App Icons list and Dock Icons list
         if (item.getAttribute('data-panel') === 'appicons') {
           loadAppIconsList();
+          loadDockIconsList();
+          loadIconSizeSetting();
         }
       });
     });
@@ -1102,6 +1124,17 @@
         loadAppIconsList();
       }
     });
+
+    // Re-render Dock Icons list if config changes
+    if (window.settingsAPI.onConfigUpdated) {
+      window.settingsAPI.onConfigUpdated(() => {
+        const activeTab = document.querySelector('.sidebar-item.active');
+        if (activeTab && activeTab.getAttribute('data-panel') === 'appicons') {
+          loadDockIconsList();
+          loadIconSizeSetting();
+        }
+      });
+    }
 
     // Debounced settings save
     let debounceSaveTimeout = null;
@@ -2301,6 +2334,125 @@
       fallback.textContent = app.name ? app.name.charAt(0) : '?';
       return fallback;
     }
+
+    async function loadDockIconsList() {
+      const container = document.getElementById('dock-icons-list-container');
+      container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading...</div>';
+      try {
+        const data = await window.settingsAPI.getDockConfig();
+        const config = data.config || data;
+        const pinned = config.pinned || [];
+        const iconOverrides = config.iconOverrides || {};
+
+        container.innerHTML = '';
+        if (pinned.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No pinned dock apps.</div>';
+          return;
+        }
+
+        for (const appId of pinned) {
+          const app = config.apps && config.apps[appId];
+          const name = app ? app.name || appId : appId;
+          const overriddenPath = iconOverrides[appId];
+
+          const row = document.createElement('div');
+          row.className = 'app-icon-row';
+
+          let imgElement;
+          if (overriddenPath) {
+            imgElement = document.createElement('img');
+            imgElement.className = 'app-icon-preview';
+            imgElement.src = overriddenPath;
+            imgElement.onerror = () => {
+              imgElement.replaceWith(createSettingsFallbackIcon({ name }));
+            };
+          } else {
+            imgElement = createSettingsFallbackIcon({ name });
+          }
+
+          const info = document.createElement('div');
+          info.className = 'app-icon-info';
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'app-icon-name';
+          nameEl.textContent = name;
+
+          const pathEl = document.createElement('div');
+          pathEl.className = 'app-icon-path';
+          pathEl.textContent = overriddenPath ? overriddenPath : 'Default icon';
+          pathEl.title = overriddenPath || '';
+
+          info.appendChild(nameEl);
+          info.appendChild(pathEl);
+
+          const buttons = document.createElement('div');
+          buttons.className = 'app-icon-buttons';
+
+          const changeBtn = document.createElement('button');
+          changeBtn.textContent = 'Change Icon...';
+          changeBtn.addEventListener('click', async () => {
+            const res = await window.settingsAPI.setDockAppIcon(appId);
+            if (res && res.success) {
+              loadDockIconsList();
+            }
+          });
+          buttons.appendChild(changeBtn);
+
+          if (overriddenPath) {
+            const resetBtn = document.createElement('button');
+            resetBtn.textContent = 'Reset';
+            resetBtn.className = 'btn-danger';
+            resetBtn.addEventListener('click', async () => {
+              const res = await window.settingsAPI.resetDockAppIcon(appId);
+              if (res && res.success) {
+                loadDockIconsList();
+              }
+            });
+            buttons.appendChild(resetBtn);
+          }
+
+          row.appendChild(imgElement);
+          row.appendChild(info);
+          row.appendChild(buttons);
+          container.appendChild(row);
+        }
+      } catch (err) {
+        console.error('Failed to load dock icons list:', err);
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ff3b30;">Failed to load dock icons.</div>';
+      }
+    }
+
+    async function loadIconSizeSetting() {
+      try {
+        const data = await window.settingsAPI.getDockConfig();
+        const config = data.config || data;
+        const size = config.iconSize || 48;
+        const slider = document.getElementById('app-dock-icon-size');
+        const valSpan = document.getElementById('app-dock-icon-size-val');
+        slider.value = size;
+        valSpan.textContent = size + 'px';
+      } catch (err) {
+        console.error('Failed to load icon size:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const iconSizeSlider = document.getElementById('app-dock-icon-size');
+      const iconSizeVal = document.getElementById('app-dock-icon-size-val');
+      if (iconSizeSlider) {
+        iconSizeSlider.addEventListener('input', () => {
+          iconSizeVal.textContent = iconSizeSlider.value + 'px';
+        });
+        iconSizeSlider.addEventListener('change', async () => {
+          try {
+            const val = parseInt(iconSizeSlider.value, 10);
+            await window.settingsAPI.setDockIconSize(val);
+          } catch (err) {
+            console.error('Failed to save icon size:', err);
+          }
+        });
+      }
+    });
 
     function applyThemeConfig(themeData) {
       if (!themeData) return;

@@ -59,6 +59,8 @@
       "process": "brave.exe"
     }
   },
+  "iconOverrides": {},
+  "iconSize": 48,
   "launchCounts": {
     "safari": 2,
     "antigravity": 4,
