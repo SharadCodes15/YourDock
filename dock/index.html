@@ -222,9 +222,30 @@
       width: var(--icon-size, 48px);
       height: var(--icon-size, 48px);
       margin: 0 6px;
-      /* Cubic Bezier for authentic macOS magnification ease */
-      transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), margin 0.12s cubic-bezier(0.16, 1, 0.3, 1);
       transform-origin: bottom center;
+    }
+
+    .dock-item.flip-animating {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    .dock-item.dock-enter {
+      animation: dockEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes dockEnter {
+      from { transform: scale(0); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .dock-item.dock-leave {
+      animation: dockLeave 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      pointer-events: none;
+    }
+
+    @keyframes dockLeave {
+      from { transform: scale(1); opacity: 1; }
+      to { transform: scale(0); opacity: 0; }
     }
 
     /* Dragging ghost styling */
@@ -486,19 +507,256 @@
     let appConfig = {};
     let appIconsMap = {};
     let isLowRamMode = false;
+    let isReduceMotion = false;
     let autoHide = false;
     let runningApps = [];
     let tempRunningApps = [];
     let mouseX = 0;
     let mouseY = 0;
     let isHovered = false;
-    let ticking = false;
-    let autoHideTimeout = null;
     let selectedCtxAppId = null;
+    let runningAppsData = {};
+    let previousTempIds = [];
+    let pulsedAppIds = new Set();
 
-    // Magnification constants
-    const R = 110; // Radius of influence
+    // =====================
+    // PARABOLIC MAGNIFICATION
+    // =====================
+    const R = 110;
     const maxScale = 1.38;
+    const baseScale = 1.0;
+    let rAFId = null;
+    let rAFActive = false;
+
+    function parabolicScale(distance, radius) {
+      if (distance >= radius) return baseScale;
+      const t = distance / radius;
+      return baseScale + (maxScale - baseScale) * Math.max(0, 1 - t * t);
+    }
+
+    function computeFLIPDelta(oldRect, newRect) {
+      return {
+        x: oldRect.left - newRect.left,
+        y: oldRect.top - newRect.top,
+        width: oldRect.width / newRect.width,
+        height: oldRect.height / newRect.height
+      };
+    }
+
+    function isMagnificationLoopActive() {
+      return rAFActive;
+    }
+
+    function startMagnificationLoop() {
+      if (rAFActive) return;
+      if (isLowRamMode || isReduceMotion) return;
+      rAFActive = true;
+      const loop = () => {
+        if (!rAFActive) return;
+        if (!isHovered || draggedElement) {
+          rAFActive = false;
+          resetMagnification();
+          return;
+        }
+        updateMagnification();
+        rAFId = requestAnimationFrame(loop);
+      };
+      rAFId = requestAnimationFrame(loop);
+    }
+
+    function stopMagnificationLoop() {
+      if (rAFId) {
+        cancelAnimationFrame(rAFId);
+        rAFId = null;
+      }
+      rAFActive = false;
+      resetMagnification();
+    }
+
+    function updateMagnification() {
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      const items = document.querySelectorAll('.dock-item');
+      if (items.length === 0) return;
+
+      const isHorizontal = position === 'bottom';
+      const sizes = [];
+      const centers = [];
+      let totalWidth = 0;
+
+      items.forEach((item, i) => {
+        const rect = item.getBoundingClientRect();
+        const size = isHorizontal ? rect.width : rect.height;
+        const center = isHorizontal ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+        sizes.push(size);
+        centers.push(center);
+        totalWidth += size + 12;
+      });
+
+      const cursorPos = isHorizontal ? mouseX : mouseY;
+      const scales = [];
+      const baseSizes = [];
+
+      items.forEach((item, i) => {
+        const rect = item.getBoundingClientRect();
+        const size = isHorizontal ? rect.width : rect.height;
+        baseSizes.push(size);
+        const center = centers[i];
+        const d = Math.abs(cursorPos - center);
+        const s = parabolicScale(d, R);
+        scales.push(s);
+      });
+
+      if (isLowRamMode || isReduceMotion) {
+        items.forEach((item, i) => {
+          if (scales[i] > 1.01) {
+            item.style.transform = `scale(${scales[i]})`;
+          } else {
+            item.style.transform = '';
+          }
+        });
+        return;
+      }
+
+      // Compute horizontal shifting: each icon gets an offset based on cumulative scale difference
+      const cursorItemIndex = findClosestItem(centers, cursorPos);
+      const offsets = new Array(items.length).fill(0);
+
+      // Shift icons to the right of the cursor rightwards, left of cursor leftwards
+      for (let i = 0; i < items.length; i++) {
+        let shift = 0;
+        if (i < cursorItemIndex) {
+          for (let j = i + 1; j <= cursorItemIndex; j++) {
+            const grown = baseSizes[j] * scales[j];
+            shift -= (grown - baseSizes[j]) / 2;
+          }
+        } else if (i > cursorItemIndex) {
+          for (let j = cursorItemIndex; j < i; j++) {
+            const grown = baseSizes[j] * scales[j];
+            shift += (grown - baseSizes[j]) / 2;
+          }
+        }
+        offsets[i] = shift;
+      }
+
+      items.forEach((item, i) => {
+        const s = scales[i];
+        const off = offsets[i];
+        if (s > 1.005 || Math.abs(off) > 0.5) {
+          if (isHorizontal) {
+            item.style.transform = `scale(${s}) translateX(${off}px)`;
+          } else {
+            item.style.transform = `scale(${s}) translateY(${off}px)`;
+          }
+        } else {
+          item.style.transform = '';
+        }
+      });
+    }
+
+    function findClosestItem(centers, cursorPos) {
+      let minDist = Infinity;
+      let idx = 0;
+      for (let i = 0; i < centers.length; i++) {
+        const d = Math.abs(centers[i] - cursorPos);
+        if (d < minDist) { minDist = d; idx = i; }
+      }
+      return idx;
+    }
+
+    function resetMagnification() {
+      const items = document.querySelectorAll('.dock-item');
+      items.forEach(item => {
+        item.style.transform = '';
+      });
+    }
+
+    // =====================
+    // FLIP TECHNIQUE HELPERS (keyed by data-app-id)
+    // =====================
+    function recordRectsById() {
+      const map = new Map();
+      document.querySelectorAll('.dock-item').forEach(el => {
+        map.set(el.getAttribute('data-app-id'), el.getBoundingClientRect());
+      });
+      return map;
+    }
+
+    function applyFLIP(oldRects, duration = 200) {
+      const newItems = document.querySelectorAll('.dock-item');
+      if (newItems.length === 0) return;
+      const reduce = isLowRamMode || isReduceMotion;
+      newItems.forEach(el => {
+        const id = el.getAttribute('data-app-id');
+        const old = oldRects.get(id);
+        if (!old) return;
+        const newRect = el.getBoundingClientRect();
+        const deltaX = old.left - newRect.left;
+        const deltaY = old.top - newRect.top;
+        if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+        if (reduce) return;
+        el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        el.classList.add('flip-animating');
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            el.style.transform = '';
+            setTimeout(() => {
+              el.classList.remove('flip-animating');
+            }, duration);
+          });
+        });
+      });
+    }
+
+    // =====================
+    // DEBOUNCED RUNNING-APP STATE (2-cycle stability)
+    // =====================
+    let stableContent = null;
+    let stableOrder = null;
+    let stableCount = 0;
+    const REQUIRED_STABLE_CYCLES = 2;
+
+    function getDebouncedTempApps(newTempApps) {
+      const contentKey = newTempApps.map(a => a.id).sort().join(',');
+      const orderKey = newTempApps.map(a => a.id).join(',');
+      if (stableContent === contentKey) {
+        stableCount++;
+        if (stableCount >= REQUIRED_STABLE_CYCLES) {
+          const orderChanged = stableOrder !== orderKey;
+          stableOrder = orderKey;
+          return { apps: newTempApps, stable: true, orderChanged };
+        }
+        return { apps: null, stable: false, orderChanged: false };
+      }
+      stableContent = contentKey;
+      stableOrder = orderKey;
+      stableCount = 1;
+      return { apps: null, stable: false, orderChanged: false };
+    }
+
+    // =====================
+    // DIRECTIONAL REVEAL HEURISTIC
+    // =====================
+    let cursorHistory = [];
+
+    function updateCursorHistory(x, y) {
+      cursorHistory.push({ x, y, t: Date.now() });
+      if (cursorHistory.length > 3) cursorHistory.shift();
+    }
+
+    function isCursorHeadedTowardDock() {
+      if (cursorHistory.length < 2) return false;
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      const p1 = cursorHistory[0];
+      const p2 = cursorHistory[cursorHistory.length - 1];
+      if (position === 'bottom') {
+        return (p2.y > p1.y) && (p2.y - p1.y) > 3;
+      } else if (position === 'left') {
+        return (p2.x < p1.x) && (p1.x - p2.x) > 3;
+      } else if (position === 'right') {
+        return (p2.x > p1.x) && (p2.x - p1.x) > 3;
+      }
+      return false;
+    }
 
     function getDockHidingMode() {
       if (appConfig && appConfig.hidingMode) {
@@ -534,7 +792,7 @@
       const sizePreset = (appConfig.general && appConfig.general.dockSize) || 'medium';
       container.classList.add(`size-${sizePreset}`);
       
-      if (appConfig.appearance && appConfig.appearance.reduceMotion) {
+      if (isReduceMotion) {
         document.body.classList.add('reduce-motion');
       }
 
@@ -551,13 +809,11 @@
       appIconsMap = data.appIconsMap || {};
       autoHide = appConfig.autoHide !== false;
       
-      // Update checkmark in custom context menu
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
       
       applyCasingStyles();
       
-      // Set initial collapsed class based on config to prevent race conditions
       const container = document.getElementById('dock-container');
       if (autoHide) {
         container.classList.add('collapsed');
@@ -572,43 +828,35 @@
       const itemsContainer = document.getElementById('dock-items');
       itemsContainer.innerHTML = '';
 
-      // 1. Render Pinned Apps
       appConfig.pinned.forEach(appId => {
         const itemData = appConfig.apps[appId];
         if (!itemData) return;
-
         const isRunning = runningApps.includes(appId);
         const itemEl = createDockItem(appId, itemData, true, isRunning, false);
         itemsContainer.appendChild(itemEl);
       });
 
-      // 2. Render Divider for Temp Apps
       const hasTempApps = tempRunningApps && tempRunningApps.length > 0;
       if (hasTempApps) {
         const tempDivider = document.createElement('div');
         tempDivider.className = 'divider';
         itemsContainer.appendChild(tempDivider);
-
-        // 3. Render Temp Running Apps
         tempRunningApps.forEach(app => {
           const itemEl = createDockItem(app.id, { name: app.name, iconPath: app.iconPath, exec: app.exec }, false, true, true);
           itemsContainer.appendChild(itemEl);
         });
       }
 
-      // 4. Render Main Divider
       const divider = document.createElement('div');
       divider.className = 'divider';
       itemsContainer.appendChild(divider);
 
-      // 5. Render Trash
       if (appConfig.apps['trash']) {
         const isTrashRunning = runningApps.includes('trash');
         const trashEl = createDockItem('trash', appConfig.apps['trash'], false, isTrashRunning, false);
         itemsContainer.appendChild(trashEl);
       }
 
-      // Notify the main process about the new dock width to center the window
       setTimeout(updateDockWidth, 100);
     }
 
@@ -625,7 +873,6 @@
         item.classList.add('active');
       }
 
-      // Icon Wrapper for bouncing
       const wrapper = document.createElement('div');
       wrapper.className = 'icon-container';
 
@@ -633,25 +880,18 @@
       img.className = 'dock-icon';
       if (isTemp) {
         img.src = data.iconPath || 'icons/preferences.svg';
-        img.onerror = () => {
-          img.onerror = null;
-          img.src = 'icons/preferences.svg';
-        };
+        img.onerror = () => { img.onerror = null; img.src = 'icons/preferences.svg'; };
       } else {
         const customIcon = appIconsMap && appIconsMap[appId];
         img.src = customIcon || `icons/${appId}.svg`;
-        img.onerror = () => {
-          img.onerror = null;
-          img.src = 'icons/preferences.svg';
-        };
+        img.onerror = () => { img.onerror = null; img.src = 'icons/preferences.svg'; };
       }
       img.alt = data.name;
-      img.draggable = false; // Prevent default image dragging
+      img.draggable = false;
 
       wrapper.appendChild(img);
       item.appendChild(wrapper);
 
-      // Render Badge Count if > 0
       const badgesMap = appConfig.badges || {};
       const badgeCount = badgesMap[appId] || 0;
       if (badgeCount > 0) {
@@ -661,7 +901,6 @@
         item.appendChild(badge);
       }
 
-      // Dot indicator
       const dot = document.createElement('div');
       dot.className = 'dot-indicator';
       if (isRunning) {
@@ -676,13 +915,11 @@
       }
       item.appendChild(dot);
 
-      // Tooltip
       const tooltip = document.createElement('div');
       tooltip.className = 'tooltip';
       tooltip.textContent = data.name;
       item.appendChild(tooltip);
 
-      // Hook up interactions
       if (pulsedAppIds.has(appId)) {
         item.classList.add('arrange-pulse');
       }
@@ -690,32 +927,24 @@
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         closeContextMenu();
-        
-        // Hop bounce animation
         item.classList.add('bounce');
         if (appId === 'launchpad') {
-          if (window.electronAPI.toggleDrawer) {
-            window.electronAPI.toggleDrawer();
-          }
+          if (window.electronAPI.toggleDrawer) window.electronAPI.toggleDrawer();
         } else {
           window.electronAPI.launchApp(appId);
         }
       });
 
       item.addEventListener('animationend', (e) => {
-        if (e.animationName === 'bounce') {
-          item.classList.remove('bounce');
-        }
+        if (e.animationName === 'bounce') item.classList.remove('bounce');
       });
 
-      // Context menu handler (Right click)
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
         openContextMenu(appId, e.clientX, e.clientY);
       });
 
-      // Drag and Drop ordering
       if (isDraggable) {
         setupDragAndDrop(item);
       }
@@ -734,7 +963,9 @@
       }
     }
 
-    // Drag-and-drop implementation
+    // =====================
+    // DRAG & DROP WITH FLIP
+    // =====================
     let draggedElement = null;
 
     function setupDragAndDrop(item) {
@@ -744,9 +975,8 @@
         draggedElement = item;
         item.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
-        // Suppress visual hover magnification during dragging
         isHovered = false;
-        resetMagnification();
+        stopMagnificationLoop();
         window.electronAPI.setIgnoreMouse(false);
       });
 
@@ -767,6 +997,7 @@
         e.preventDefault();
         if (draggedElement && draggedElement !== item) {
           const container = document.getElementById('dock-items');
+          const oldRects = recordRectsById();
           const children = Array.from(container.querySelectorAll('.dock-item[draggable="true"]'));
           const draggedIndex = children.indexOf(draggedElement);
           const targetIndex = children.indexOf(item);
@@ -777,6 +1008,7 @@
             container.insertBefore(draggedElement, item);
           }
 
+          applyFLIP(oldRects);
           saveDockOrder();
         }
       });
@@ -786,110 +1018,44 @@
       const container = document.getElementById('dock-items');
       const items = Array.from(container.querySelectorAll('.dock-item[draggable="true"]'));
       const newOrder = items.map(item => item.getAttribute('data-app-id'));
-      
       appConfig.pinned = newOrder;
       window.electronAPI.saveConfig(newOrder);
     }
 
-    // Magnification (Fisheye Effect)
+    // =====================
+    // MAGNIFICATION LOOP (rAF-based)
+    // =====================
     const dockContainer = document.getElementById('dock-container');
 
     dockContainer.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      isHovered = true;
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          updateMagnification();
-          ticking = false;
-        });
-        ticking = true;
+      updateCursorHistory(mouseX, mouseY);
+      if (!isHovered) {
+        isHovered = true;
+        startMagnificationLoop();
       }
     });
 
     dockContainer.addEventListener('mouseleave', () => {
       isHovered = false;
-      window.requestAnimationFrame(() => {
-        resetMagnification();
-      });
+      stopMagnificationLoop();
     });
 
-    function updateMagnification() {
-      if (isLowRamMode) {
-        resetMagnification();
-        return;
-      }
-      if (!isHovered || draggedElement) return;
-
-      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
-      const items = document.querySelectorAll('.dock-item');
-      items.forEach(item => {
-        const rect = item.getBoundingClientRect();
-        let d = 0;
-        if (position === 'bottom') {
-          const center = rect.left + rect.width / 2;
-          d = Math.abs(mouseX - center);
-        } else {
-          const center = rect.top + rect.height / 2;
-          d = Math.abs(mouseY - center);
-        }
-
-        if (d < R) {
-          const ratio = d / R;
-          const scale = 1.0 + (maxScale - 1.0) * Math.cos(ratio * Math.PI / 2);
-          item.style.transform = `scale(${scale})`;
-          if (position === 'bottom') {
-            item.style.margin = `0 ${(scale - 1) * 10 + 6}px`;
-          } else {
-            item.style.margin = `${(scale - 1) * 10 + 6}px 0`;
-          }
-        } else {
-          item.style.transform = 'scale(1)';
-          if (position === 'bottom') {
-            item.style.margin = '0 6px';
-          } else {
-            item.style.margin = '6px 0';
-          }
-        }
-      });
-    }
-
-    function resetMagnification() {
-      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
-      const items = document.querySelectorAll('.dock-item');
-      items.forEach(item => {
-        item.style.transform = 'scale(1)';
-        if (position === 'bottom') {
-          item.style.margin = '0 6px';
-        } else {
-          item.style.margin = '6px 0';
-        }
-      });
-    }
-
-    // Auto-hide Toggling
-    function handleAutoHide() {
-      const container = document.getElementById('dock-container');
-      if (autoHide && !isHovered) {
-        container.classList.add('hidden-dock');
-      } else {
-        container.classList.remove('hidden-dock');
-      }
-    }
-
-    // Global mouse tracking for auto-hide state and click-through
+    // =====================
+    // AUTO-HIDE & MOUSE TRACKING
+    // =====================
     window.addEventListener('mousemove', (e) => {
       checkMouseIgnore(e);
-
       if (autoHide) {
         isHovered = true;
+        updateCursorHistory(e.clientX, e.clientY);
       }
     });
 
     document.addEventListener('mouseleave', () => {
       isHovered = false;
-      resetMagnification();
-      
+      stopMagnificationLoop();
       if (!selectedCtxAppId) {
         window.electronAPI.setIgnoreMouse(true);
       }
@@ -900,23 +1066,21 @@
         window.electronAPI.setIgnoreMouse(false);
         return;
       }
-
       const target = e ? e.target : null;
       const isOverInteractive = target && (
         target.closest('.interactive') !== null ||
         target.closest('.context-menu') !== null
       );
-      
       window.electronAPI.setIgnoreMouse(!isOverInteractive);
     }
 
-    // Context Menu Logic
+    // =====================
+    // CONTEXT MENU
+    // =====================
     const ctxMenu = document.getElementById('context-menu');
 
     function openContextMenu(appId, clientX, clientY) {
       selectedCtxAppId = appId;
-      
-      // Clear old dynamic window items
       document.querySelectorAll('.ctx-window-item').forEach(el => el.remove());
       document.querySelectorAll('.ctx-window-divider').forEach(el => el.remove());
 
@@ -924,7 +1088,6 @@
       const removeBtn = document.getElementById('ctx-remove');
       const keepBtn = document.getElementById('ctx-keep');
       const badgeBtn = document.getElementById('ctx-badge');
-      
       const isPinned = appConfig.pinned.includes(appId);
       const isTrash = appId === 'trash';
       
@@ -939,28 +1102,22 @@
         keepBtn.style.display = 'none';
         badgeBtn.style.display = 'flex';
       } else {
-        // Temp running app
         showInFinderBtn.style.display = 'flex';
         removeBtn.style.display = 'none';
         keepBtn.style.display = 'flex';
         badgeBtn.style.display = 'flex';
       }
 
-      // Expand window height so context menu is not clipped
       window.electronAPI.setDockHeight(300);
       window.electronAPI.setIgnoreMouse(false);
       window.electronAPI.contextMenuState(true);
 
       ctxMenu.style.display = 'block';
-
-      // [FIX] Perform instant positioning using the unified positioning function
       doPositioning();
 
-      // Fetch windows and prepend to context menu
       window.electronAPI.getOpenWindows(appId).then(windows => {
         if (windows && windows.length > 0) {
           const reversed = [...windows].reverse();
-          
           const divider = document.createElement('div');
           divider.className = 'menu-divider-custom ctx-window-divider';
           ctxMenu.insertBefore(divider, ctxMenu.firstChild);
@@ -990,13 +1147,9 @@
           header.style.paddingTop = '6px';
           header.textContent = 'Open Windows';
           ctxMenu.insertBefore(header, ctxMenu.firstChild);
-
-          // [FIX] Re-position context menu since its height has changed after async content rendering
           doPositioning();
         }
-      }).catch(err => {
-        console.error(err);
-      });
+      }).catch(err => console.error(err));
 
       function doPositioning() {
         const dockItem = document.querySelector(`.dock-item[data-app-id="${appId}"]`);
@@ -1005,7 +1158,6 @@
           ctxMenu.style.left = `${pos.left}px`;
           ctxMenu.style.top = `${pos.top}px`;
         } else {
-          // Fallback to click position
           const menuWidth = ctxMenu.offsetWidth || 175;
           const menuHeight = ctxMenu.offsetHeight || 160;
           let left = clientX - menuWidth / 2;
@@ -1024,37 +1176,27 @@
       checkMouseIgnore();
     }
 
-
-    // Context menu click actions
     document.getElementById('ctx-open').addEventListener('click', () => {
       if (selectedCtxAppId) {
-        // HOP animation
         const el = document.querySelector(`.dock-item[data-app-id="${selectedCtxAppId}"]`);
         if (el) el.classList.add('bounce');
-        
         window.electronAPI.launchApp(selectedCtxAppId);
       }
       closeContextMenu();
     });
 
     document.getElementById('ctx-show').addEventListener('click', () => {
-      if (selectedCtxAppId) {
-        window.electronAPI.showInFinder(selectedCtxAppId);
-      }
+      if (selectedCtxAppId) window.electronAPI.showInFinder(selectedCtxAppId);
       closeContextMenu();
     });
 
     document.getElementById('ctx-remove').addEventListener('click', () => {
-      if (selectedCtxAppId) {
-        window.electronAPI.removeFromDock(selectedCtxAppId);
-      }
+      if (selectedCtxAppId) window.electronAPI.removeFromDock(selectedCtxAppId);
       closeContextMenu();
     });
 
     document.getElementById('ctx-keep').addEventListener('click', () => {
-      if (selectedCtxAppId) {
-        window.electronAPI.keepInDock(selectedCtxAppId);
-      }
+      if (selectedCtxAppId) window.electronAPI.keepInDock(selectedCtxAppId);
       closeContextMenu();
     });
 
@@ -1065,9 +1207,7 @@
         const input = window.prompt("Set Badge Count (0 to clear):", currentCount);
         if (input !== null) {
           const count = parseInt(input);
-          if (!isNaN(count)) {
-            window.electronAPI.setBadge(selectedCtxAppId, count);
-          }
+          if (!isNaN(count)) window.electronAPI.setBadge(selectedCtxAppId, count);
         }
       }
       closeContextMenu();
@@ -1076,11 +1216,8 @@
     document.getElementById('ctx-autohide').addEventListener('click', () => {
       autoHide = !autoHide;
       window.electronAPI.saveAutoHide(autoHide);
-      
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
-      
-      handleAutoHide();
       closeContextMenu();
     });
 
@@ -1088,18 +1225,15 @@
       window.electronAPI.quitApp(selectedCtxAppId);
     });
 
-    // Close context menu on outside click
     document.addEventListener('click', (e) => {
-      if (selectedCtxAppId && !e.target.closest('#context-menu')) {
-        closeContextMenu();
-      }
+      if (selectedCtxAppId && !e.target.closest('#context-menu')) closeContextMenu();
     });
 
-    let runningAppsData = {};
-    let previousTempIds = [];
-    let pulsedAppIds = new Set();
+    // =====================
+    // RUNNING APPS WITH DEBOUNCE + SMOOTH INSERT/REMOVE
+    // =====================
+    let pendingRemovalIds = [];
 
-    // Handle incoming process list updates from Main process
     window.electronAPI.onProcessUpdate((data) => {
       runningAppsData = data;
       let newTempApps = [];
@@ -1110,24 +1244,95 @@
         runningApps = data.runningPinned || [];
         newTempApps = data.tempRunning || [];
       }
-      
+
+      const debounced = getDebouncedTempApps(newTempApps);
+      if (!debounced.stable) return;
+
+      // If a removal animation is already in progress, queue for next cycle
+      if (pendingRemovalIds.length > 0) return;
+
       const newTempIds = newTempApps.map(app => app.id);
+      const oldTempIds = previousTempIds;
       pulsedAppIds.clear();
-      
-      if (previousTempIds.length > 0 && newTempIds.length === previousTempIds.length) {
-        for (let i = 0; i < newTempIds.length; i++) {
-          if (newTempIds[i] !== previousTempIds[i]) {
-            pulsedAppIds.add(newTempIds[i]);
+
+      const addedIds = newTempIds.filter(id => !oldTempIds.includes(id));
+      const removedIds = oldTempIds.filter(id => !newTempIds.includes(id));
+      const reduce = isLowRamMode || isReduceMotion;
+
+      // CASE 1: Items removed — animate them out first
+      if (removedIds.length > 0 && !reduce) {
+        const container = document.getElementById('dock-items');
+        pendingRemovalIds = removedIds;
+        let animCount = 0;
+
+        removedIds.forEach(id => {
+          const el = container.querySelector(`.dock-item[data-app-id="${id}"]`);
+          if (el) {
+            el.classList.add('dock-leave');
+            el.addEventListener('animationend', () => {
+              animCount++;
+              if (animCount >= pendingRemovalIds.length) {
+                // All leave animations done — now update data and re-render with FLIP
+                const oldRects = recordRectsById();
+                previousTempIds = newTempIds;
+                tempRunningApps = newTempApps;
+                pendingRemovalIds = [];
+                renderDock();
+                applyFLIP(oldRects);
+                addedIds.forEach(id => {
+                  const el2 = container.querySelector(`.dock-item[data-app-id="${id}"]`);
+                  if (el2) {
+                    el2.classList.add('dock-enter');
+                    el2.addEventListener('animationend', () => { el2.classList.remove('dock-enter'); }, { once: true });
+                  }
+                });
+              }
+            }, { once: true });
+          } else {
+            animCount++;
+            if (animCount >= pendingRemovalIds.length) {
+              const oldRects = recordRectsById();
+              previousTempIds = newTempIds;
+              tempRunningApps = newTempApps;
+              pendingRemovalIds = [];
+              renderDock();
+              applyFLIP(oldRects);
+            }
           }
-        }
+        });
+        return;
       }
-      
+
+      // CASE 2: Items added, or order changed — FLIP + enter animation
+      const orderChanged = debounced.orderChanged;
+      if (addedIds.length > 0 || orderChanged) {
+        addedIds.forEach(id => pulsedAppIds.add(id));
+        const oldRects = recordRectsById();
+        previousTempIds = newTempIds;
+        tempRunningApps = newTempApps;
+        renderDock();
+        applyFLIP(oldRects);
+        if (!reduce) {
+          const container = document.getElementById('dock-items');
+          addedIds.forEach(id => {
+            const el = container.querySelector(`.dock-item[data-app-id="${id}"]`);
+            if (el) {
+              el.classList.add('dock-enter');
+              el.addEventListener('animationend', () => { el.classList.remove('dock-enter'); }, { once: true });
+            }
+          });
+        }
+        return;
+      }
+
+      // CASE 3: No content or order change — just update data
       previousTempIds = newTempIds;
       tempRunningApps = newTempApps;
-      renderDock();
     });
 
-    // Listen for config changes
+    // =====================
+    // CONFIG / THEME / SETTINGS LISTENERS
+    // =====================
     window.electronAPI.onConfigChanged((data) => {
       appConfig = data.config || data;
       appIconsMap = data.appIconsMap || {};
@@ -1138,81 +1343,54 @@
       renderDock();
     });
 
-    // Listen for play-genie minimize animations
     window.electronAPI.onPlayGenie((appId) => {
       if (isLowRamMode) return;
       const item = document.querySelector(`.dock-item[data-app-id="${appId}"]`);
       if (item) {
         item.classList.add('genie');
         item.addEventListener('animationend', (e) => {
-          if (e.animationName === 'genie') {
-            item.classList.remove('genie');
-          }
+          if (e.animationName === 'genie') item.classList.remove('genie');
         }, { once: true });
       }
     });
 
-    // Listen for collapse state changes (Dynamic Island notch mode)
     window.electronAPI.onSetCollapseState((collapsed) => {
       const container = document.getElementById('dock-container');
       const mode = getDockHidingMode();
-      
       if (mode === 'none') {
         container.classList.remove('collapsed');
       } else {
-        if (collapsed) {
-          container.classList.add('collapsed');
-        } else {
-          container.classList.remove('collapsed');
-        }
+        container.classList.toggle('collapsed', !!collapsed);
       }
-      // Update dock width instantly to avoid clipping
       updateDockWidth();
     });
 
-    window.electronAPI.onCloseContextMenu(() => {
-      closeContextMenu();
-    });
+    window.electronAPI.onCloseContextMenu(() => { closeContextMenu(); });
 
     function applyThemeConfig(themeData) {
       if (!themeData) return;
       isLowRamMode = !!themeData.lowRamMode;
+      isReduceMotion = appConfig && appConfig.appearance && !!appConfig.appearance.reduceMotion;
       if (themeData.theme === 'dark') {
         document.body.classList.add('dark-theme');
       } else {
         document.body.classList.remove('dark-theme');
       }
-      
-      let blurVal = '20px';
-      let opacityVal = '0.85';
-      if (themeData.glassIntensity === 'Subtle') {
-        blurVal = '8px';
-        opacityVal = '0.60';
-      } else if (themeData.glassIntensity === 'Heavy') {
-        blurVal = '40px';
-        opacityVal = '0.95';
-      }
-      
+      let blurVal = '20px', opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') { blurVal = '8px'; opacityVal = '0.60'; }
+      else if (themeData.glassIntensity === 'Heavy') { blurVal = '40px'; opacityVal = '0.95'; }
       document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
       document.documentElement.style.setProperty('--glass-blur', blurVal);
       document.documentElement.style.setProperty('--glass-opacity', opacityVal);
       document.documentElement.style.setProperty('--corner-radius', `${themeData.cornerRadius}px`);
-      
       let r = 0, g = 122, b = 255;
       const color = themeData.accentColor;
       if (color && color.startsWith('#')) {
         const hex = color.substring(1);
-        if (hex.length === 3) {
-          r = parseInt(hex[0] + hex[0], 16);
-          g = parseInt(hex[1] + hex[1], 16);
-          b = parseInt(hex[2] + hex[2], 16);
-        } else if (hex.length === 6) {
-          r = parseInt(hex.substring(0, 2), 16);
-          g = parseInt(hex.substring(2, 4), 16);
-          b = parseInt(hex.substring(4, 6), 16);
-        }
+        if (hex.length === 3) { r = parseInt(hex[0]+hex[0],16); g = parseInt(hex[1]+hex[1],16); b = parseInt(hex[2]+hex[2],16); }
+        else if (hex.length === 6) { r = parseInt(hex.substring(0,2),16); g = parseInt(hex.substring(2,4),16); b = parseInt(hex.substring(4,6),16); }
       }
-      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r},${g},${b},0.15)`);
     }
 
     if (window.electronAPI.onThemeChanged) {
@@ -1223,13 +1401,39 @@
     window.electronAPI.onSettingsChanged((newSettings) => {
       appConfig.general = newSettings.general;
       appConfig.appearance = newSettings.appearance;
+      isReduceMotion = !!(newSettings.appearance && newSettings.appearance.reduceMotion);
       autoHide = appConfig.autoHide !== false;
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
       applyCasingStyles();
       updateDockWidth();
-      resetMagnification();
+      if (isReduceMotion || isLowRamMode) {
+        stopMagnificationLoop();
+      } else if (isHovered) {
+        startMagnificationLoop();
+      }
     });
+
+    // =====================
+    // SMART REVEAL: override auto-hide debounce when cursor heads toward dock
+    // =====================
+    (function patchRevealTiming() {
+      const origSend = window.electronAPI.setDockHover;
+      window.electronAPI.setDockHover = function(hover) {
+        if (hover === true && autoHide && isCursorHeadedTowardDock()) {
+          const container = document.getElementById('dock-container');
+          if (container.classList.contains('collapsed')) {
+            window.electronAPI.setDockHeight(getDockThickness());
+            const pos = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+            if (pos === 'bottom') {
+              const rect = container.getBoundingClientRect();
+              window.electronAPI.setDockWidth(rect.width + 24);
+            }
+          }
+        }
+        if (origSend) origSend(hover);
+      };
+    })();
 
     // Startup Init
     loadDock();

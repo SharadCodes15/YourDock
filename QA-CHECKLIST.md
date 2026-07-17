@@ -64,6 +64,23 @@ This checklist provides a set of manual tests to verify the robustness, aestheti
 
 ## 3. Motion & Animation Adjustments
 
+### Dock Parabolic Magnification
+- [ ] Hover over dock icons. Confirm magnification follows a **parabolic curve** (1 - t²): closest icon scales to ~1.38×, falloff is smooth and natural.
+- [ ] Magnification centers on the hovered icon and smoothly tapers to neighbors — not a sudden jump.
+- [ ] Icons **shift horizontally** (translateX) to accommodate scaled neighbors, no overlapping at maximum magnification.
+- [ ] rAF loop **activates on hover** and **cancels immediately on mouseleave** (check devtools: `isMagnificationLoopActive()` returns true while hovered, false after leave).
+- [ ] rAF loop **does NOT run** when Reduce Motion or Low RAM Mode is enabled.
+
+### Dock FLIP Animation (Reorder & Insert/Remove)
+- [ ] Drag an icon to a new position in the dock. Confirm remaining icons **FLIP smoothly** (transform transition 200ms) — no sudden jumps.
+- [ ] Launch an app (adds a temporary running app). Confirm the dock **FLIPs** existing icons into new positions, then the new app icon **fades in** (dock-enter animation: scale 0→1 + opacity 0→1 over 200ms).
+- [ ] Quit a running app (removes a temporary app). Confirm the removed icon **fades out** (dock-leave: scale 1→0 + opacity 1→0 over 150ms), then remaining icons **FLIP** into new positions.
+- [ ] Rapidly launch/quit multiple apps. Confirm the 2-cycle debounce prevents flicker — state must be stable for 2 consecutive polls before any animation triggers.
+
+### Dock Smart Reveal
+- [ ] With dock hidden (Direct Hide or Dynamic Island mode), move cursor **toward** the dock edge. Confirm dock **reveals immediately** (no 800ms delay) — uses cursor history heuristic (3-point heading detection).
+- [ ] Move cursor **away from** dock edge. Confirm dock stays hidden.
+
 ### Fluid Easing
 - [ ] Hover over icons in the Dock. Confirm that magnification uses a smooth `cubic-bezier(0.16, 1, 0.3, 1)` easing.
 - [ ] Expand and collapse the Menu Bar. Verify the transition is fluid.
