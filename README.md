@@ -254,7 +254,11 @@ dock
 ---
 
 # 🚀 Installation
-1 > Go To Releases select the latest version 
+1> 📥 Download
+
+Download the latest version from the **Releases** page:
+
+https://github.com/SharadCodes15/YourDock/releases/latest
 
 2 >
 Clone the repository
