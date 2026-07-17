@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.send('save-settings', settings),
   registerShortcut: (type, shortcut) => ipcRenderer.invoke('register-shortcut', { type, shortcut }),
+  checkShortcutConflict: (shortcut) => ipcRenderer.invoke('check-shortcut-conflict', shortcut),
   restoreDefaults: () => ipcRenderer.invoke('restore-defaults'),
   onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', (_event, settings) => callback(settings)),
   getApps: () => ipcRenderer.invoke('get-apps'),
@@ -15,6 +16,10 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   saveDockHidingMode: (mode) => ipcRenderer.send('save-dock-hiding-mode', mode),
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   importSettings: () => ipcRenderer.invoke('import-settings'),
+  exportTheme: (name) => ipcRenderer.invoke('export-theme', name),
+  importTheme: () => ipcRenderer.invoke('import-theme'),
+  applyBuiltinTheme: (name) => ipcRenderer.invoke('apply-builtin-theme', name),
+  revertLastImport: () => ipcRenderer.invoke('revert-last-import'),
   pressEscape: () => ipcRenderer.send('escape-pressed'),
   onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, data) => callback(data)),
   getThemeConfig: () => ipcRenderer.invoke('get-theme-config'),
@@ -23,7 +28,12 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   clearIconCache: () => ipcRenderer.invoke('clear-icon-cache'),
   refreshApp: () => ipcRenderer.send('refresh-app'),
   openErrorLog: () => ipcRenderer.send('open-error-log'),
-  // Notification Center (weather + screenshot settings live in settings.general)
+  openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
+  readExperimentalFlags: () => ipcRenderer.invoke('read-experimental-flags'),
+  saveExperimentalFlags: (flags) => ipcRenderer.invoke('save-experimental-flags', flags),
+  readRawSettings: () => ipcRenderer.invoke('read-raw-settings'),
+  writeRawSettings: (content) => ipcRenderer.invoke('write-raw-settings', content),
+  getDebugInfo: () => ipcRenderer.invoke('get-debug-info'),
+  setVerboseLogging: (enabled) => ipcRenderer.send('set-verbose-logging', enabled),
   onNotificationChanged: (callback) => ipcRenderer.on('notification-settings-changed', (_event, data) => callback(data))
 });
-

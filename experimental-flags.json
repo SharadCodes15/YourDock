@@ -1,0 +1,6 @@
+{
+  "_comment": "Feature flags for the macOS Menu Bar & Dock app. Toggle via Settings → Experimental or edit this file directly.",
+  "directionalReveal": true,
+  "autoArrangeByUsage": false,
+  "weatherWidget": true
+}

@@ -15,13 +15,27 @@
     "screenshotFolder": "",
     "copyScreenshotToClipboard": true
   },
+  "displays": {
+    "dockDisplayId": null,
+    "menuBarDisplayId": null,
+    "dockOnAllDisplays": false,
+    "menuBarOnAllDisplays": false
+  },
   "appearance": {
     "theme": "dark",
     "blurIntensity": 12,
     "opacity": 1,
     "accentColor": "#ff2d55",
     "glassIntensity": "Standard",
-    "cornerRadius": 12
+    "cornerRadius": 12,
+    "colors": {
+      "dockBgTint": "",
+      "menuBarBgTint": "",
+      "notificationCenterBgTint": "",
+      "accentOverride": "",
+      "badgeColor": "",
+      "textColorOverride": ""
+    }
   },
   "hiding": {
     "enabled": true,
@@ -58,11 +72,19 @@
   },
   "shortcuts": {
     "toggleMenuBar": "",
+    "toggleDockVisibility": "",
     "openSettings": "",
     "openDrawer": "",
+    "openNotificationCenter": "",
+    "openControlCenter": "",
     "captureFullScreen": "",
     "captureSelectedArea": "",
-    "captureWindow": ""
+    "captureWindow": "",
+    "forceQuitApplications": "",
+    "sleep": "",
+    "restart": "",
+    "shutDown": "",
+    "openSpotlightSearch": ""
   },
   "notificationCenter": {
     "visible": {
@@ -97,7 +119,79 @@
       "cornerRadius": 12
     }
   ],
+  "builtinThemes": [
+    {
+      "name": "Classic Light",
+      "theme": "light",
+      "accentColor": "#007aff",
+      "glassIntensity": "Subtle",
+      "cornerRadius": 10,
+      "colors": {
+        "dockBgTint": "#e8e8e8",
+        "menuBarBgTint": "#dcdcdc",
+        "notificationCenterBgTint": "#f0f0f0",
+        "accentOverride": "#007aff",
+        "badgeColor": "#ff3b30",
+        "textColorOverride": ""
+      }
+    },
+    {
+      "name": "Midnight",
+      "theme": "dark",
+      "accentColor": "#5e5ce6",
+      "glassIntensity": "Heavy",
+      "cornerRadius": 14,
+      "colors": {
+        "dockBgTint": "#1c1c2e",
+        "menuBarBgTint": "#16162a",
+        "notificationCenterBgTint": "#20203a",
+        "accentOverride": "#5e5ce6",
+        "badgeColor": "#ff375f",
+        "textColorOverride": ""
+      }
+    },
+    {
+      "name": "High Contrast",
+      "theme": "light",
+      "accentColor": "#000000",
+      "glassIntensity": "Subtle",
+      "cornerRadius": 8,
+      "colors": {
+        "dockBgTint": "#ffffff",
+        "menuBarBgTint": "#ffffff",
+        "notificationCenterBgTint": "#ffffff",
+        "accentOverride": "#000000",
+        "badgeColor": "#000000",
+        "textColorOverride": "#000000"
+      }
+    },
+    {
+      "name": "Pastel",
+      "theme": "light",
+      "accentColor": "#a78bfa",
+      "glassIntensity": "Standard",
+      "cornerRadius": 16,
+      "colors": {
+        "dockBgTint": "#fdf2f8",
+        "menuBarBgTint": "#fce7f3",
+        "notificationCenterBgTint": "#fff1f2",
+        "accentOverride": "#a78bfa",
+        "badgeColor": "#fb7185",
+        "textColorOverride": ""
+      }
+    }
+  ],
   "performance": {
-    "lowRamMode": true
+    "lowRamMode": true,
+    "debugOverlay": false,
+    "verboseLogging": false
+  },
+  "experimental": {
+    "unlocked": false,
+    "featureFlags": {
+      "directionalReveal": true,
+      "autoArrangeByUsage": false,
+      "weatherWidget": true
+    }
   }
 }

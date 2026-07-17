@@ -96,18 +96,25 @@ async function loadSettings() {
     if (fs.existsSync(settingsPath)) {
       const raw = await fs.promises.readFile(settingsPath, 'utf8');
       settings = JSON.parse(raw);
+      // Ensure new sections exist with defaults for upgrade compatibility
+      if (!settings.displays) settings.displays = { dockDisplayId: null, menuBarDisplayId: null, dockOnAllDisplays: false, menuBarOnAllDisplays: false };
+      if (!settings.appearance.colors) settings.appearance.colors = { dockBgTint: '', menuBarBgTint: '', notificationCenterBgTint: '', accentOverride: '', badgeColor: '', textColorOverride: '' };
+      if (!settings.builtinThemes) settings.builtinThemes = [];
+      if (!settings.experimental) settings.experimental = { unlocked: false, featureFlags: { directionalReveal: true, autoArrangeByUsage: false, weatherWidget: true } };
+      if (!settings.performance) settings.performance = { lowRamMode: true, debugOverlay: false, verboseLogging: false };
+      if (!settings.shortcuts.toggleDockVisibility) settings.shortcuts.toggleDockVisibility = '';
+      if (!settings.shortcuts.openNotificationCenter) settings.shortcuts.openNotificationCenter = '';
+      if (!settings.shortcuts.openControlCenter) settings.shortcuts.openControlCenter = '';
+      if (!settings.shortcuts.forceQuitApplications) settings.shortcuts.forceQuitApplications = '';
+      if (!settings.shortcuts.sleep) settings.shortcuts.sleep = '';
+      if (!settings.shortcuts.restart) settings.shortcuts.restart = '';
+      if (!settings.shortcuts.shutDown) settings.shortcuts.shutDown = '';
+      if (!settings.shortcuts.openSpotlightSearch) settings.shortcuts.openSpotlightSearch = '';
     } else {
       // Default settings.json
-      settings = {
-        general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true, weatherLocation: '', screenshotFolder: '', copyScreenshotToClipboard: true },
-        appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
-        hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
-        menuItems: {
-          visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, notification: true, screenshot: true, settings: true, clock: true },
-          order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'notification', 'screenshot', 'settings', 'clock']
-        },
-        shortcuts: { toggleMenuBar: '', openSettings: '', openDrawer: '', captureFullScreen: '', captureSelectedArea: '', captureWindow: '' }
-      };
+      const defaultSettings = require('./settings.json');
+      settings = JSON.parse(JSON.stringify(defaultSettings));
+      if (!settings.general) settings.general = {};
       await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     }
   } catch (err) {
@@ -824,79 +831,67 @@ function stopDockCursorPolling() {}
 function registerGlobalShortcuts() {
   globalShortcut.unregisterAll();
 
-  if (settings.shortcuts && settings.shortcuts.toggleMenuBar) {
-    try {
-      globalShortcut.register(settings.shortcuts.toggleMenuBar, () => {
-        if (menuBarWin) {
-          if (menuBarWin.isVisible()) menuBarWin.hide();
-          else menuBarWin.show();
+  const shortcutActions = {
+    toggleMenuBar: () => {
+      if (menuBarWin) {
+        if (menuBarWin.isVisible()) menuBarWin.hide();
+        else menuBarWin.show();
+      }
+    },
+    toggleDockVisibility: () => {
+      if (dockWin) {
+        if (dockWin.isVisible()) dockWin.hide();
+        else dockWin.show();
+      }
+    },
+    openSettings: () => showSettingsWindow(),
+    openDrawer: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); },
+    openNotificationCenter: () => {
+      if (notificationWin) {
+        if (notificationWin.isVisible()) notificationWin.hide();
+        else {
+          notificationWin.show();
+          notificationWin.focus();
         }
-      });
-    } catch (err) {
-      console.error('Failed to register toggleMenuBar shortcut:', err);
+      }
+    },
+    openControlCenter: () => {
+      if (ccWin) {
+        if (ccWin.isVisible()) ccWin.hide();
+        else { ccWin.show(); ccWin.focus(); }
+      } else {
+        createControlCenterWindow();
+        ccWin.once('ready-to-show', () => { if (ccWin) { ccWin.show(); ccWin.focus(); } });
+      }
+    },
+    captureFullScreen: () => handleScreenshot('fullscreen'),
+    captureSelectedArea: () => handleScreenshot('area'),
+    captureWindow: () => handleScreenshot('window'),
+    forceQuitApplications: () => { if (forceQuitWin) { forceQuitWin.show(); forceQuitWin.focus(); } },
+    sleep: () => { exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0'); },
+    restart: () => { exec('shutdown /r /t 0'); },
+    shutDown: () => { exec('shutdown /s /t 0'); },
+    openSpotlightSearch: () => toggleSpotlight()
+  };
+
+  for (const [action, handler] of Object.entries(shortcutActions)) {
+    const shortcut = settings.shortcuts && settings.shortcuts[action];
+    if (shortcut) {
+      try {
+        globalShortcut.register(shortcut, handler);
+      } catch (err) {
+        console.error(`Failed to register ${action} shortcut:`, err);
+      }
     }
   }
 
-  if (settings.shortcuts && settings.shortcuts.openSettings) {
-    try {
-      globalShortcut.register(settings.shortcuts.openSettings, () => {
-        showSettingsWindow();
-      });
-    } catch (err) {
-      console.error('Failed to register openSettings shortcut:', err);
-    }
-  }
-
-  if (settings.shortcuts && settings.shortcuts.openDrawer) {
-    try {
-      globalShortcut.register(settings.shortcuts.openDrawer, () => {
-        if (isDrawerOpen) {
-          closeDrawer();
-        } else {
-          openDrawer();
-        }
-      });
-    } catch (err) {
-      console.error('Failed to register openDrawer shortcut:', err);
-    }
-  }
-
-  // Register Spotlight search shortcut
+  // Built-in Spotlight search shortcut (always registered)
   try {
     globalShortcut.register('CommandOrControl+Space', () => {
       toggleSpotlight();
     });
   } catch (err) {
     console.error('Failed to register spotlight shortcut:', err);
-  }
-
-  // Screenshot shortcuts
-  if (settings.shortcuts && settings.shortcuts.captureFullScreen) {
-    try {
-      globalShortcut.register(settings.shortcuts.captureFullScreen, () => {
-        handleScreenshot('fullscreen');
-      });
-    } catch (err) {
-      console.error('Failed to register captureFullScreen shortcut:', err);
-    }
-  }
-  if (settings.shortcuts && settings.shortcuts.captureSelectedArea) {
-    try {
-      globalShortcut.register(settings.shortcuts.captureSelectedArea, () => {
-        handleScreenshot('area');
-      });
-    } catch (err) {
-      console.error('Failed to register captureSelectedArea shortcut:', err);
-    }
-  }
-  if (settings.shortcuts && settings.shortcuts.captureWindow) {
-    try {
-      globalShortcut.register(settings.shortcuts.captureWindow, () => {
-        handleScreenshot('window');
-      });
-    } catch (err) {
-      console.error('Failed to register captureWindow shortcut:', err);
-    }
   }
 }
 
@@ -1035,6 +1030,7 @@ function resolveThemeConfig() {
   let glassIntensity = (settings.appearance && settings.appearance.glassIntensity) || 'Standard';
   let cornerRadius = (settings.appearance && settings.appearance.cornerRadius) || 12;
   let accentColor = (settings.appearance && settings.appearance.accentColor) || '#007aff';
+  let colors = (settings.appearance && settings.appearance.colors) || {};
   
   const presets = settings.themePresets || [];
   const matchedPreset = presets.find(p => p.name === activeTheme);
@@ -1043,6 +1039,17 @@ function resolveThemeConfig() {
     glassIntensity = matchedPreset.glassIntensity;
     cornerRadius = matchedPreset.cornerRadius;
     accentColor = matchedPreset.accentColor;
+  }
+  
+  // Check builtin themes
+  const builtinThemes = settings.builtinThemes || [];
+  const matchedBuiltin = builtinThemes.find(p => p.name === activeTheme);
+  if (matchedBuiltin) {
+    activeTheme = matchedBuiltin.theme;
+    glassIntensity = matchedBuiltin.glassIntensity;
+    cornerRadius = matchedBuiltin.cornerRadius;
+    accentColor = matchedBuiltin.accentColor;
+    colors = matchedBuiltin.colors || colors;
   }
   
   let themeValue = activeTheme;
@@ -1055,12 +1062,33 @@ function resolveThemeConfig() {
     accentColor,
     glassIntensity,
     cornerRadius,
-    lowRamMode: !!(settings.performance && settings.performance.lowRamMode)
+    lowRamMode: !!(settings.performance && settings.performance.lowRamMode),
+    colors: {
+      dockBgTint: colors.dockBgTint || '',
+      menuBarBgTint: colors.menuBarBgTint || '',
+      notificationCenterBgTint: colors.notificationCenterBgTint || '',
+      accentOverride: colors.accentOverride || '',
+      badgeColor: colors.badgeColor || '',
+      textColorOverride: colors.textColorOverride || ''
+    }
   };
 }
 
 function broadcastThemeConfig() {
   const resolved = resolveThemeConfig();
+  // Include per-element color overrides
+  resolved.colors = (settings.appearance && settings.appearance.colors) || {};
+  // Resolve builtin theme colors if selected
+  const builtinThemes = settings.builtinThemes || [];
+  const themeName = settings.appearance && settings.appearance.theme;
+  const matchedBuiltin = builtinThemes.find(p => p.name === themeName);
+  if (matchedBuiltin && matchedBuiltin.colors) {
+    Object.keys(matchedBuiltin.colors).forEach(k => {
+      if (matchedBuiltin.colors[k] && !resolved.colors[k]) {
+        resolved.colors[k] = matchedBuiltin.colors[k];
+      }
+    });
+  }
   const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin, aboutWin, forceQuitWin, notificationWin];
   for (const w of windows) {
     if (w && !w.isDestroyed()) {
@@ -2468,25 +2496,40 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
       return { success: false, error: 'Shortcut already in use by another app.' };
     }
 
-    // Attempt temporary register
-    const success = globalShortcut.register(shortcut, () => {
-      if (type === 'toggleMenuBar') {
-        if (menuBarWin) {
-          if (menuBarWin.isVisible()) menuBarWin.hide();
-          else menuBarWin.show();
+    // Check for conflicts with other configured shortcuts in settings
+    if (settings.shortcuts) {
+      for (const [otherType, otherShortcut] of Object.entries(settings.shortcuts)) {
+        if (otherType !== type && otherShortcut === shortcut) {
+          return { success: false, error: `Already assigned to ${formatShortcutAction(otherType)}` };
         }
-      } else if (type === 'openSettings') {
-        showSettingsWindow();
-      } else if (type === 'openDrawer') {
-        if (isDrawerOpen) closeDrawer(); else openDrawer();
-      } else if (type === 'captureFullScreen') {
-        handleScreenshot('fullscreen');
-      } else if (type === 'captureSelectedArea') {
-        handleScreenshot('area');
-      } else if (type === 'captureWindow') {
-        handleScreenshot('window');
       }
-    });
+    }
+
+    // Build action handler
+    const actionHandlers = {
+      toggleMenuBar: () => { if (menuBarWin) { if (menuBarWin.isVisible()) menuBarWin.hide(); else menuBarWin.show(); } },
+      toggleDockVisibility: () => { if (dockWin) { if (dockWin.isVisible()) dockWin.hide(); else dockWin.show(); } },
+      openSettings: () => showSettingsWindow(),
+      openDrawer: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); },
+      openNotificationCenter: () => { if (notificationWin) { if (notificationWin.isVisible()) notificationWin.hide(); else { notificationWin.show(); notificationWin.focus(); } } },
+      openControlCenter: () => { if (ccWin) { if (ccWin.isVisible()) ccWin.hide(); else { ccWin.show(); ccWin.focus(); } } else { createControlCenterWindow(); ccWin.once('ready-to-show', () => { if (ccWin) { ccWin.show(); ccWin.focus(); } }); } },
+      captureFullScreen: () => handleScreenshot('fullscreen'),
+      captureSelectedArea: () => handleScreenshot('area'),
+      captureWindow: () => handleScreenshot('window'),
+      forceQuitApplications: () => { if (forceQuitWin) { forceQuitWin.show(); forceQuitWin.focus(); } },
+      sleep: () => { exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0'); },
+      restart: () => { exec('shutdown /r /t 0'); },
+      shutDown: () => { exec('shutdown /s /t 0'); },
+      openSpotlightSearch: () => toggleSpotlight()
+    };
+
+    const handler = actionHandlers[type];
+    if (!handler) {
+      return { success: false, error: `Unknown shortcut type: ${type}` };
+    }
+
+    // Attempt temporary register
+    const success = globalShortcut.register(shortcut, handler);
 
     if (success) {
       globalShortcut.unregister(shortcut);
@@ -2502,22 +2545,291 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
   }
 });
 
-ipcMain.handle('restore-defaults', async () => {
-  settings = {
-    general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true, weatherLocation: '', screenshotFolder: '', copyScreenshotToClipboard: true },
-    appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
-    hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
-    menuItems: {
-      visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, notification: true, screenshot: true, settings: true, clock: true },
-      order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'notification', 'screenshot', 'settings', 'clock']
-    },
-    shortcuts: { toggleMenuBar: '', openSettings: '', openDrawer: '', captureFullScreen: '', captureSelectedArea: '', captureWindow: '' },
-    notificationCenter: { visible: { clock: true, calendar: true, weather: true, notes: true }, order: ['clock','calendar','weather','notes'], quickNote: '' }
+ipcMain.handle('check-shortcut-conflict', async (event, shortcut) => {
+  if (!shortcut) return { conflict: false };
+  if (globalShortcut.isRegistered(shortcut)) {
+    return { conflict: true, error: 'Shortcut already in use by another app.' };
+  }
+  if (settings.shortcuts) {
+    for (const [otherType, otherShortcut] of Object.entries(settings.shortcuts)) {
+      if (otherShortcut === shortcut) {
+        return { conflict: true, error: `Already assigned to ${formatShortcutAction(otherType)}` };
+      }
+    }
+  }
+  return { conflict: false };
+});
+
+function formatShortcutAction(type) {
+  const names = {
+    toggleMenuBar: 'Toggle Dock Visibility',
+    toggleDockVisibility: 'Toggle Dock Visibility',
+    openSettings: 'Open Settings',
+    openDrawer: 'Open Drawer',
+    openNotificationCenter: 'Open Notification Center',
+    openControlCenter: 'Open Control Center',
+    captureFullScreen: 'Capture Full Screen',
+    captureSelectedArea: 'Capture Selected Area',
+    captureWindow: 'Capture Window',
+    forceQuitApplications: 'Force Quit Applications',
+    sleep: 'Sleep',
+    restart: 'Restart',
+    shutDown: 'Shut Down',
+    openSpotlightSearch: 'Open Spotlight Search'
   };
+  return names[type] || type;
+}
+
+ipcMain.handle('restore-defaults', async () => {
+  const defaultSettings = require('./settings.json');
+  settings = JSON.parse(JSON.stringify(defaultSettings));
+  settings.general.weatherLocation = '';
+  settings.general.screenshotFolder = '';
+  settings.general.copyScreenshotToClipboard = true;
   await saveSettings();
   applySettings();
   registerGlobalShortcuts();
   return settings;
+});
+
+// ==========================================
+// THEME EXPORT / IMPORT
+// ==========================================
+const themeExport = require('./theme-export');
+let backedUpTheme = null;
+
+ipcMain.handle('export-theme', async (event, name) => {
+  try {
+    const theme = themeExport.bundleTheme(settings, name || 'Exported Theme');
+    const result = await dialog.showSaveDialog(settingsWin || undefined, {
+      defaultPath: `${theme.name}.macdocktheme.json`,
+      filters: [{ name: 'macOS Dock Theme', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return { success: false, error: 'Export cancelled.' };
+    await fs.promises.writeFile(result.filePath, JSON.stringify(theme, null, 2), 'utf8');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('import-theme', async () => {
+  try {
+    const result = await dialog.showOpenDialog(settingsWin, {
+      filters: [{ name: 'macOS Dock Theme', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    if (result.canceled || result.filePaths.length === 0) return { success: false, error: 'Import cancelled.' };
+    const raw = await fs.promises.readFile(result.filePaths[0], 'utf8');
+    const data = JSON.parse(raw);
+    const validation = themeExport.validateThemeFile(data);
+    if (!validation.valid) return { success: false, error: validation.error };
+    backedUpTheme = themeExport.bundleTheme(settings, 'Backup');
+    settings = themeExport.applyThemeToSettings(settings, data);
+    await saveSettings();
+    applySettings();
+    broadcastThemeConfig();
+    return { success: true, hasBackup: true };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { success: false, error: 'Invalid JSON syntax in theme file.' };
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('apply-builtin-theme', async (event, name) => {
+  try {
+    const builtinThemes = settings.builtinThemes || [];
+    const theme = builtinThemes.find(t => t.name === name);
+    if (!theme) return { success: false, error: `Theme "${name}" not found.` };
+    backedUpTheme = themeExport.bundleTheme(settings, 'Backup');
+    settings = themeExport.applyThemeToSettings(settings, theme);
+    await saveSettings();
+    applySettings();
+    broadcastThemeConfig();
+    return { success: true, hasBackup: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('revert-last-import', async () => {
+  try {
+    if (!backedUpTheme) return { success: false, error: 'No previous theme to revert to.' };
+    settings = themeExport.applyThemeToSettings(settings, backedUpTheme);
+    backedUpTheme = null;
+    await saveSettings();
+    applySettings();
+    broadcastThemeConfig();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ==========================================
+// DISPLAY / MULTI-MONITOR
+// =========================================
+function handleDisplayChange() {
+  const all = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  // If stored display IDs no longer exist, revert to primary and show notice
+  if (settings.displays) {
+    const dockTarget = settings.displays.dockDisplayId;
+    const menuBarTarget = settings.displays.menuBarDisplayId;
+    if (dockTarget && !all.find(d => String(d.id) === String(dockTarget))) {
+      settings.displays.dockDisplayId = null;
+      debugLog('Dock display no longer connected - reverting to primary');
+    }
+    if (menuBarTarget && !all.find(d => String(d.id) === String(menuBarTarget))) {
+      settings.displays.menuBarDisplayId = null;
+      debugLog('Menu bar display no longer connected - reverting to primary');
+    }
+  }
+  // Reposition windows
+  if (dockWin && !dockWin.isDestroyed()) {
+    const bounds = getDockDimensionsForDisplay();
+    dockWin.setBounds(bounds);
+  }
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    const targetDisplay = getTargetDisplayForMenuBar();
+    const { x: dx, y: dy, width: screenWidth } = targetDisplay.bounds;
+    menuBarWin.setBounds({ x: dx, y: dy, width: screenWidth, height: 30 });
+  }
+}
+
+function getTargetDisplayForMenuBar() {
+  if (settings.displays && settings.displays.menuBarOnAllDisplays) {
+    return screen.getPrimaryDisplay();
+  }
+  const displayId = settings.displays && settings.displays.menuBarDisplayId;
+  if (displayId) {
+    const all = screen.getAllDisplays();
+    const matched = all.find(d => String(d.id) === String(displayId));
+    if (matched) return matched;
+  }
+  return getTargetDisplay();
+}
+
+function getDockDimensionsForDisplay() {
+  const targetDisplay = (settings.displays && settings.displays.dockOnAllDisplays)
+    ? screen.getPrimaryDisplay()
+    : (() => {
+        const id = settings.displays && settings.displays.dockDisplayId;
+        if (id) {
+          const all = screen.getAllDisplays();
+          const matched = all.find(d => String(d.id) === String(id));
+          if (matched) return matched;
+        }
+        return getTargetDisplay();
+      })();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay;
+  const dockSize = settings.general && settings.general.dockSize || 'medium';
+  let height = 82;
+  if (dockSize === 'small') height = 62;
+  else if (dockSize === 'large') height = 102;
+  const dockPadding = 12;
+  const screenDockWidth = Math.min(screenWidth, 800);
+  const x = dx + Math.round((screenWidth - screenDockWidth) / 2);
+  const y = dy + screenHeight - height - dockPadding;
+  return { x, y, width: screenDockWidth, height: height + dockPadding };
+}
+
+ipcMain.handle('get-displays-detailed', () => {
+  return screen.getAllDisplays().map(d => ({
+    id: d.id,
+    bounds: d.bounds,
+    size: d.size,
+    isPrimary: d.id === screen.getPrimaryDisplay().id,
+    label: `${d.size.width}x${d.size.height}${d.id === screen.getPrimaryDisplay().id ? ' (Primary)' : ''}`
+  }));
+});
+
+// ==========================================
+// EXPERIMENTAL / DEVELOPER OPTIONS
+// =========================================
+const experimentalPath = require('node:path').join(app.getPath('userData'), 'experimental-flags.json');
+
+ipcMain.handle('read-experimental-flags', async () => {
+  try {
+    if (fs.existsSync(experimentalPath)) {
+      return JSON.parse(await fs.promises.readFile(experimentalPath, 'utf8'));
+    }
+    return { directionalReveal: true, autoArrangeByUsage: false, weatherWidget: true };
+  } catch (err) {
+    return { directionalReveal: true, autoArrangeByUsage: false, weatherWidget: true };
+  }
+});
+
+ipcMain.handle('save-experimental-flags', async (event, flags) => {
+  try {
+    if (settings.experimental) settings.experimental.featureFlags = flags;
+    await fs.promises.writeFile(experimentalPath, JSON.stringify(flags, null, 2), 'utf8');
+    await saveSettings();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('read-raw-settings', async () => {
+  try {
+    return { content: await fs.promises.readFile(settingsPath, 'utf8') };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('write-raw-settings', async (event, content) => {
+  try {
+    const parsed = JSON.parse(content);
+    // Auto-backup
+    const backupPath = settingsPath.replace('.json', `-backup-${Date.now()}.json`);
+    await fs.promises.copyFile(settingsPath, backupPath);
+    await fs.promises.writeFile(settingsPath, JSON.stringify(parsed, null, 2), 'utf8');
+    settings = parsed;
+    await saveSettings();
+    applySettings();
+    registerGlobalShortcuts();
+    return { success: true };
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      return { success: false, error: 'Invalid JSON syntax.' };
+    }
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('get-debug-info', async () => {
+  try {
+    const memInfo = await process.getProcessMemoryInfo();
+    return { rss: Math.round(memInfo.residentSet / 1024), heap: Math.round(memInfo.heapUsed / 1024) };
+  } catch {
+    return { rss: 0, heap: 0 };
+  }
+});
+
+ipcMain.handle('open-config-folder', async () => {
+  try {
+    const userDataDir = require('electron').app.getPath('userData');
+    await require('electron').shell.openPath(userDataDir);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.on('set-verbose-logging', (event, enabled) => {
+  const fs = require('node:fs');
+  // Toggle the DEBUG flag by rewriting a small module or using app settings
+  settings.performance = settings.performance || {};
+  settings.performance.verboseLogging = enabled;
+  // Reload main process to apply? We can't change const DEBUG at runtime,
+  // but we store the preference so it persists. On next restart it will be read.
+  // For now we forward the flag to renderers that check it.
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    menuBarWin.webContents.send('verbose-logging-changed', enabled);
+  }
+  saveSettings();
 });
 
 // Application Drawer IPC Handlers
@@ -3060,6 +3372,16 @@ if (!isPrimaryInstance) {
       registerGlobalShortcuts();
       startMasterTimer();
     }
+
+    // Register display hotplug listeners (must be after app ready)
+    screen.on('display-added', (_event, newDisplay) => {
+      debugLog('Display added:', newDisplay.id);
+      handleDisplayChange();
+    });
+    screen.on('display-removed', (_event, oldDisplay) => {
+      debugLog('Display removed:', oldDisplay.id);
+      handleDisplayChange();
+    });
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

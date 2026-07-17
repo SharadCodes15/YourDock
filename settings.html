@@ -436,9 +436,17 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><polyline points="21 15 16 10 5 21" stroke="currentColor"/></svg>
       <span>App Icons</span>
     </div>
+    <div class="sidebar-item" data-panel="displays">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>Displays</span>
+    </div>
     <div class="sidebar-item" data-panel="shortcuts">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" /><line x1="6" y1="8" x2="6.01" y2="8"/><line x1="10" y1="8" x2="10.01" y2="8"/><line x1="14" y1="8" x2="14.01" y2="8"/><line x1="18" y1="8" x2="18.01" y2="8"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/><line x1="14" y1="12" x2="14.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></svg>
       <span>Shortcuts</span>
+    </div>
+    <div class="sidebar-item" data-panel="experimental" id="sidebar-experimental" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <span>Experimental</span>
     </div>
     <div class="sidebar-item" data-panel="performance">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -627,10 +635,59 @@
         </div>
       </div>
 
+      <div class="section-title">Per-Element Colors</div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Dock Background Tint</div>
+          <div class="setting-desc">Override the dock's glass background color.</div>
+        </div>
+        <input type="color" id="app-color-dockBgTint" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Menu Bar Background Tint</div>
+          <div class="setting-desc">Override the menu bar's glass background color.</div>
+        </div>
+        <input type="color" id="app-color-menuBarBgTint" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Notification Center Tint</div>
+          <div class="setting-desc">Override the notification center's background color.</div>
+        </div>
+        <input type="color" id="app-color-notificationCenterBgTint" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Accent / Highlight Color</div>
+          <div class="setting-desc">Override hover states, toggles, and highlights.</div>
+        </div>
+        <input type="color" id="app-color-accentOverride" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Badge Color</div>
+          <div class="setting-desc">Override notification badge color.</div>
+        </div>
+        <input type="color" id="app-color-badgeColor" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Text Color Override</div>
+          <div class="setting-desc">Leave empty for automatic (follows light/dark theme).</div>
+        </div>
+        <input type="color" id="app-color-textColorOverride" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
+      </div>
+
+      <div class="setting-row">
+        <button id="app-colors-reset" style="padding: 6px 14px;">Reset Colors to Theme Default</button>
+      </div>
+
       <div class="setting-row">
         <div>
           <div class="setting-label">Accent Color</div>
-          <div class="setting-desc">Highlight color for interactive items.</div>
+          <div class="setting-desc">Primary highlight color for interactive items.</div>
         </div>
         <input type="color" id="app-accent-picker" style="border: none; width: 44px; height: 32px; background: transparent; cursor: pointer; padding: 0;">
       </div>
@@ -641,6 +698,36 @@
           <div class="setting-desc">Disable all app-wide CSS transitions and animations.</div>
         </div>
         <input type="checkbox" id="app-reduce-motion">
+      </div>
+
+      <div class="section-title" style="margin-top: 20px;">Theme Export / Import</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Export Theme</div>
+          <div class="setting-desc">Save all visual settings as a shareable .json file.</div>
+        </div>
+        <button id="app-theme-export" style="padding: 6px 14px;">Export...</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Import Theme</div>
+          <div class="setting-desc">Load a previously exported theme file.</div>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button id="app-theme-import" style="padding: 6px 14px;">Import...</button>
+          <button id="app-theme-revert" style="padding: 6px 14px; display: none;">Revert Last Import</button>
+        </div>
+      </div>
+
+      <div class="section-title">Built-in Theme Gallery</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Quick Apply</div>
+          <div class="setting-desc">Choose a built-in preset theme.</div>
+        </div>
+        <select id="app-builtin-themes" style="min-width: 180px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+          <option value="">-- Select a theme --</option>
+        </select>
       </div>
 
       <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
@@ -767,45 +854,61 @@
       </div>
     </div>
 
+    <!-- DISPLAYS PANEL -->
+    <div class="panel" id="panel-displays">
+      <h2>Displays</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Configure which displays the Dock and Menu Bar appear on.</p>
+
+      <div id="displays-list" style="margin-bottom: 15px;">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="section-title">Dock Placement</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Dock appears on</div>
+          <div class="setting-desc">Select which display shows the Dock.</div>
+        </div>
+        <select id="displays-dock-select" style="min-width: 200px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);"></select>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Dock on all displays</div>
+          <div class="setting-desc">Spawn a Dock instance on every connected display.</div>
+        </div>
+        <input type="checkbox" id="displays-dock-all">
+      </div>
+
+      <div class="section-title">Menu Bar Placement</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Menu Bar appears on</div>
+          <div class="setting-desc">Select which display shows the Menu Bar.</div>
+        </div>
+        <select id="displays-menubar-select" style="min-width: 200px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);"></select>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show Menu Bar on all displays</div>
+          <div class="setting-desc">Spawn a Menu Bar instance on every connected display.</div>
+        </div>
+        <input type="checkbox" id="displays-menubar-all">
+      </div>
+    </div>
+
     <!-- SHORTCUTS PANEL -->
     <div class="panel" id="panel-shortcuts">
       <h2>Shortcuts</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 12px;">Click any input, then press the desired key combination.</p>
 
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Force-Toggle Menu Bar</div>
-          <div class="setting-desc">Global shortcut to force show/hide menu bar.</div>
-        </div>
-        <div class="shortcut-wrapper">
-          <input type="text" id="short-toggle" class="shortcut-input" placeholder="Click to record..." readonly>
-          <button id="short-toggle-clear">Clear</button>
-        </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 15px; align-items: center;">
+        <input type="text" id="shortcuts-filter" placeholder="Search shortcuts..." style="flex:1; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--panel-bg); color: var(--text-color); outline: none; font-size: 12px;">
+        <button id="shortcuts-reset-all" class="btn-danger" style="padding: 6px 12px; font-size: 11px;">Reset All to Defaults</button>
       </div>
-      <div class="shortcut-error" id="short-toggle-error">Conflict detected. Try another shortcut.</div>
 
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Open Settings Window</div>
-          <div class="setting-desc">Global shortcut to launch this panel directly.</div>
-        </div>
-        <div class="shortcut-wrapper">
-          <input type="text" id="short-settings" class="shortcut-input" placeholder="Click to record..." readonly>
-          <button id="short-settings-clear">Clear</button>
-        </div>
+      <div id="shortcuts-list" style="max-height: 420px; overflow-y: auto; padding-right: 4px;">
+        <!-- Dynamically rendered -->
       </div>
-      <div class="shortcut-error" id="short-settings-error">Conflict detected. Try another shortcut.</div>
-
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Open Application Drawer</div>
-          <div class="setting-desc">Global shortcut to toggle fullscreen drawer.</div>
-        </div>
-        <div class="shortcut-wrapper">
-          <input type="text" id="short-drawer" class="shortcut-input" placeholder="Click to record..." readonly>
-          <button id="short-drawer-clear">Clear</button>
-        </div>
-      </div>
-      <div class="shortcut-error" id="short-drawer-error">Conflict detected. Try another shortcut.</div>
     </div>
 
     <!-- PERFORMANCE PANEL -->
@@ -834,6 +937,49 @@
       </div>
     </div>
 
+    <!-- EXPERIMENTAL PANEL -->
+    <div class="panel" id="panel-experimental">
+      <h2>Experimental</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Developer options and in-progress features. Handle with care.</p>
+
+      <div class="section-title">Feature Flags</div>
+      <div id="experimental-flags-container">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="section-title">Developer Tools</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Debug Overlay</div>
+          <div class="setting-desc">Show FPS + RAM usage readout pinned to screen corner.</div>
+        </div>
+        <input type="checkbox" id="experimental-debug-overlay">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Verbose Logging</div>
+          <div class="setting-desc">Enable detailed debug console output.</div>
+        </div>
+        <input type="checkbox" id="experimental-verbose-logging">
+      </div>
+      <div class="setting-row" style="margin-top: 10px;">
+        <div>
+          <div class="setting-label">Open Config Folder</div>
+          <div class="setting-desc">Browse the userData config directory.</div>
+        </div>
+        <button id="experimental-open-config" style="padding: 6px 14px;">Open Folder</button>
+      </div>
+
+      <div class="section-title" style="margin-top: 20px;">Raw JSON Editor</div>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 8px;">Editing this incorrectly may break the app. A backup is made automatically before saving.</p>
+      <textarea id="experimental-json-editor" style="width: 100%; height: 200px; font-family: monospace; font-size: 11px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); resize: vertical;"></textarea>
+      <div style="display: flex; gap: 8px; margin-top: 8px; align-items: center;">
+        <button id="experimental-json-save" class="btn-primary" style="padding: 6px 14px;">Save</button>
+        <button id="experimental-json-refresh" style="padding: 6px 14px;">Refresh</button>
+        <span id="experimental-json-status" style="font-size: 11px; color: var(--text-muted);"></span>
+      </div>
+    </div>
+
     <!-- ABOUT PANEL -->
     <div class="panel" id="panel-about">
       <h2>About</h2>
@@ -841,7 +987,7 @@
       <div class="about-info">
         <div class="about-logo">⚙️</div>
         <div class="about-title">macOS Top Menu Bar</div>
-        <div class="about-version" id="about-version-text">Version 1.0.0</div>
+        <div class="about-version" id="about-version-text" style="cursor: pointer;">Version 1.0.0</div>
         <div class="about-desc">
           An integrated macOS-style top Menu Bar and bottom Dock container, built natively with Electron, HTML5, and vanilla CSS transitions.
         </div>
@@ -866,6 +1012,7 @@
   <script>
     let currentSettings = {};
     let activeKeyCaptureId = null;
+    let versionClickCount = 0;
 
     // Map keys to display names
     const itemNames = {
@@ -878,6 +1025,23 @@
       settings: 'Settings Gear',
       clock: 'System Clock'
     };
+
+    const shortcutActions = [
+      { key: 'toggleMenuBar', label: 'Toggle Menu Bar Visibility' },
+      { key: 'toggleDockVisibility', label: 'Toggle Dock Visibility' },
+      { key: 'openSettings', label: 'Open Settings Window' },
+      { key: 'openDrawer', label: 'Open Application Drawer' },
+      { key: 'openNotificationCenter', label: 'Open Notification Center' },
+      { key: 'openControlCenter', label: 'Open Control Center' },
+      { key: 'captureFullScreen', label: 'Capture Full Screen' },
+      { key: 'captureSelectedArea', label: 'Capture Selected Area' },
+      { key: 'captureWindow', label: 'Capture Window' },
+      { key: 'forceQuitApplications', label: 'Force Quit Applications' },
+      { key: 'sleep', label: 'Sleep' },
+      { key: 'restart', label: 'Restart' },
+      { key: 'shutDown', label: 'Shut Down' },
+      { key: 'openSpotlightSearch', label: 'Open Spotlight Search' }
+    ];
 
     // Tab Switcher
     const sidebarItems = document.querySelectorAll('.sidebar-item');
@@ -997,9 +1161,32 @@
       renderMenuItemsList();
 
       // Shortcuts Binding
-      document.getElementById('short-toggle').value = currentSettings.shortcuts.toggleMenuBar || '';
-      document.getElementById('short-settings').value = currentSettings.shortcuts.openSettings || '';
-      document.getElementById('short-drawer').value = currentSettings.shortcuts.openDrawer || '';
+      renderShortcutsList();
+
+      // Displays Binding
+      loadDisplaysPanel();
+
+      // Experimental Bindings
+      loadExperimentalFlags();
+      document.getElementById('experimental-debug-overlay').checked = (currentSettings.performance && currentSettings.performance.debugOverlay) || false;
+      document.getElementById('experimental-verbose-logging').checked = (currentSettings.performance && currentSettings.performance.verboseLogging) || false;
+
+      // Per-element color pickers
+      const colors = currentSettings.appearance.colors || {};
+      document.getElementById('app-color-dockBgTint').value = colors.dockBgTint || '#000000';
+      document.getElementById('app-color-menuBarBgTint').value = colors.menuBarBgTint || '#000000';
+      document.getElementById('app-color-notificationCenterBgTint').value = colors.notificationCenterBgTint || '#000000';
+      document.getElementById('app-color-accentOverride').value = colors.accentOverride || currentSettings.appearance.accentColor || '#007aff';
+      document.getElementById('app-color-badgeColor').value = colors.badgeColor || '#ff3b30';
+      document.getElementById('app-color-textColorOverride').value = colors.textColorOverride || '#000000';
+
+      // Builtin themes dropdown
+      populateBuiltinThemes();
+
+      // Show experimental sidebar if unlocked
+      if (currentSettings.experimental && currentSettings.experimental.unlocked) {
+        document.getElementById('sidebar-experimental').style.display = '';
+      }
 
       // Performance Bindings
       document.getElementById('perf-low-ram').checked = (currentSettings.performance && currentSettings.performance.lowRamMode) || false;
@@ -1364,18 +1551,79 @@
       triggerSave();
     });
 
-    // Shortcuts Key Capturing
-    const toggleInput = document.getElementById('short-toggle');
-    const settingsInput = document.getElementById('short-settings');
-    const drawerInput = document.getElementById('short-drawer');
+    // Shortcuts Rendering
+    function renderShortcutsList() {
+      const container = document.getElementById('shortcuts-list');
+      container.innerHTML = '';
+      const filter = (document.getElementById('shortcuts-filter') || { value: '' }).value.toLowerCase();
 
-    toggleInput.addEventListener('click', () => startShortcutCapture('short-toggle', 'toggleMenuBar'));
-    settingsInput.addEventListener('click', () => startShortcutCapture('short-settings', 'openSettings'));
-    drawerInput.addEventListener('click', () => startShortcutCapture('short-drawer', 'openDrawer'));
+      shortcutActions.forEach(action => {
+        if (filter && !action.label.toLowerCase().includes(filter) && !action.key.toLowerCase().includes(filter)) return;
 
-    document.getElementById('short-toggle-clear').addEventListener('click', () => clearShortcut('short-toggle', 'toggleMenuBar'));
-    document.getElementById('short-settings-clear').addEventListener('click', () => clearShortcut('short-settings', 'openSettings'));
-    document.getElementById('short-drawer-clear').addEventListener('click', () => clearShortcut('short-drawer', 'openDrawer'));
+        const row = document.createElement('div');
+        row.className = 'setting-row';
+
+        const left = document.createElement('div');
+        left.style.flex = '1';
+        const label = document.createElement('div');
+        label.className = 'setting-label';
+        label.textContent = action.label;
+        const desc = document.createElement('div');
+        desc.className = 'setting-desc';
+        desc.textContent = action.key;
+        left.appendChild(label);
+        left.appendChild(desc);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shortcut-wrapper';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `short-${action.key}`;
+        input.className = 'shortcut-input';
+        input.placeholder = 'Click to record...';
+        input.readOnly = true;
+        input.value = (currentSettings.shortcuts && currentSettings.shortcuts[action.key]) || '';
+        input.addEventListener('click', () => startShortcutCapture(`short-${action.key}`, action.key));
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear';
+        clearBtn.addEventListener('click', () => clearShortcut(`short-${action.key}`, action.key));
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(clearBtn);
+
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'shortcut-error';
+        errorDiv.id = `short-${action.key}-error`;
+        errorDiv.style.display = 'none';
+
+        row.appendChild(left);
+        row.appendChild(wrapper);
+        container.appendChild(row);
+        container.appendChild(errorDiv);
+      });
+    }
+
+    document.getElementById('shortcuts-filter').addEventListener('input', () => {
+      renderShortcutsList();
+    });
+
+    document.getElementById('shortcuts-reset-all').addEventListener('click', async () => {
+      const confirmed = window.confirm('Reset all shortcuts to defaults (unset)?');
+      if (!confirmed) return;
+      shortcutActions.forEach(action => {
+        currentSettings.shortcuts[action.key] = '';
+      });
+      renderShortcutsList();
+      // Clear each via IPC
+      for (const action of shortcutActions) {
+        await window.settingsAPI.registerShortcut(action.key, '');
+      }
+      currentSettings.shortcuts = currentSettings.shortcuts || {};
+      triggerSave();
+      alert('All shortcuts have been cleared.');
+    });
 
     function startShortcutCapture(inputId, settingKey) {
       stopShortcutCapture();
@@ -1385,7 +1633,8 @@
       input.value = 'Recording... Press keys';
       input.style.borderColor = 'var(--accent-color)';
       
-      document.getElementById(`${inputId}-error`).style.display = 'none';
+      const errorDiv = document.getElementById(`${inputId}-error`);
+      if (errorDiv) errorDiv.style.display = 'none';
       window.addEventListener('keydown', captureKeys);
     }
 
@@ -1407,7 +1656,7 @@
 
       const keys = [];
       if (e.ctrlKey) keys.push('Ctrl');
-      if (e.metaKey) keys.push('Super'); // Maps to Command on Mac, Win key on Windows
+      if (e.metaKey) keys.push('Super');
       if (e.altKey) keys.push('Alt');
       if (e.shiftKey) keys.push('Shift');
 
@@ -1429,13 +1678,23 @@
         const input = document.getElementById(activeKeyCaptureId.inputId);
         input.value = shortcutStr;
 
-        // Verify/register shortcut with main process
-        const res = await window.settingsAPI.registerShortcut(activeKeyCaptureId.settingKey, shortcutStr);
+        // Check conflicts before registering
+        const conflictCheck = await window.settingsAPI.checkShortcutConflict(shortcutStr);
         const errorLabel = document.getElementById(`${activeKeyCaptureId.inputId}-error`);
+
+        if (conflictCheck.conflict) {
+          errorLabel.textContent = conflictCheck.error || 'Already assigned to another action.';
+          errorLabel.style.display = 'block';
+          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+          stopShortcutCapture();
+          return;
+        }
+
+        const res = await window.settingsAPI.registerShortcut(activeKeyCaptureId.settingKey, shortcutStr);
 
         if (res.success) {
           currentSettings.shortcuts[activeKeyCaptureId.settingKey] = shortcutStr;
-          errorLabel.style.display = 'none';
+          if (errorLabel) errorLabel.style.display = 'none';
         } else {
           errorLabel.textContent = res.error || 'Conflict detected.';
           errorLabel.style.display = 'block';
@@ -1448,14 +1707,328 @@
 
     async function clearShortcut(inputId, settingKey) {
       stopShortcutCapture();
-      document.getElementById(`${inputId}-error`).style.display = 'none';
+      const errorLabel = document.getElementById(`${inputId}-error`);
+      if (errorLabel) errorLabel.style.display = 'none';
       const input = document.getElementById(inputId);
       input.value = '';
 
-      // Clear in main
       await window.settingsAPI.registerShortcut(settingKey, '');
       currentSettings.shortcuts[settingKey] = '';
     }
+
+    // =====================
+    // PER-ELEMENT COLOR PICKERS
+    // =====================
+    const colorPickers = ['dockBgTint', 'menuBarBgTint', 'notificationCenterBgTint', 'accentOverride', 'badgeColor', 'textColorOverride'];
+    colorPickers.forEach(picker => {
+      const el = document.getElementById(`app-color-${picker}`);
+      if (el) {
+        el.addEventListener('input', (e) => {
+          if (!currentSettings.appearance.colors) currentSettings.appearance.colors = {};
+          currentSettings.appearance.colors[picker] = e.target.value;
+          triggerSave();
+        });
+      }
+    });
+
+    document.getElementById('app-colors-reset').addEventListener('click', () => {
+      const colors = currentSettings.appearance.colors || {};
+      Object.keys(colors).forEach(k => { colors[k] = ''; });
+      colorPickers.forEach(picker => {
+        const defaults = { dockBgTint: '#000000', menuBarBgTint: '#000000', notificationCenterBgTint: '#000000', accentOverride: currentSettings.appearance.accentColor || '#007aff', badgeColor: '#ff3b30', textColorOverride: '#000000' };
+        document.getElementById(`app-color-${picker}`).value = defaults[picker] || '#000000';
+      });
+      triggerSave();
+    });
+
+    // =====================
+    // THEME EXPORT / IMPORT
+    // =====================
+    document.getElementById('app-theme-export').addEventListener('click', async () => {
+      const name = window.prompt('Theme name:', 'My Theme');
+      if (!name) return;
+      const res = await window.settingsAPI.exportTheme(name);
+      if (res.success) {
+        alert('Theme exported successfully!');
+      } else {
+        alert(res.error || 'Export failed.');
+      }
+    });
+
+    document.getElementById('app-theme-import').addEventListener('click', async () => {
+      const res = await window.settingsAPI.importTheme();
+      if (res && res.success) {
+        alert('Theme imported successfully!');
+        loadSettings();
+        if (res.hasBackup) {
+          document.getElementById('app-theme-revert').style.display = '';
+        }
+      } else if (res && res.error) {
+        alert(`Import failed: ${res.error}`);
+      }
+    });
+
+    document.getElementById('app-theme-revert').addEventListener('click', async () => {
+      const res = await window.settingsAPI.revertLastImport();
+      if (res.success) {
+        alert('Theme reverted to previous state.');
+        document.getElementById('app-theme-revert').style.display = 'none';
+        loadSettings();
+      }
+    });
+
+    function populateBuiltinThemes() {
+      const select = document.getElementById('app-builtin-themes');
+      if (!select) return;
+      const builtins = currentSettings.builtinThemes || [];
+      select.innerHTML = '<option value="">-- Select a theme --</option>';
+      builtins.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.name;
+        opt.textContent = t.name;
+        select.appendChild(opt);
+      });
+    }
+
+    document.getElementById('app-builtin-themes').addEventListener('change', async (e) => {
+      const name = e.target.value;
+      if (!name) return;
+      const res = await window.settingsAPI.applyBuiltinTheme(name);
+      if (res.success) {
+        await loadSettings();
+        if (res.hasBackup) {
+          document.getElementById('app-theme-revert').style.display = '';
+        }
+      } else {
+        alert(res.error || 'Failed to apply theme.');
+      }
+      e.target.value = '';
+    });
+
+    // =====================
+    // DISPLAYS PANEL
+    // =====================
+    async function loadDisplaysPanel() {
+      const container = document.getElementById('displays-list');
+      const dockSelect = document.getElementById('displays-dock-select');
+      const menuBarSelect = document.getElementById('displays-menubar-select');
+
+      if (!dockSelect) return;
+
+      try {
+        const displays = await window.settingsAPI.getDisplays();
+        container.innerHTML = '<div style="margin-bottom: 10px; font-size: 12px; color: var(--text-muted);">Detected displays:</div>';
+        (displays || []).forEach(d => {
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;';
+          const dot = document.createElement('span');
+          dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${d.isPrimary ? '#34c759' : '#8e8e93'};display:inline-block;`;
+          div.appendChild(dot);
+          div.appendChild(document.createTextNode(`${d.bounds.width}x${d.bounds.height}${d.isPrimary ? ' (Primary)' : ''}`));
+          container.appendChild(div);
+        });
+
+        const storageAccount = (currentSettings.displays || {});
+        // Populate dock select
+        dockSelect.innerHTML = '<option value="">Primary Display</option>';
+        (displays || []).forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = `${d.bounds.width}x${d.bounds.height}${d.isPrimary ? ' (Primary)' : ''}`;
+          dockSelect.appendChild(opt);
+        });
+        const dockId = storageAccount.dockDisplayId;
+        if (dockId && displays.some(d => String(d.id) === String(dockId))) {
+          dockSelect.value = dockId;
+        }
+
+        // Populate menubar select
+        menuBarSelect.innerHTML = '<option value="">Primary Display</option>';
+        (displays || []).forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = `${d.bounds.width}x${d.bounds.height}${d.isPrimary ? ' (Primary)' : ''}`;
+          menuBarSelect.appendChild(opt);
+        });
+        const menuBarId = storageAccount.menuBarDisplayId;
+        if (menuBarId && displays.some(d => String(d.id) === String(menuBarId))) {
+          menuBarSelect.value = menuBarId;
+        }
+
+        // All-displays toggles
+        document.getElementById('displays-dock-all').checked = storageAccount.dockOnAllDisplays || false;
+        document.getElementById('displays-menubar-all').checked = storageAccount.menuBarOnAllDisplays || false;
+
+        // Mutually exclusive: disable dropdown when all-displays is checked
+        dockSelect.disabled = storageAccount.dockOnAllDisplays;
+        menuBarSelect.disabled = storageAccount.menuBarOnAllDisplays;
+
+      } catch (err) {
+        console.error('Failed to load displays:', err);
+        container.innerHTML = '<div style="color:#ff3b30;font-size:12px;">Failed to detect displays.</div>';
+      }
+    }
+
+    document.getElementById('displays-dock-select').addEventListener('change', (e) => {
+      if (!currentSettings.displays) currentSettings.displays = {};
+      currentSettings.displays.dockDisplayId = e.target.value || null;
+      currentSettings.displays.dockOnAllDisplays = false;
+      triggerSave();
+    });
+
+    document.getElementById('displays-menubar-select').addEventListener('change', (e) => {
+      if (!currentSettings.displays) currentSettings.displays = {};
+      currentSettings.displays.menuBarDisplayId = e.target.value || null;
+      currentSettings.displays.menuBarOnAllDisplays = false;
+      triggerSave();
+    });
+
+    document.getElementById('displays-dock-all').addEventListener('change', (e) => {
+      if (!currentSettings.displays) currentSettings.displays = {};
+      currentSettings.displays.dockOnAllDisplays = e.target.checked;
+      if (e.target.checked) {
+        currentSettings.displays.dockDisplayId = null;
+        document.getElementById('displays-dock-select').disabled = true;
+      } else {
+        document.getElementById('displays-dock-select').disabled = false;
+      }
+      triggerSave();
+    });
+
+    document.getElementById('displays-menubar-all').addEventListener('change', (e) => {
+      if (!currentSettings.displays) currentSettings.displays = {};
+      currentSettings.displays.menuBarOnAllDisplays = e.target.checked;
+      if (e.target.checked) {
+        currentSettings.displays.menuBarDisplayId = null;
+        document.getElementById('displays-menubar-select').disabled = true;
+      } else {
+        document.getElementById('displays-menubar-select').disabled = false;
+      }
+      triggerSave();
+    });
+
+    // =====================
+    // EXPERIMENTAL PANEL
+    // =====================
+    async function loadExperimentalFlags() {
+      const container = document.getElementById('experimental-flags-container');
+      if (!container) return;
+      try {
+        const flags = currentSettings.experimental && currentSettings.experimental.featureFlags
+          ? currentSettings.experimental.featureFlags
+          : { directionalReveal: true, autoArrangeByUsage: false, weatherWidget: true };
+        container.innerHTML = '';
+        const flagLabels = {
+          directionalReveal: 'Directional Reveal Heuristic',
+          autoArrangeByUsage: 'Auto-arrange by Usage Frequency',
+          weatherWidget: 'Weather Widget'
+        };
+        const flagDescs = {
+          directionalReveal: 'Smart dock reveal using cursor heading detection.',
+          autoArrangeByUsage: 'Auto-sort dock running apps by launch frequency.',
+          weatherWidget: 'Show weather data in Notification Center.'
+        };
+        Object.entries(flags).forEach(([key, val]) => {
+          const row = document.createElement('div');
+          row.className = 'setting-row';
+          const left = document.createElement('div');
+          left.style.flex = '1';
+          const label = document.createElement('div');
+          label.className = 'setting-label';
+          label.textContent = flagLabels[key] || key;
+          const desc = document.createElement('div');
+          desc.className = 'setting-desc';
+          desc.textContent = flagDescs[key] || '';
+          left.appendChild(label);
+          left.appendChild(desc);
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = val !== false;
+          cb.addEventListener('change', async (e) => {
+            if (!currentSettings.experimental) currentSettings.experimental = { featureFlags: {} };
+            if (!currentSettings.experimental.featureFlags) currentSettings.experimental.featureFlags = {};
+            currentSettings.experimental.featureFlags[key] = e.target.checked;
+            await window.settingsAPI.saveExperimentalFlags(currentSettings.experimental.featureFlags);
+          });
+          row.appendChild(left);
+          row.appendChild(cb);
+          container.appendChild(row);
+        });
+      } catch (err) {
+        console.error('Failed to load experimental flags:', err);
+      }
+    }
+
+    document.getElementById('experimental-debug-overlay').addEventListener('change', (e) => {
+      if (!currentSettings.performance) currentSettings.performance = {};
+      currentSettings.performance.debugOverlay = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('experimental-verbose-logging').addEventListener('change', (e) => {
+      if (!currentSettings.performance) currentSettings.performance = {};
+      currentSettings.performance.verboseLogging = e.target.checked;
+      window.settingsAPI.setVerboseLogging(e.target.checked);
+      triggerSave();
+    });
+
+    document.getElementById('experimental-open-config').addEventListener('click', async () => {
+      const res = await window.settingsAPI.openConfigFolder();
+      if (!res || !res.success) {
+        alert('Failed to open config folder.');
+      }
+    });
+
+    // Raw JSON Editor
+    document.getElementById('experimental-json-refresh').addEventListener('click', async () => {
+      const res = await window.settingsAPI.readRawSettings();
+      if (res && res.content) {
+        document.getElementById('experimental-json-editor').value = res.content;
+        document.getElementById('experimental-json-status').textContent = 'Loaded.';
+      } else {
+        document.getElementById('experimental-json-status').textContent = 'Failed to load.';
+      }
+    });
+
+    document.getElementById('experimental-json-save').addEventListener('click', async () => {
+      const content = document.getElementById('experimental-json-editor').value;
+      const status = document.getElementById('experimental-json-status');
+      if (!content.trim()) {
+        status.textContent = 'Cannot save empty content.';
+        return;
+      }
+      try {
+        JSON.parse(content);
+      } catch {
+        status.textContent = 'Invalid JSON syntax.';
+        status.style.color = '#ff3b30';
+        return;
+      }
+      const res = await window.settingsAPI.writeRawSettings(content);
+      if (res.success) {
+        status.textContent = 'Saved successfully! App will reload settings.';
+        status.style.color = '#34c759';
+        loadSettings();
+      } else {
+        status.textContent = res.error || 'Save failed.';
+        status.style.color = '#ff3b30';
+      }
+    });
+
+    // =====================
+    // EASTER EGG: Experimental unlock
+    // =====================
+    document.getElementById('about-version-text').addEventListener('click', () => {
+      versionClickCount++;
+      if (versionClickCount >= 7) {
+        versionClickCount = 0;
+        if (!currentSettings.experimental) currentSettings.experimental = {};
+        currentSettings.experimental.unlocked = true;
+        document.getElementById('sidebar-experimental').style.display = '';
+        triggerSave();
+        alert('Experimental options unlocked!');
+      }
+    });
 
     // Backup & Restore
     document.getElementById('about-export').addEventListener('click', async () => {
@@ -1625,6 +2198,15 @@
         }
       }
       document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r}, ${g}, ${b}, 0.15)`);
+      
+      // Per-element color overrides
+      const colors = themeData.colors || {};
+      if (colors.dockBgTint) document.documentElement.style.setProperty('--dock-bg-tint', colors.dockBgTint);
+      if (colors.menuBarBgTint) document.documentElement.style.setProperty('--menubar-bg-tint', colors.menuBarBgTint);
+      if (colors.notificationCenterBgTint) document.documentElement.style.setProperty('--nc-bg-tint', colors.notificationCenterBgTint);
+      if (colors.accentOverride) document.documentElement.style.setProperty('--accent-override', colors.accentOverride);
+      if (colors.badgeColor) document.documentElement.style.setProperty('--badge-color', colors.badgeColor);
+      if (colors.textColorOverride) document.documentElement.style.setProperty('--text-color-override', colors.textColorOverride);
     }
 
     if (window.settingsAPI.onThemeChanged) {
