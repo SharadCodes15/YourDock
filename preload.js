@@ -33,5 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   refreshApps: () => ipcRenderer.invoke('refresh-apps'),
   closeWelcome: () => ipcRenderer.send('close-welcome'),
   // added manually
-  onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', (_event, value) => callback(value))
+  onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', (_event, value) => callback(value)),
+  // Notification Center
+  toggleNotificationCenter: (rect) => ipcRenderer.send('toggle-notification-center', rect),
+  // Screenshot
+  takeScreenshot: (mode) => ipcRenderer.send('take-screenshot', mode)
 });

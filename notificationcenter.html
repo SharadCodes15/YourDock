@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notification Center</title>
+  <style>
+    :root { --accent-color: #007aff; --accent-color-translucent: rgba(0, 122, 255, 0.15); --accent-rgb: 0, 122, 255; }
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 13px; color: #1d1d1f; overflow: hidden; background: transparent;
+      width: 100vw; height: 100vh;
+    }
+    body.dark-theme {
+      color: #e5e5e7;
+    }
+    body.reduce-motion * { animation-duration: 0s !important; transition-duration: 0s !important; }
+
+    .panel {
+      width: 100vw; height: 100vh;
+      background: rgba(255, 255, 255, var(--glass-opacity, 0.72));
+      backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(180%) brightness(1.05);
+      border-left: 1px solid rgba(0, 0, 0, 0.1);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    body.dark-theme .panel {
+      background: rgba(30, 30, 30, var(--glass-opacity, 0.82));
+      border-left-color: rgba(255, 255, 255, 0.08);
+    }
+    .panel.open { transform: translateX(0); }
+
+    .panel-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 16px 10px; border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      flex-shrink: 0;
+    }
+    body.dark-theme .panel-header { border-bottom-color: rgba(255, 255, 255, 0.06); }
+    .panel-header h2 { font-size: 16px; font-weight: 700; }
+    .edit-btn {
+      font-size: 11px; padding: 4px 10px; border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.1); background: transparent; cursor: pointer;
+      color: inherit; transition: background 0.15s;
+    }
+    .edit-btn:hover { background: rgba(0, 0, 0, 0.05); }
+    body.dark-theme .edit-btn { border-color: rgba(255, 255, 255, 0.15); }
+    body.dark-theme .edit-btn:hover { background: rgba(255, 255, 255, 0.08); }
+
+    .widgets-container {
+      flex: 1; overflow-y: auto; padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .widgets-container::-webkit-scrollbar { width: 4px; }
+    .widgets-container::-webkit-scrollbar-track { background: transparent; }
+    .widgets-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+    .widget-card {
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px; padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      position: relative;
+    }
+    body.dark-theme .widget-card {
+      background: rgba(60, 60, 60, 0.4);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+    .widget-card + .widget-divider { display: none; }
+
+    .clock-widget { text-align: center; padding: 20px 16px; }
+    .clock-time { font-size: 42px; font-weight: 300; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+    .clock-date { font-size: 14px; color: #86868b; margin-top: 4px; }
+    body.dark-theme .clock-date { color: #98989d; }
+
+    .cal-widget { }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .cal-header span { font-weight: 600; font-size: 14px; }
+    .cal-nav { display: flex; gap: 8px; }
+    .cal-nav button {
+      width: 24px; height: 24px; border-radius: 6px; border: none; background: transparent;
+      cursor: pointer; font-size: 14px; color: inherit; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cal-nav button:hover { background: rgba(0,0,0,0.08); }
+    body.dark-theme .cal-nav button:hover { background: rgba(255,255,255,0.1); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-day-header { text-align: center; font-size: 10px; font-weight: 600; color: #86868b; padding: 4px 0; }
+    .cal-day { text-align: center; padding: 5px 0; font-size: 12px; border-radius: 6px; }
+    .cal-day.today { background: var(--accent-color); color: white; font-weight: 600; }
+    .cal-day.other-month { color: #c8c8cc; }
+    body.dark-theme .cal-day.other-month { color: #555; }
+    .cal-day-empty { }
+
+    .weather-widget { display: flex; align-items: center; gap: 12px; }
+    .weather-icon { font-size: 32px; }
+    .weather-info { flex: 1; }
+    .weather-temp { font-size: 22px; font-weight: 600; }
+    .weather-city { font-size: 11px; color: #86868b; margin-top: 2px; }
+    body.dark-theme .weather-city { color: #98989d; }
+    .weather-error { font-size: 12px; color: #86868b; padding: 8px 0; }
+
+    .notes-widget { }
+    .notes-widget textarea {
+      width: 100%; min-height: 80px; border: none; background: transparent;
+      font-family: inherit; font-size: 13px; color: inherit; resize: vertical;
+      outline: none; padding: 0; line-height: 1.5;
+    }
+    .notes-widget textarea::placeholder { color: #c8c8cc; }
+
+    .edit-overlay {
+      display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      z-index: 10; padding: 16px;
+      flex-direction: column;
+    }
+    body.dark-theme .edit-overlay { background: rgba(30, 30, 30, 0.9); }
+    .edit-overlay.open { display: flex; }
+    .edit-overlay h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .widget-edit-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 8px; border-radius: 6px; transition: background 0.15s;
+    }
+    .widget-edit-row:hover { background: rgba(0,0,0,0.04); }
+    body.dark-theme .widget-edit-row:hover { background: rgba(255,255,255,0.04); }
+    .widget-edit-left { display: flex; align-items: center; gap: 8px; }
+    .widget-edit-left input[type="checkbox"] { accent-color: var(--accent-color); cursor: pointer; }
+    .widget-edit-actions { display: flex; gap: 4px; }
+    .widget-edit-actions button {
+      width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1);
+      background: transparent; cursor: pointer; font-size: 10px; color: inherit;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .widget-edit-actions button:disabled { opacity: 0.3; cursor: default; }
+    .widget-edit-actions button:hover:not(:disabled) { background: rgba(0,0,0,0.06); }
+    body.dark-theme .widget-edit-actions button { border-color: rgba(255,255,255,0.15); }
+    body.dark-theme .widget-edit-actions button:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+    .edit-done-btn {
+      margin-top: 12px; padding: 6px 16px; border-radius: 6px;
+      background: var(--accent-color); color: white; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 500; align-self: flex-end;
+    }
+    .widget-hidden { display: none; }
+
+    .toast-message {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); color: white; padding: 6px 14px; border-radius: 8px;
+      font-size: 12px; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    }
+    .toast-message.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="panel" id="panel">
+    <div class="panel-header">
+      <h2>Notification Center</h2>
+      <button class="edit-btn" id="editBtn">Edit Widgets</button>
+    </div>
+
+    <div class="widgets-container" id="widgetsContainer">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Edit overlay -->
+    <div class="edit-overlay" id="editOverlay">
+      <h3>Customize Widgets</h3>
+      <div id="editList"></div>
+      <button class="edit-done-btn" id="editDoneBtn">Done</button>
+    </div>
+
+    <div class="toast-message" id="toast"></div>
+  </div>
+
+  <script src="weather.js"></script>
+  <script src="closeOnEscape.js"></script>
+  <script>
+    let currentSettings = {};
+    let editMode = false;
+    let calendarMonth = new Date().getMonth();
+    let calendarYear = new Date().getFullYear();
+    let weatherRefreshTimer = null;
+    let notesSaveTimer = null;
+
+    const widgetNames = { clock: 'Clock', calendar: 'Calendar', weather: 'Weather', notes: 'Notes' };
+
+    function applyThemeConfig(themeData) {
+      if (!themeData) return;
+      if (themeData.theme === 'dark') document.body.classList.add('dark-theme');
+      else document.body.classList.remove('dark-theme');
+      if (themeData.reduceMotion) document.body.classList.add('reduce-motion');
+      else document.body.classList.remove('reduce-motion');
+      let blurVal = '20px', opacityVal = '0.85';
+      if (themeData.glassIntensity === 'Subtle') { blurVal = '8px'; opacityVal = '0.60'; }
+      else if (themeData.glassIntensity === 'Heavy') { blurVal = '40px'; opacityVal = '0.95'; }
+      document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+      document.documentElement.style.setProperty('--glass-blur', blurVal);
+      document.documentElement.style.setProperty('--glass-opacity', opacityVal);
+      let r = 0, g = 122, b = 255;
+      const color = themeData.accentColor;
+      if (color && color.startsWith('#')) {
+        const hex = color.substring(1);
+        if (hex.length === 3) { r = parseInt(hex[0]+hex[0],16); g = parseInt(hex[1]+hex[1],16); b = parseInt(hex[2]+hex[2],16); }
+        else if (hex.length === 6) { r = parseInt(hex.substring(0,2),16); g = parseInt(hex.substring(2,4),16); b = parseInt(hex.substring(4,6),16); }
+      }
+      document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r},${g},${b},0.15)`);
+      document.documentElement.style.setProperty('--accent-rgb', `${r},${g},${b}`);
+    }
+
+    window.notificationAPI.onThemeChanged(applyThemeConfig);
+    window.notificationAPI.getThemeConfig().then(applyThemeConfig).catch(() => {});
+
+    function renderWidgets() {
+      const nc = currentSettings.notificationCenter || { visible: {}, order: ['clock','calendar','weather','notes'] };
+      const container = document.getElementById('widgetsContainer');
+      container.innerHTML = '';
+      nc.order.forEach(key => {
+        if (nc.visible[key] === false) return;
+        const card = document.createElement('div');
+        card.className = 'widget-card';
+        card.id = `widget-${key}`;
+
+        if (key === 'clock') {
+          const now = new Date();
+          const format12 = !currentSettings.general || currentSettings.general.clockFormat12h;
+          let hours = now.getHours();
+          const mins = String(now.getMinutes()).padStart(2, '0');
+          let timeStr;
+          if (format12) {
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            timeStr = `${hours}:${mins} ${ampm}`;
+          } else {
+            timeStr = `${String(hours).padStart(2,'0')}:${mins}`;
+          }
+          const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+          const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          const dateStr = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+          card.className = 'widget-card clock-widget';
+          card.innerHTML = `<div class="clock-time">${timeStr}</div><div class="clock-date">${dateStr}</div>`;
+        } else if (key === 'calendar') {
+          card.className = 'widget-card cal-widget';
+          const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
+          const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+          const today = new Date();
+          let html = `<div class="cal-header"><span>${monthNames[calendarMonth]} ${calendarYear}</span>
+            <div class="cal-nav"><button class="cal-prev">\u25C0</button><button class="cal-next">\u25B6</button></div></div>`;
+          html += '<div class="cal-grid">';
+          ['S','M','T','W','T','F','S'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
+          for (let i = 0; i < firstDay; i++) html += '<div class="cal-day-empty"></div>';
+          for (let d = 1; d <= daysInMonth; d++) {
+            const isToday = d === today.getDate() && calendarMonth === today.getMonth() && calendarYear === today.getFullYear();
+            html += `<div class="cal-day${isToday ? ' today' : ''}">${d}</div>`;
+          }
+          html += '</div>';
+          card.innerHTML = html;
+        } else if (key === 'weather') {
+          card.className = 'widget-card weather-widget';
+          card.innerHTML = '<div class="weather-info" style="flex:1;text-align:center;padding:8px 0;"><span style="font-size:12px;color:#86868b;">Loading weather...</span></div>';
+          fetchWeatherData();
+        } else if (key === 'notes') {
+          card.className = 'widget-card notes-widget';
+          const note = (nc.quickNote || '');
+          card.innerHTML = `<textarea id="notesTextarea" placeholder="Write a quick note..." spellcheck="false">${note}</textarea>`;
+        }
+        container.appendChild(card);
+      });
+
+      // Bind calendar navigation
+      container.querySelectorAll('.cal-prev').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); calendarMonth--; if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; } renderWidgets(); }));
+      container.querySelectorAll('.cal-next').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); calendarMonth++; if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; } renderWidgets(); }));
+
+      // Bind notes autosave
+      const notesTA = document.getElementById('notesTextarea');
+      if (notesTA) {
+        const saveNote = () => {
+          currentSettings.notificationCenter = currentSettings.notificationCenter || { visible: {}, order: ['clock','calendar','weather','notes'], quickNote: '' };
+          currentSettings.notificationCenter.quickNote = notesTA.value;
+          window.notificationAPI.saveSettings(currentSettings);
+        };
+        notesTA.addEventListener('blur', saveNote);
+        notesTA.addEventListener('input', () => {
+          if (notesSaveTimer) clearTimeout(notesSaveTimer);
+          notesSaveTimer = setTimeout(saveNote, 500);
+        });
+      }
+    }
+
+    let lastWeatherFetch = 0;
+    function fetchWeatherData() {
+      const now = Date.now();
+      if (now - lastWeatherFetch < 30000) return;
+      lastWeatherFetch = now;
+      const location = currentSettings.general && currentSettings.general.weatherLocation ? currentSettings.general.weatherLocation : '';
+
+      window.notificationAPI.fetchWeather(location).then(data => {
+        if (!data || data.error) {
+          const w = document.querySelector('#widget-weather .weather-info');
+          if (w) w.innerHTML = '<span style="font-size:12px;color:#86868b;">Weather unavailable</span>';
+          return;
+        }
+        const w = document.querySelector('#widget-weather .weather-info');
+        if (w) {
+          w.innerHTML = `<div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:32px;">${data.conditionIcon || '\u2600\uFE0F'}</span>
+            <div><div class="weather-temp">${data.temperature}\u00B0</div>
+            <div class="weather-city">${data.city || ''}</div></div>
+          </div>`;
+        }
+      }).catch(() => {
+        const w = document.querySelector('#widget-weather .weather-info');
+        if (w) w.innerHTML = '<span style="font-size:12px;color:#86868b;">Weather unavailable</span>';
+      });
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    // Edit mode
+    document.getElementById('editBtn').addEventListener('click', () => {
+      editMode = true;
+      document.getElementById('editOverlay').classList.add('open');
+      renderEditList();
+    });
+    document.getElementById('editDoneBtn').addEventListener('click', () => {
+      editMode = false;
+      document.getElementById('editOverlay').classList.remove('open');
+    });
+
+    function renderEditList() {
+      const list = document.getElementById('editList');
+      list.innerHTML = '';
+      const nc = currentSettings.notificationCenter || { visible: {}, order: ['clock','calendar','weather','notes'] };
+      nc.order.forEach((key, index) => {
+        const row = document.createElement('div');
+        row.className = 'widget-edit-row';
+        const left = document.createElement('div');
+        left.className = 'widget-edit-left';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = nc.visible[key] !== false;
+        cb.addEventListener('change', () => {
+          nc.visible[key] = cb.checked;
+          saveNCSettings(nc);
+          renderWidgets();
+        });
+        const label = document.createElement('span');
+        label.textContent = widgetNames[key] || key;
+        left.appendChild(cb); left.appendChild(label);
+        const actions = document.createElement('div');
+        actions.className = 'widget-edit-actions';
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '\u25B2'; upBtn.disabled = index === 0;
+        upBtn.addEventListener('click', () => { moveWidget(index, index - 1, nc); });
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '\u25BC'; downBtn.disabled = index === nc.order.length - 1;
+        downBtn.addEventListener('click', () => { moveWidget(index, index + 1, nc); });
+        actions.appendChild(upBtn); actions.appendChild(downBtn);
+        row.appendChild(left); row.appendChild(actions);
+        list.appendChild(row);
+      });
+    }
+
+    function moveWidget(fromIdx, toIdx, nc) {
+      const arr = nc.order;
+      [arr[fromIdx], arr[toIdx]] = [arr[toIdx], arr[fromIdx]];
+      saveNCSettings(nc);
+      renderEditList();
+      renderWidgets();
+    }
+
+    function saveNCSettings(nc) {
+      currentSettings.notificationCenter = nc;
+      window.notificationAPI.saveSettings(currentSettings);
+    }
+
+    // Panel open animation
+    function openPanel() {
+      document.getElementById('panel').classList.add('open');
+    }
+
+    // Load settings
+    async function init() {
+      currentSettings = await window.notificationAPI.getSettings();
+      renderWidgets();
+      openPanel();
+
+      // Weather periodic refresh
+      const nc = currentSettings.notificationCenter || {};
+      if (nc.visible === undefined || nc.visible.weather !== false) {
+        if (weatherRefreshTimer) clearInterval(weatherRefreshTimer);
+        weatherRefreshTimer = setInterval(fetchWeatherData, 30 * 60 * 1000);
+      }
+
+      // Settings live update
+      window.notificationAPI.onSettingsChanged((settings) => {
+        const oldLocation = currentSettings.general && currentSettings.general.weatherLocation;
+        currentSettings = settings;
+        renderWidgets();
+      });
+    }
+
+    // Clock updates
+    setInterval(() => {
+      const nc = currentSettings.notificationCenter;
+      if (!nc || nc.visible.clock !== false) {
+        renderWidgets();
+      }
+    }, 30000);
+
+    // Init after DOM ready
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      init().catch(console.error);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => init().catch(console.error));
+    }
+  </script>
+</body>
+</html>

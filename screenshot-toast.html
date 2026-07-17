@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenshot Toast</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    body {
+      background: rgba(40,40,40,0.88);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-radius: 10px; width: 100vw; height: 100vh; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .toast-content {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; height: 100%;
+    }
+    .thumbnail {
+      width: 40px; height: 40px; border-radius: 6px;
+      background: #555; flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: white;
+    }
+    .info { flex: 1; min-width: 0; }
+    .info .label { font-size: 12px; font-weight: 600; color: #e5e5e7; }
+    .info .hint { font-size: 10px; color: #98989d; margin-top: 2px; }
+    .close-btn {
+      width: 20px; height: 20px; border-radius: 50%; border: none;
+      background: rgba(255,255,255,0.1); color: #ccc; cursor: pointer;
+      font-size: 12px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    .close-btn:hover { background: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+  <div class="toast-content" id="toastContent">
+    <div class="thumbnail">\U0001F4F7</div>
+    <div class="info">
+      <div class="label">Screenshot Saved</div>
+      <div class="hint">Click to open</div>
+    </div>
+    <button class="close-btn" id="closeBtn">&times;</button>
+  </div>
+  <script>
+    let dismissTimer = null;
+    let currentFilePath = '';
+
+    window.toastAPI.onToastData((data) => {
+      currentFilePath = data.filePath || '';
+      if (dismissTimer) clearTimeout(dismissTimer);
+      dismissTimer = setTimeout(() => {
+        window.toastAPI.closeToast();
+      }, data.dismissMs || 4000);
+    });
+
+    document.getElementById('toastContent').addEventListener('click', (e) => {
+      if (e.target.closest('#closeBtn')) return;
+      if (currentFilePath) window.toastAPI.openFile(currentFilePath);
+      window.toastAPI.closeToast();
+    });
+
+    document.getElementById('closeBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.toastAPI.closeToast();
+    });
+  </script>
+</body>
+</html>

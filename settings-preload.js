@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getRamUsage: () => ipcRenderer.invoke('get-ram-usage'),
   clearIconCache: () => ipcRenderer.invoke('clear-icon-cache'),
   refreshApp: () => ipcRenderer.send('refresh-app'),
-  openErrorLog: () => ipcRenderer.send('open-error-log')
+  openErrorLog: () => ipcRenderer.send('open-error-log'),
+  // Notification Center (weather + screenshot settings live in settings.general)
+  onNotificationChanged: (callback) => ipcRenderer.on('notification-settings-changed', (_event, data) => callback(data))
 });
 

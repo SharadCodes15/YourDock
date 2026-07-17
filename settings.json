@@ -5,7 +5,15 @@
     "clockFormat12h": true,
     "showDate": true,
     "checkForUpdatesAutomatically": false,
-    "smartOrdering": true
+    "smartOrdering": true,
+    "startMinimizedToTray": false,
+    "dockPosition": "bottom",
+    "dockSize": "medium",
+    "displayMonitor": "primary",
+    "hideDevTools": true,
+    "weatherLocation": "",
+    "screenshotFolder": "",
+    "copyScreenshotToClipboard": true
   },
   "appearance": {
     "theme": "dark",
@@ -30,6 +38,8 @@
       "volume": true,
       "spotlight": true,
       "controlCenter": true,
+      "notification": true,
+      "screenshot": true,
       "settings": true,
       "clock": true
     },
@@ -40,13 +50,29 @@
       "volume",
       "spotlight",
       "controlCenter",
+      "notification",
+      "screenshot",
       "settings",
       "clock"
     ]
   },
   "shortcuts": {
     "toggleMenuBar": "",
-    "openSettings": ""
+    "openSettings": "",
+    "openDrawer": "",
+    "captureFullScreen": "",
+    "captureSelectedArea": "",
+    "captureWindow": ""
+  },
+  "notificationCenter": {
+    "visible": {
+      "clock": true,
+      "calendar": true,
+      "weather": true,
+      "notes": true
+    },
+    "order": ["clock", "calendar", "weather", "notes"],
+    "quickNote": ""
   },
   "themePresets": [
     {

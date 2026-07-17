@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const focusForwarder = require('./focusForwarder');
 const appScanner = require('./appscanner');
 const configPaths = require('./configPaths');
+const screenshotModule = require('./screenshot');
 const { shouldShowWindowsAtStartup } = require('./startupVisibility');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
@@ -79,11 +80,13 @@ const configPath = configPaths.configPath;
 let settings = {};
 const settingsPath = configPaths.settingsPath;
 let settingsWin = null;
+let notificationWin = null;
 let aboutWin = null;
 let forceQuitWin = null;
 let welcomeWin = null;
 let showWindowsOnStartup = true;
 let globalProcessMap = {};
+let weatherCache = { data: null, timestamp: 0 };
 
 // Cache dynamically loaded modules
 let activeWinModule = null;
@@ -96,14 +99,14 @@ async function loadSettings() {
     } else {
       // Default settings.json
       settings = {
-        general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true },
+        general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true, weatherLocation: '', screenshotFolder: '', copyScreenshotToClipboard: true },
         appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
         hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
         menuItems: {
-          visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, settings: true, clock: true },
-          order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'settings', 'clock']
+          visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, notification: true, screenshot: true, settings: true, clock: true },
+          order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'notification', 'screenshot', 'settings', 'clock']
         },
-        shortcuts: { toggleMenuBar: '', openSettings: '' }
+        shortcuts: { toggleMenuBar: '', openSettings: '', openDrawer: '', captureFullScreen: '', captureSelectedArea: '', captureWindow: '' }
       };
       await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     }
@@ -117,6 +120,7 @@ async function saveSettings() {
     await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     if (menuBarWin) menuBarWin.webContents.send('settings-changed', settings);
     if (settingsWin) settingsWin.webContents.send('settings-changed', settings);
+    if (notificationWin) notificationWin.webContents.send('settings-changed', settings);
   } catch (err) {
     console.error('Error saving settings:', err);
   }
@@ -865,6 +869,110 @@ function registerGlobalShortcuts() {
   } catch (err) {
     console.error('Failed to register spotlight shortcut:', err);
   }
+
+  // Screenshot shortcuts
+  if (settings.shortcuts && settings.shortcuts.captureFullScreen) {
+    try {
+      globalShortcut.register(settings.shortcuts.captureFullScreen, () => {
+        handleScreenshot('fullscreen');
+      });
+    } catch (err) {
+      console.error('Failed to register captureFullScreen shortcut:', err);
+    }
+  }
+  if (settings.shortcuts && settings.shortcuts.captureSelectedArea) {
+    try {
+      globalShortcut.register(settings.shortcuts.captureSelectedArea, () => {
+        handleScreenshot('area');
+      });
+    } catch (err) {
+      console.error('Failed to register captureSelectedArea shortcut:', err);
+    }
+  }
+  if (settings.shortcuts && settings.shortcuts.captureWindow) {
+    try {
+      globalShortcut.register(settings.shortcuts.captureWindow, () => {
+        handleScreenshot('window');
+      });
+    } catch (err) {
+      console.error('Failed to register captureWindow shortcut:', err);
+    }
+  }
+}
+
+// Notification Center Window
+function createNotificationCenterWindow() {
+  if (notificationWin) return;
+  const targetDisplay = getTargetDisplay();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  notificationWin = new BrowserWindow({
+    width: 340,
+    height: screenHeight,
+    x: dx + screenWidth - 340,
+    y: dy,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'notificationcenter-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  notificationWin.loadFile(path.join(__dirname, 'notificationcenter.html'));
+  notificationWin.on('blur', () => {
+    if (notificationWin && !notificationWin.isDestroyed()) notificationWin.hide();
+  });
+  notificationWin.on('closed', () => {
+    if (notificationWin) { try { notificationWin.removeAllListeners(); } catch (err) {} }
+    notificationWin = null;
+  });
+}
+
+function showNotificationCenter(rect) {
+  const targetDisplay = getTargetDisplay();
+  const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+  if (!notificationWin) {
+    createNotificationCenterWindow();
+    notificationWin.once('ready-to-show', () => {
+      if (notificationWin) {
+        notificationWin.setBounds({ x: dx + screenWidth - 340, y: dy, width: 340, height: screenHeight });
+        notificationWin.show();
+        notificationWin.focus();
+      }
+    });
+  } else {
+    if (notificationWin.isVisible()) {
+      notificationWin.hide();
+    } else {
+      notificationWin.setBounds({ x: dx + screenWidth - 340, y: dy, width: 340, height: screenHeight });
+      notificationWin.show();
+      notificationWin.focus();
+    }
+  }
+}
+
+// Screenshot handler
+async function handleScreenshot(mode) {
+  try {
+    let filePath = null;
+    if (mode === 'fullscreen') {
+      filePath = await screenshotModule.captureFullScreen(settings);
+    } else if (mode === 'area') {
+      filePath = await screenshotModule.captureSelectedArea(settings);
+    } else if (mode === 'window') {
+      filePath = await screenshotModule.captureWindow('', settings);
+    }
+    if (filePath) {
+      screenshotModule.createToastWindow(filePath, settings);
+    }
+  } catch (err) {
+    console.error('Screenshot failed:', err);
+  }
 }
 
 // Create Settings Window
@@ -953,7 +1061,7 @@ function resolveThemeConfig() {
 
 function broadcastThemeConfig() {
   const resolved = resolveThemeConfig();
-  const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin, aboutWin, forceQuitWin];
+  const windows = [menuBarWin, dockWin, drawerWin, ccWin, spotlightWin, settingsWin, aboutWin, forceQuitWin, notificationWin];
   for (const w of windows) {
     if (w && !w.isDestroyed()) {
       w.webContents.send('theme-changed', resolved);
@@ -2175,7 +2283,7 @@ ipcMain.on('refresh-app', async () => {
   
   await broadcastConfigUpdate();
   
-  const windows = [menuBarWin, spotlightWin, ccWin, settingsWin];
+  const windows = [menuBarWin, spotlightWin, ccWin, settingsWin, notificationWin];
   for (const w of windows) {
     if (w && !w.isDestroyed()) {
       w.webContents.send('settings-changed', settings);
@@ -2228,6 +2336,10 @@ function forceCollapseAll() {
   
   if (drawerWin && !drawerWin.isDestroyed() && isDrawerOpen) {
     closeDrawer();
+  }
+
+  if (notificationWin && !notificationWin.isDestroyed() && notificationWin.isVisible()) {
+    notificationWin.hide();
   }
 }
 
@@ -2367,6 +2479,12 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
         showSettingsWindow();
       } else if (type === 'openDrawer') {
         if (isDrawerOpen) closeDrawer(); else openDrawer();
+      } else if (type === 'captureFullScreen') {
+        handleScreenshot('fullscreen');
+      } else if (type === 'captureSelectedArea') {
+        handleScreenshot('area');
+      } else if (type === 'captureWindow') {
+        handleScreenshot('window');
       }
     });
 
@@ -2386,14 +2504,15 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
 
 ipcMain.handle('restore-defaults', async () => {
   settings = {
-    general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true },
+    general: { launchAtLogin: false, showInDock: true, clockFormat12h: true, showDate: true, weatherLocation: '', screenshotFolder: '', copyScreenshotToClipboard: true },
     appearance: { theme: 'auto', blurIntensity: 20, opacity: 0.85, accentColor: '#007aff' },
     hiding: { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180 },
     menuItems: {
-      visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, settings: true, clock: true },
-      order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'settings', 'clock']
+      visible: { wifi: true, bluetooth: true, battery: true, volume: true, spotlight: true, controlCenter: true, notification: true, screenshot: true, settings: true, clock: true },
+      order: ['wifi', 'bluetooth', 'battery', 'volume', 'spotlight', 'controlCenter', 'notification', 'screenshot', 'settings', 'clock']
     },
-    shortcuts: { toggleMenuBar: '', openSettings: '' }
+    shortcuts: { toggleMenuBar: '', openSettings: '', openDrawer: '', captureFullScreen: '', captureSelectedArea: '', captureWindow: '' },
+    notificationCenter: { visible: { clock: true, calendar: true, weather: true, notes: true }, order: ['clock','calendar','weather','notes'], quickNote: '' }
   };
   await saveSettings();
   applySettings();
@@ -3651,4 +3770,83 @@ ipcMain.on('toggle-spotlight', () => {
 ipcMain.on('close-spotlight', () => {
   if (spotlightWin) spotlightWin.hide();
 });
+
+// Notification Center IPC
+ipcMain.on('toggle-notification-center', (event, rect) => {
+  showNotificationCenter(rect);
+});
+
+ipcMain.on('close-notification-center', () => {
+  if (notificationWin) notificationWin.hide();
+});
+
+// Screenshot IPC
+ipcMain.on('take-screenshot', (event, mode) => {
+  handleScreenshot(mode);
+});
+
+ipcMain.on('close-toast', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) win.destroy();
+});
+
+// Weather IPC
+ipcMain.handle('fetch-weather', async (event, location) => {
+  const CACHE_TTL = 30 * 60 * 1000;
+  if (weatherCache.data && (Date.now() - weatherCache.timestamp < CACHE_TTL)) {
+    return weatherCache.data;
+  }
+  try {
+    let lat, lon, city;
+    if (location && location.trim()) {
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location.trim())}&count=1&language=en&format=json`);
+      if (!geoRes.ok) throw new Error('Location search failed');
+      const geoData = await geoRes.json();
+      if (!geoData.results || geoData.results.length === 0) throw new Error('Location not found');
+      lat = geoData.results[0].latitude;
+      lon = geoData.results[0].longitude;
+      city = geoData.results[0].name;
+    } else {
+      const ipRes = await fetch('https://ip-api.com/json/');
+      if (!ipRes.ok) throw new Error('GeoIP lookup failed');
+      const ipData = await ipRes.json();
+      if (ipData.status === 'fail') throw new Error('GeoIP lookup failed');
+      lat = ipData.lat;
+      lon = ipData.lon;
+      city = ipData.city;
+    }
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`);
+    if (!weatherRes.ok) throw new Error('Weather fetch failed');
+    const weatherData = await weatherRes.json();
+    const cw = weatherData.current_weather;
+    const result = {
+      temperature: Math.round(cw.temperature),
+      conditionCode: cw.weathercode,
+      conditionIcon: getWeatherIcon(cw.weathercode),
+      city: city,
+      timestamp: cw.time
+    };
+    weatherCache = { data: result, timestamp: Date.now() };
+    return result;
+  } catch (err) {
+    console.error('Weather fetch error:', err.message);
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('get-weather-cache', () => {
+  return weatherCache;
+});
+
+function getWeatherIcon(code) {
+  if (code === 0) return '\u2600\uFE0F';
+  if (code <= 3) return '\u26C5';
+  if (code <= 48) return '\U0001F32B\uFE0F';
+  if (code <= 57) return '\U0001F4A7';
+  if (code <= 67) return '\U0001F327\uFE0F';
+  if (code <= 77) return '\U0001F328\uFE0F';
+  if (code <= 82) return '\U0001F327\uFE0F';
+  if (code <= 86) return '\U0001F329\uFE0F';
+  return '\U0001F300';
+}
 

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Area</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    body {
+      background: rgba(0,0,0,0.3); width: 100vw; height: 100vh; overflow: hidden;
+      cursor: crosshair;
+    }
+    #selection-box {
+      position: fixed; border: 2px solid rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.08); pointer-events: none;
+      display: none; z-index: 10;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.3);
+    }
+    .instruction {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.6); color: white; padding: 8px 16px;
+      border-radius: 8px; font-family: -apple-system, sans-serif; font-size: 13px;
+      pointer-events: none; z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div id="selection-box"></div>
+  <div class="instruction">Drag to select an area &bull; Esc to cancel</div>
+  <script>
+    let startX, startY, isDown = false;
+    const box = document.getElementById('selection-box');
+
+    document.addEventListener('mousedown', (e) => {
+      startX = e.clientX; startY = e.clientY;
+      isDown = true;
+      box.style.display = 'block';
+      box.style.left = startX + 'px'; box.style.top = startY + 'px';
+      box.style.width = '0px'; box.style.height = '0px';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      const x = Math.min(startX, e.clientX);
+      const y = Math.min(startY, e.clientY);
+      const w = Math.abs(e.clientX - startX);
+      const h = Math.abs(e.clientY - startY);
+      box.style.left = x + 'px'; box.style.top = y + 'px';
+      box.style.width = w + 'px'; box.style.height = h + 'px';
+    });
+
+    document.addEventListener('mouseup', (e) => {
+      if (!isDown) return;
+      isDown = false;
+      const x = Math.min(startX, e.clientX);
+      const y = Math.min(startY, e.clientY);
+      const w = Math.abs(e.clientX - startX);
+      const h = Math.abs(e.clientY - startY);
+      window.overlayAPI.sendSelection({ x, y, width: w, height: h });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.overlayAPI.sendCancel();
+    });
+  </script>
+</body>
+</html>
