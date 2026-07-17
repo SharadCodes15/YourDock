@@ -975,10 +975,12 @@ function createSettingsWindow() {
   if (settingsWin) return;
 
   settingsWin = new BrowserWindow({
-    width: 480,
-    height: 600,
+    width: 540,
+    height: 640,
+    minWidth: 480,
+    minHeight: 560,
     frame: true,
-    resizable: false,
+    resizable: true,
     alwaysOnTop: false,
     show: false,
     title: 'Menu Bar Settings',
@@ -2415,6 +2417,47 @@ ipcMain.handle('get-config', async () => {
 ipcMain.on('save-config', async (event, pinned) => {
   config.pinned = pinned;
   await saveConfig();
+});
+
+ipcMain.handle('read-raw-config', async () => {
+  try {
+    const content = await fs.promises.readFile(configPath, 'utf8');
+    return { content };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('write-raw-config', async (event, content) => {
+  try {
+    const parsed = JSON.parse(content);
+    const backupPath = configPath.replace('.json', `-backup-${Date.now()}.json`);
+    await fs.promises.copyFile(configPath, backupPath);
+    await fs.promises.writeFile(configPath, JSON.stringify(parsed, null, 2), 'utf8');
+    config = parsed;
+    if (dockWin && !dockWin.isDestroyed()) {
+      dockWin.webContents.send('config-updated', config);
+    }
+    return { success: true };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { success: false, error: 'Invalid JSON syntax.' };
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('set-pinned-app-exec', async (event, { appId, exec }) => {
+  if (!config.apps) config.apps = {};
+  if (!config.apps[appId]) {
+    config.apps[appId] = { name: appId.charAt(0).toUpperCase() + appId.slice(1), win: exec, process: exec };
+  }
+  config.apps[appId].win = exec;
+  config.apps[appId].process = exec;
+  await saveConfig();
+  // Notify the dock renderer
+  if (dockWin && !dockWin.isDestroyed()) {
+    dockWin.webContents.send('config-updated', config);
+  }
+  return { success: true };
 });
 
 ipcMain.on('save-auto-hide', async (event, autoHide) => {

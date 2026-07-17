@@ -503,6 +503,21 @@
         <input type="checkbox" id="gen-smart-ordering">
       </div>
 
+      <div class="section-title">Pinned App Executables</div>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">Set which program each pinned dock icon launches (edits <code>config.json</code>).</p>
+      <div id="pinned-apps-exec-list">
+        <!-- Populated dynamically from dock config -->
+      </div>
+
+      <div class="section-title" style="margin-top: 20px;">Advanced: Dock Config (<code>config.json</code>)</div>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 8px;">Edit the raw dock configuration — pinned apps, exec paths, launch counts, etc. A backup is made automatically before saving.</p>
+      <textarea id="gen-config-editor" style="width:100%;height:160px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button id="gen-config-save" class="btn-primary" style="padding:6px 14px;">Save</button>
+        <button id="gen-config-refresh" style="padding:6px 14px;">Refresh</button>
+        <span id="gen-config-status" style="font-size:11px;color:var(--text-muted);"></span>
+      </div>
+
       <div class="setting-row">
         <div>
           <div class="setting-label">Hide Developer Tools & Utilities</div>
@@ -1104,6 +1119,11 @@
       const dockSizeVal = currentSettings.general.dockSize || 'medium';
       document.getElementById(`gen-dock-size-${dockSizeVal}`).checked = true;
 
+      // Pinned Apps Exec List
+      window.settingsAPI.getDockConfig().then(dockCfg => {
+        renderPinnedAppsExecList(dockCfg);
+      }).catch(err => console.error('Failed to load dock config:', err));
+
       // Monitor Override Binding
       window.settingsAPI.getDisplays().then(displays => {
         if (displays && displays.length > 1) {
@@ -1288,6 +1308,98 @@
     document.getElementById('gen-refresh-app').addEventListener('click', () => {
       window.settingsAPI.refreshApp();
       alert("Application configuration refreshed!");
+    });
+
+    function renderPinnedAppsExecList(dockCfg) {
+      const container = document.getElementById('pinned-apps-exec-list');
+      if (!container) return;
+      container.innerHTML = '';
+      const pinned = dockCfg.pinned || [];
+      const apps = dockCfg.apps || {};
+      pinned.forEach(appId => {
+        const app = apps[appId];
+        if (!app) return;
+        const row = document.createElement('div');
+        row.className = 'setting-row';
+        const left = document.createElement('div');
+        left.style.flex = '1';
+        const label = document.createElement('div');
+        label.className = 'setting-label';
+        label.textContent = app.name + ' (' + appId + ')';
+        const desc = document.createElement('div');
+        desc.className = 'setting-desc';
+        desc.textContent = 'Executable / command to launch';
+        left.appendChild(label);
+        left.appendChild(desc);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = app.win || '';
+        input.placeholder = 'e.g. explorer.exe';
+        input.style.cssText = 'width:180px;font-family:monospace;padding:4px 8px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);outline:none;font-size:12px;';
+        let timeout = null;
+        input.addEventListener('input', () => {
+          if (timeout) clearTimeout(timeout);
+          timeout = setTimeout(async () => {
+            const val = input.value.trim();
+            const res = await window.settingsAPI.setPinnedAppExec(appId, val || app.win || '');
+            if (!res || !res.success) {
+              console.error('Failed to update exec for', appId);
+            }
+          }, 400);
+        });
+        row.appendChild(left);
+        row.appendChild(input);
+        container.appendChild(row);
+      });
+      // Load raw config content into editor
+      loadConfigEditorContent();
+    }
+
+    function loadConfigEditorContent() {
+      window.settingsAPI.readRawConfig().then(res => {
+        const editor = document.getElementById('gen-config-editor');
+        const status = document.getElementById('gen-config-status');
+        if (res && res.content) {
+          editor.value = res.content;
+          if (status) status.textContent = 'Loaded.';
+        } else if (res && res.error) {
+          if (status) status.textContent = 'Error: ' + res.error;
+        }
+      }).catch(err => {
+        const status = document.getElementById('gen-config-status');
+        if (status) status.textContent = 'Failed to load.';
+      });
+    }
+
+    document.getElementById('gen-config-refresh').addEventListener('click', () => {
+      loadConfigEditorContent();
+    });
+
+    document.getElementById('gen-config-save').addEventListener('click', async () => {
+      const content = document.getElementById('gen-config-editor').value;
+      const status = document.getElementById('gen-config-status');
+      if (!content.trim()) {
+        status.textContent = 'Cannot save empty content.';
+        status.style.color = '#ff3b30';
+        return;
+      }
+      try { JSON.parse(content); } catch {
+        status.textContent = 'Invalid JSON syntax.';
+        status.style.color = '#ff3b30';
+        return;
+      }
+      const res = await window.settingsAPI.writeRawConfig(content);
+      if (res.success) {
+        status.textContent = 'Saved! Dock will reload.';
+        status.style.color = '#34c759';
+        // Refresh the pinned apps exec list
+        window.settingsAPI.getDockConfig().then(dockCfg => {
+          renderPinnedAppsExecList(dockCfg);
+        }).catch(console.error);
+      } else {
+        status.textContent = res.error || 'Save failed.';
+        status.style.color = '#ff3b30';
+      }
     });
 
     function updatePresetDropdown() {
