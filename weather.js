@@ -25,7 +25,7 @@ const WeatherModule = (() => {
     return ipCache;
   }
 
-  async function fetchWeather(location) {
+  async function fetchWeather(location, enableGeolocation) {
     if (weatherCache && (Date.now() - weatherCache.timestamp < CACHE_TTL)) {
       return weatherCache.data;
     }
@@ -40,6 +40,9 @@ const WeatherModule = (() => {
       lon = geoData.results[0].longitude;
       city = geoData.results[0].name;
     } else {
+      if (!enableGeolocation) {
+        return { error: 'geolocation_disabled', geolocationDisabled: true };
+      }
       const geo = await fetchGeoIP();
       lat = geo.lat;
       lon = geo.lon;

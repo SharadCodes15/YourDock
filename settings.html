@@ -503,6 +503,22 @@
         <input type="checkbox" id="gen-smart-ordering">
       </div>
 
+      <div class="section-title">Location Permission</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable Location</div>
+          <div class="setting-desc">Allow the app to use your IP address to detect location for weather (only when no city is manually set).</div>
+        </div>
+        <input type="checkbox" id="gen-enable-geolocation">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Don't ask again</div>
+          <div class="setting-desc">Suppress the location prompt in Notification Center when weather needs a city.</div>
+        </div>
+        <input type="checkbox" id="gen-geolocation-dontask">
+      </div>
+
       <div class="section-title">Pinned App Executables</div>
       <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 10px;">Set which program each pinned dock icon launches (edits <code>config.json</code>).</p>
       <div id="pinned-apps-exec-list">
@@ -1119,6 +1135,10 @@
       const dockSizeVal = currentSettings.general.dockSize || 'medium';
       document.getElementById(`gen-dock-size-${dockSizeVal}`).checked = true;
 
+      // Location Permission
+      document.getElementById('gen-enable-geolocation').checked = currentSettings.general.enableGeolocation || false;
+      document.getElementById('gen-geolocation-dontask').checked = currentSettings.general.geolocationDontAsk || false;
+
       // Pinned Apps Exec List
       window.settingsAPI.getDockConfig().then(dockCfg => {
         renderPinnedAppsExecList(dockCfg);
@@ -1302,6 +1322,16 @@
 
     document.getElementById('gen-date').addEventListener('change', (e) => {
       currentSettings.general.showDate = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-enable-geolocation').addEventListener('change', (e) => {
+      currentSettings.general.enableGeolocation = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-geolocation-dontask').addEventListener('change', (e) => {
+      currentSettings.general.geolocationDontAsk = e.target.checked;
       triggerSave();
     });
 

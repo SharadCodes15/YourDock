@@ -13,7 +13,9 @@
     "hideDevTools": true,
     "weatherLocation": "",
     "screenshotFolder": "",
-    "copyScreenshotToClipboard": true
+    "copyScreenshotToClipboard": true,
+    "enableGeolocation": false,
+    "geolocationDontAsk": false
   },
   "displays": {
     "dockDisplayId": null,

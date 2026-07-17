@@ -110,6 +110,8 @@ async function loadSettings() {
       if (!settings.shortcuts.restart) settings.shortcuts.restart = '';
       if (!settings.shortcuts.shutDown) settings.shortcuts.shutDown = '';
       if (!settings.shortcuts.openSpotlightSearch) settings.shortcuts.openSpotlightSearch = '';
+      if (settings.general.enableGeolocation === undefined) settings.general.enableGeolocation = false;
+      if (settings.general.geolocationDontAsk === undefined) settings.general.geolocationDontAsk = false;
     } else {
       // Default settings.json
       const defaultSettings = require('./settings.json');
@@ -2629,6 +2631,8 @@ ipcMain.handle('restore-defaults', async () => {
   settings.general.weatherLocation = '';
   settings.general.screenshotFolder = '';
   settings.general.copyScreenshotToClipboard = true;
+  settings.general.enableGeolocation = false;
+  settings.general.geolocationDontAsk = false;
   await saveSettings();
   applySettings();
   registerGlobalShortcuts();
@@ -3224,6 +3228,12 @@ ipcMain.on('close-welcome', () => {
   createDrawerWindow();
   registerGlobalShortcuts();
   startMasterTimer();
+});
+
+ipcMain.on('save-geo-prefs', (event, { enableGeo, dontAsk }) => {
+  settings.general.enableGeolocation = enableGeo;
+  settings.general.geolocationDontAsk = dontAsk;
+  saveSettings();
 });
 
 ipcMain.on('open-error-log', () => {
@@ -4172,6 +4182,11 @@ ipcMain.handle('fetch-weather', async (event, location) => {
       lon = geoData.results[0].longitude;
       city = geoData.results[0].name;
     } else {
+      // Check geolocation permission before using IP-based lookup
+      const geoEnabled = settings.general && settings.general.enableGeolocation;
+      if (!geoEnabled) {
+        return { error: 'geolocation_disabled', geolocationDisabled: true };
+      }
       const ipRes = await fetch('https://ip-api.com/json/');
       if (!ipRes.ok) throw new Error('GeoIP lookup failed');
       const ipData = await ipRes.json();

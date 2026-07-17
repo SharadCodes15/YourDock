@@ -198,8 +198,29 @@
       </div>
     </div>
 
-    <!-- STEP 3: Complete -->
+    <!-- STEP 3: Location Permission -->
     <div class="step" id="step3">
+      <div class="logo-container">📍</div>
+      <h1>Weather &amp; Location</h1>
+      <p style="max-width:360px;">The weather widget can detect your city automatically. Allow IP-based geolocation to show local weather instantly — or set a city manually in Settings later.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;margin-bottom:20px;text-align:left;width:100%;padding:0 20px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+          <input type="checkbox" id="welcome-enable-geo" checked>
+          <span>Enable location for weather</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+          <input type="checkbox" id="welcome-geo-dontask" checked>
+          <span>Don't ask again</span>
+        </label>
+      </div>
+      <div style="display:flex;justify-content:center;gap:10px;">
+        <button class="btn btn-secondary" onclick="nextStep(2)">Back</button>
+        <button class="btn" onclick="saveGeoPrefs()">Continue</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Complete -->
+    <div class="step" id="step4">
       <div class="logo-container">🚀</div>
       <h1>You're All Set!</h1>
       <p>The dock is active at the bottom, and the top menu bar is ready. Right-click any icon to customize settings, pin items, or toggle hiding.</p>
@@ -211,6 +232,7 @@
       <div class="dot active" id="dot1"></div>
       <div class="dot" id="dot2"></div>
       <div class="dot" id="dot3"></div>
+      <div class="dot" id="dot4"></div>
     </div>
   </div>
 
@@ -234,7 +256,6 @@
       spinner.style.display = 'block';
 
       try {
-        // Trigger app scan in the main process
         if (window.electronAPI && window.electronAPI.refreshApps) {
           await window.electronAPI.refreshApps();
         }
@@ -242,12 +263,20 @@
         console.error(err);
       }
 
-      // Simulate a small delay for premium feel
       setTimeout(() => {
         spinner.style.display = 'none';
         btnScan.style.display = 'inline-block';
         nextStep(3);
       }, 1500);
+    }
+
+    function saveGeoPrefs() {
+      const enableGeo = document.getElementById('welcome-enable-geo').checked;
+      const dontAsk = document.getElementById('welcome-geo-dontask').checked;
+      if (window.electronAPI && window.electronAPI.saveGeoPrefs) {
+        window.electronAPI.saveGeoPrefs(enableGeo, dontAsk);
+      }
+      nextStep(4);
     }
 
     function finishWelcome() {

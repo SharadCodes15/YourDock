@@ -299,7 +299,18 @@
       window.notificationAPI.fetchWeather(location).then(data => {
         if (!data || data.error) {
           const w = document.querySelector('#widget-weather .weather-info');
-          if (w) w.innerHTML = '<span style="font-size:12px;color:#86868b;">Weather unavailable</span>';
+          if (w) {
+            if (data && data.geolocationDisabled) {
+              const dontAsk = currentSettings.general && currentSettings.general.geolocationDontAsk;
+              if (!dontAsk) {
+                w.innerHTML = '<div style="text-align:center;"><span style="font-size:12px;color:#86868b;">Location access needed for weather.</span><br><button onclick="enableGeolocation()" style="margin-top:4px;padding:2px 8px;font-size:11px;border:1px solid #86868b;border-radius:4px;background:transparent;color:var(--text-color);cursor:pointer;">Enable</button></div>';
+              } else {
+                w.innerHTML = '<span style="font-size:12px;color:#86868b;">Set a city in Settings to see weather</span>';
+              }
+            } else {
+              w.innerHTML = '<span style="font-size:12px;color:#86868b;">Weather unavailable</span>';
+            }
+          }
           return;
         }
         const w = document.querySelector('#widget-weather .weather-info');
@@ -400,9 +411,25 @@
       // Settings live update
       window.notificationAPI.onSettingsChanged((settings) => {
         const oldLocation = currentSettings.general && currentSettings.general.weatherLocation;
+        const oldGeo = currentSettings.general && currentSettings.general.enableGeolocation;
         currentSettings = settings;
         renderWidgets();
+        if (settings.general && (settings.general.enableGeolocation !== oldGeo || settings.general.weatherLocation !== oldLocation)) {
+          lastWeatherFetch = 0;
+          fetchWeatherData();
+        }
       });
+    }
+
+    function enableGeolocation() {
+      if (!currentSettings.general) currentSettings.general = {};
+      currentSettings.general.enableGeolocation = true;
+      if (currentSettings.general.geolocationDontAsk === undefined) currentSettings.general.geolocationDontAsk = true;
+      if (window.settingsAPI && window.settingsAPI.saveSettings) {
+        window.settingsAPI.saveSettings(currentSettings);
+      }
+      lastWeatherFetch = 0;
+      fetchWeatherData();
     }
 
     // Clock updates

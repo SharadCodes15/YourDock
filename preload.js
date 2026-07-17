@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showForceQuit: () => ipcRenderer.send('show-force-quit'),
   refreshApps: () => ipcRenderer.invoke('refresh-apps'),
   closeWelcome: () => ipcRenderer.send('close-welcome'),
+  saveGeoPrefs: (enableGeo, dontAsk) => ipcRenderer.send('save-geo-prefs', { enableGeo, dontAsk }),
   // added manually
   onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', (_event, value) => callback(value)),
   // Notification Center
