@@ -44,7 +44,8 @@
     "mode": "fully-hide",
     "sensitivity": 100,
     "delay": 400,
-    "pillWidth": 172
+    "pillWidth": 172,
+    "menuBarIsland": false
   },
   "menuItems": {
     "visible": {

@@ -112,6 +112,7 @@ async function loadSettings() {
       if (!settings.shortcuts.openSpotlightSearch) settings.shortcuts.openSpotlightSearch = '';
       if (settings.general.enableGeolocation === undefined) settings.general.enableGeolocation = false;
       if (settings.general.geolocationDontAsk === undefined) settings.general.geolocationDontAsk = false;
+      if (settings.hiding.menuBarIsland === undefined) settings.hiding.menuBarIsland = false;
     } else {
       // Default settings.json
       const defaultSettings = require('./settings.json');
@@ -535,6 +536,20 @@ function checkControlCenterCursor() {
   }
 }
 
+// Menu bar collapsed state helper — supports dynamic island (CSS pill) or fully-hide (window shown/hidden)
+function setMenuBarCollapsed(collapsed) {
+  if (!menuBarWin || menuBarWin.isDestroyed()) return;
+  if (settings.hiding && settings.hiding.menuBarIsland) {
+    menuBarWin.webContents.send('set-collapse-state', collapsed);
+  } else {
+    if (collapsed) {
+      if (menuBarWin.isVisible()) menuBarWin.hide();
+    } else {
+      if (!menuBarWin.isVisible()) menuBarWin.show();
+    }
+  }
+}
+
 // Cursor polling for reveal when collapsed (Dynamic Island mode for Menu Bar)
 function pollMenuBarHover() {
   checkControlCenterCursor();
@@ -544,7 +559,7 @@ function pollMenuBarHover() {
   if (!activeAppOnScreen) {
     if (menuBarState !== 'expanded') {
       menuBarState = 'expanded';
-      menuBarWin.webContents.send('set-collapse-state', false);
+      setMenuBarCollapsed(false);
     }
     return;
   }
@@ -553,7 +568,7 @@ function pollMenuBarHover() {
   if (!settings.hiding || !settings.hiding.enabled) {
     if (menuBarState !== 'expanded') {
       menuBarState = 'expanded';
-      menuBarWin.webContents.send('set-collapse-state', false);
+      setMenuBarCollapsed(false);
     }
     return;
   }
@@ -584,7 +599,7 @@ function pollMenuBarHover() {
           clearTimeout(leaveTimeout);
           leaveTimeout = null;
         }
-        menuBarWin.webContents.send('set-collapse-state', false); // Expand visually
+        setMenuBarCollapsed(false);
       }
     } else {
       consecutiveHotspotPolls = 0;
@@ -615,7 +630,7 @@ function pollMenuBarHover() {
 
           if (stillOutside) {
             menuBarState = 'collapsed';
-            menuBarWin.webContents.send('set-collapse-state', true); // Collapse back to pill
+            setMenuBarCollapsed(true);
           }
           leaveTimeout = null;
         }, delay);
@@ -1521,6 +1536,8 @@ function applySettings() {
   // 4. Auto-Hide behavior
   const autoHideEnabled = settings.hiding && settings.hiding.enabled;
   menuBarState = autoHideEnabled ? 'collapsed' : 'expanded';
+  // Re-evaluate menu bar state immediately based on cursor and app-on-screen status
+  pollMenuBarHover();
 
   // Reposition and update dock dimensions immediately
   if (dockWin && !dockWin.isDestroyed()) {
@@ -1915,7 +1932,7 @@ function createMenuBarWindow() {
       console.log('[window] menuBar visible', menuBarWin.isVisible(), 'bounds', menuBarWin.getBounds());
       applySettings();
       if (menuBarState === 'collapsed') {
-        menuBarWin.webContents.send('set-collapse-state', true);
+        setMenuBarCollapsed(true);
       }
     }, 80);
   });
@@ -2354,7 +2371,7 @@ function forceCollapseAll() {
   }
   
   if (menuBarWin && !menuBarWin.isDestroyed()) {
-    menuBarWin.webContents.send('set-collapse-state', true);
+    setMenuBarCollapsed(true);
     menuBarState = 'collapsed';
   }
   
