@@ -411,6 +411,30 @@
       gap: 6px;
       flex-shrink: 0;
     }
+    .flash-applied {
+      outline: 2px solid #34c759 !important;
+      box-shadow: 0 0 10px rgba(52, 199, 89, 0.7) !important;
+      border-radius: 4px;
+      transition: all 0.05s ease-in-out;
+    }
+    .settings-status-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: rgba(52, 199, 89, 0.15);
+      color: #34c759;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .settings-status-badge.saving {
+      background: rgba(255, 149, 0, 0.15);
+      color: #ff9500;
+    }
   </style>
 </head>
 <body>
@@ -465,7 +489,10 @@
   </div>
 
   <!-- Content Right Panel -->
-  <div class="content-area">
+  <div class="content-area" style="position: relative;">
+    <div style="position: absolute; top: 12px; right: 18px; z-index: 1000;">
+      <span id="settings-save-status" class="settings-status-badge">Saved ✓</span>
+    </div>
     
     <!-- GENERAL PANEL -->
     <div class="panel active" id="panel-general">
@@ -713,6 +740,7 @@
 
       <div class="setting-row">
         <button id="app-colors-reset" style="padding: 6px 14px;">Reset Colors to Theme Default</button>
+        <button id="app-appearance-reset" style="padding: 6px 14px; margin-left: 8px; background: #ff3b30; color: white; border: none; border-radius: 4px; cursor: pointer;">Reset All to Default</button>
       </div>
 
       <div class="setting-row">
@@ -776,8 +804,8 @@
 
       <div class="setting-row">
         <div>
-          <div class="setting-label">Enable Auto-Hide</div>
-          <div class="setting-desc">Hide when windows are fullscreen/maximized.</div>
+          <div class="setting-label">Master Auto-Hide Enable</div>
+          <div class="setting-desc">Enable or disable auto-hiding system-wide.</div>
         </div>
         <input type="checkbox" id="hide-master">
       </div>
@@ -792,79 +820,197 @@
         </select>
       </div>
 
-      <div class="section-title" style="margin-top: 15px;">Menu Bar Settings</div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-label">Menu Bar Dynamic Island</div>
-          <div class="setting-desc">Collapse the Menu Bar to a small pill when auto-hide is active, revealing on hover.</div>
-        </div>
-        <input type="checkbox" id="hide-menubar-island">
-      </div>
-
-      <div class="section-title" style="margin-top: 15px;">Dock Settings</div>
-      <div class="setting-row" id="row-dock-hide-mode">
-        <div>
-          <div class="setting-label">Dock Hiding Mode</div>
-          <div class="setting-desc">Configure when and how the Dock hides.</div>
-        </div>
-        <select id="hide-dock-mode" style="min-width: 175px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
-          <option value="none">Always Visible</option>
-          <option value="island">Dynamic Island (Collapse to Pill)</option>
-          <option value="direct-always">Direct Hide (Always Hide Completely)</option>
-          <option value="direct-app-open">Direct Hide (Only when apps are open)</option>
-        </select>
-      </div>
-
-      <div id="hiding-options">
+      <!-- DOCK HIDING SECTION -->
+      <div class="section-title" style="margin-top: 15px;">Dock Hiding Settings</div>
+      <div id="dock-hiding-section">
         <div class="setting-row">
           <div>
-            <div class="setting-label">Behavior Mode</div>
-            <div class="setting-desc">How the menu bar hides visually.</div>
+            <div class="setting-label">Enable Dock Auto-Hide</div>
+            <div class="setting-desc">Automatically hide the Dock when not in use.</div>
           </div>
-          <div class="radio-group">
-            <label class="radio-option">
-              <input type="radio" name="hide-mode" id="hide-mode-hide" value="fully-hide">
-              <span>Fully Hide</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="hide-mode" id="hide-mode-island" value="collapsed" checked>
-              <span>Dynamic Island</span>
-            </label>
-          </div>
+          <input type="checkbox" id="dock-hide-enabled" checked>
         </div>
 
-        <div class="setting-row">
+        <div class="setting-row" id="row-dock-hide-mode">
           <div>
-            <div class="setting-label">Hover Reveal Sensitivity</div>
-            <div class="setting-desc">Width of the reveal trigger zone.</div>
+            <div class="setting-label">Dock Hiding Mode</div>
+            <div class="setting-desc">Configure when and how the Dock hides.</div>
           </div>
-          <select id="hide-sensitivity">
-            <option value="50">Narrow (50px)</option>
-            <option value="100" selected>Medium (100px)</option>
-            <option value="200">Wide (200px)</option>
+          <select id="hide-dock-mode" style="min-width: 175px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color);">
+            <option value="none">Always Visible</option>
+            <option value="island">Dynamic Island (Collapse to Pill)</option>
+            <option value="direct-always">Direct Hide (Always Hide Completely)</option>
+            <option value="direct-app-open">Direct Hide (Only when apps are open)</option>
           </select>
         </div>
 
         <div class="setting-row">
           <div>
-            <div class="setting-label">Reveal Delay</div>
-            <div class="setting-desc">Debounce delay required to reveal on hover.</div>
+            <div class="setting-label">Dock Trigger Mode</div>
+            <div class="setting-desc">When auto-hiding should activate for Dock.</div>
           </div>
-          <select id="hide-delay">
-            <option value="0">Instant</option>
-            <option value="100">Short (100ms)</option>
-            <option value="400" selected>Normal (400ms)</option>
+          <select id="dock-trigger-mode">
+            <option value="always">Always Auto-Hide</option>
+            <option value="fullscreen-only">Only When Apps/Windows Open</option>
           </select>
         </div>
 
-        <div class="setting-row" id="row-pill-width">
+        <div class="setting-row">
           <div>
-            <div class="setting-label">Dynamic Island Width</div>
-            <div class="setting-desc">Width of the collapsed pill notch.</div>
+            <div class="setting-label">Dock Hotspot Sensitivity</div>
+            <div class="setting-desc">Width of Dock reveal trigger zone.</div>
           </div>
-          <div class="slider-container">
-            <input type="range" id="hide-pill-width" min="120" max="240" value="180">
-            <span class="slider-value" id="hide-pill-width-val">180px</span>
+          <select id="dock-hotspot-width">
+            <option value="narrow">Narrow (100px)</option>
+            <option value="medium" selected>Medium (200px)</option>
+            <option value="wide">Wide (350px)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Dock Reveal Delay</div>
+            <div class="setting-desc">Hover duration before Dock reveals.</div>
+          </div>
+          <select id="dock-reveal-delay">
+            <option value="instant" selected>Instant (0ms)</option>
+            <option value="short">Short (150ms)</option>
+            <option value="normal">Normal (300ms)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Dock Hide Delay</div>
+            <div class="setting-desc">Delay before Dock hides after cursor leaves.</div>
+          </div>
+          <select id="dock-hide-delay">
+            <option value="200">200ms (Fast)</option>
+            <option value="400" selected>400ms (Standard)</option>
+            <option value="600">600ms (Slow)</option>
+            <option value="800">800ms (Relaxed)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MENU BAR HIDING SECTION -->
+      <div class="section-title" style="margin-top: 20px;">Menu Bar Hiding Settings</div>
+      <div id="menubar-hiding-section">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Enable Menu Bar Auto-Hide</div>
+            <div class="setting-desc">Automatically hide the Menu Bar.</div>
+          </div>
+          <input type="checkbox" id="menubar-hide-enabled" checked>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Dynamic Island</div>
+            <div class="setting-desc">Collapse the Menu Bar to a small pill when auto-hide is active, revealing on hover.</div>
+          </div>
+          <input type="checkbox" id="hide-menubar-island">
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Trigger Mode</div>
+            <div class="setting-desc">When auto-hiding should activate for Menu Bar.</div>
+          </div>
+          <select id="menubar-trigger-mode">
+            <option value="always">Always Auto-Hide</option>
+            <option value="fullscreen-only">Only When Apps/Windows Open</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Hotspot Sensitivity</div>
+            <div class="setting-desc">Width of Menu Bar reveal trigger zone.</div>
+          </div>
+          <select id="menubar-hotspot-width">
+            <option value="narrow">Narrow (100px)</option>
+            <option value="medium" selected>Medium (200px)</option>
+            <option value="wide">Wide (350px)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Reveal Delay</div>
+            <div class="setting-desc">Hover duration before Menu Bar reveals.</div>
+          </div>
+          <select id="menubar-reveal-delay">
+            <option value="instant" selected>Instant (0ms)</option>
+            <option value="short">Short (150ms)</option>
+            <option value="normal">Normal (300ms)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Hide Delay</div>
+            <div class="setting-desc">Delay before Menu Bar hides after cursor leaves.</div>
+          </div>
+          <select id="menubar-hide-delay">
+            <option value="200">200ms (Fast)</option>
+            <option value="400" selected>400ms (Standard)</option>
+            <option value="600">600ms (Slow)</option>
+            <option value="800">800ms (Relaxed)</option>
+          </select>
+        </div>
+
+        <div id="hiding-options">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Behavior Mode</div>
+              <div class="setting-desc">How the menu bar hides visually.</div>
+            </div>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="hide-mode" id="hide-mode-hide" value="fully-hide">
+                <span>Fully Hide</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="hide-mode" id="hide-mode-island" value="collapsed" checked>
+                <span>Dynamic Island</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Legacy Sensitivity</div>
+              <div class="setting-desc">Legacy reveal sensitivity setting.</div>
+            </div>
+            <select id="hide-sensitivity">
+              <option value="50">Narrow (50px)</option>
+              <option value="100" selected>Medium (100px)</option>
+              <option value="200">Wide (200px)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Legacy Delay</div>
+              <div class="setting-desc">Legacy hide delay setting.</div>
+            </div>
+            <select id="hide-delay">
+              <option value="0">Instant</option>
+              <option value="100">Short (100ms)</option>
+              <option value="400" selected>Normal (400ms)</option>
+            </select>
+          </div>
+
+          <div class="setting-row" id="row-pill-width">
+            <div>
+              <div class="setting-label">Dynamic Island Width</div>
+              <div class="setting-desc">Width of the collapsed pill notch.</div>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="hide-pill-width" min="120" max="240" value="180">
+              <span class="slider-value" id="hide-pill-width-val">180px</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1145,13 +1291,32 @@
       });
     }
 
-    // Debounced settings save
+    // Debounced settings save with visual indicator
     let debounceSaveTimeout = null;
     function triggerSave() {
+      const statusEl = document.getElementById('settings-save-status');
+      if (statusEl) {
+        statusEl.textContent = 'Applying...';
+        statusEl.className = 'settings-status-badge saving';
+      }
       if (debounceSaveTimeout) clearTimeout(debounceSaveTimeout);
       debounceSaveTimeout = setTimeout(() => {
         window.settingsAPI.saveSettings(currentSettings);
+        if (statusEl) {
+          statusEl.textContent = 'Saved ✓';
+          statusEl.className = 'settings-status-badge';
+        }
       }, 150);
+    }
+
+    // 100ms visual flash confirmation helper
+    function flashControl(el) {
+      if (!el) return;
+      const target = el.closest('.setting-row') || el;
+      target.classList.add('flash-applied');
+      setTimeout(() => {
+        target.classList.remove('flash-applied');
+      }, 100);
     }
 
     // Load Settings
@@ -1213,9 +1378,33 @@
       document.getElementById('app-reduce-motion').checked = currentSettings.appearance.reduceMotion || false;
 
       // Hiding Bindings
+      if (!currentSettings.dockHideSettings) {
+        currentSettings.dockHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+      }
+      if (!currentSettings.menuBarHideSettings) {
+        currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+      }
+      if (!currentSettings.hiding) {
+        currentSettings.hiding = { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180, menuBarIsland: false };
+      }
+
+      // Dock Hiding Controls Loading
+      document.getElementById('dock-hide-enabled').checked = currentSettings.dockHideSettings.enabled;
+      document.getElementById('dock-trigger-mode').value = currentSettings.dockHideSettings.triggerMode || 'always';
+      document.getElementById('dock-hotspot-width').value = currentSettings.dockHideSettings.hotspotWidth || 'medium';
+      document.getElementById('dock-reveal-delay').value = currentSettings.dockHideSettings.revealDelayMs || 'instant';
+      document.getElementById('dock-hide-delay').value = String(currentSettings.dockHideSettings.hideDelayMs || 400);
+
+      // Menu Bar Hiding Controls Loading
+      document.getElementById('menubar-hide-enabled').checked = currentSettings.menuBarHideSettings.enabled;
+      document.getElementById('menubar-trigger-mode').value = currentSettings.menuBarHideSettings.triggerMode || 'always';
+      document.getElementById('menubar-hotspot-width').value = currentSettings.menuBarHideSettings.hotspotWidth || 'medium';
+      document.getElementById('menubar-reveal-delay').value = currentSettings.menuBarHideSettings.revealDelayMs || 'instant';
+      document.getElementById('menubar-hide-delay').value = String(currentSettings.menuBarHideSettings.hideDelayMs || 400);
+
+      // Master & Legacy Bindings
       document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
       
-      // Dock Hiding Binding
       window.settingsAPI.getDockConfig().then(dockCfg => {
         let activeMode = 'island';
         if (dockCfg.hidingMode) {
@@ -1229,12 +1418,13 @@
       }).catch(err => console.error(err));
       
       const hideModeVal = currentSettings.hiding.mode;
-      document.getElementById(`hide-mode-${hideModeVal === 'collapsed' ? 'island' : 'hide'}`).checked = true;
+      const hideModeRadio = document.getElementById(`hide-mode-${hideModeVal === 'collapsed' ? 'island' : 'hide'}`);
+      if (hideModeRadio) hideModeRadio.checked = true;
       
-      document.getElementById('hide-sensitivity').value = currentSettings.hiding.sensitivity;
-      document.getElementById('hide-delay').value = currentSettings.hiding.delay;
-      document.getElementById('hide-pill-width').value = currentSettings.hiding.pillWidth;
-      document.getElementById('hide-pill-width-val').textContent = `${currentSettings.hiding.pillWidth}px`;
+      document.getElementById('hide-sensitivity').value = currentSettings.hiding.sensitivity || 100;
+      document.getElementById('hide-delay').value = currentSettings.hiding.delay || 400;
+      document.getElementById('hide-pill-width').value = currentSettings.hiding.pillWidth || 180;
+      document.getElementById('hide-pill-width-val').textContent = `${currentSettings.hiding.pillWidth || 180}px`;
       document.getElementById('hide-menubar-island').checked = currentSettings.hiding.menuBarIsland || false;
 
       toggleHidingSubOptions(currentSettings.hiding.enabled);
@@ -1591,59 +1781,184 @@
       alert(`Preset "${name}" saved successfully!`);
     });
 
-    // Hiding Event Handlers
-    document.getElementById('hide-master').addEventListener('change', (e) => {
+    // Hiding Event Handlers - Dock Hiding Controls
+    document.getElementById('dock-hide-enabled').addEventListener('change', (e) => {
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.enabled = e.target.checked;
+      if (!currentSettings.hiding) currentSettings.hiding = {};
       currentSettings.hiding.enabled = e.target.checked;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'dock', hideSettings: currentSettings.dockHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('dock-trigger-mode').addEventListener('change', (e) => {
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.triggerMode = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'dock', hideSettings: currentSettings.dockHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('dock-hotspot-width').addEventListener('change', (e) => {
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.hotspotWidth = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'dock', hideSettings: currentSettings.dockHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('dock-reveal-delay').addEventListener('change', (e) => {
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.revealDelayMs = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'dock', hideSettings: currentSettings.dockHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('dock-hide-delay').addEventListener('change', (e) => {
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.hideDelayMs = parseInt(e.target.value);
+      if (!currentSettings.hiding) currentSettings.hiding = {};
+      currentSettings.hiding.delay = parseInt(e.target.value);
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'dock', hideSettings: currentSettings.dockHideSettings });
+      triggerSave();
+    });
+
+    // Hiding Event Handlers - Menu Bar Hiding Controls
+    document.getElementById('menubar-hide-enabled').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.enabled = e.target.checked;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('menubar-trigger-mode').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.triggerMode = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('menubar-hotspot-width').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.hotspotWidth = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('menubar-reveal-delay').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.revealDelayMs = e.target.value;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    document.getElementById('menubar-hide-delay').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.hideDelayMs = parseInt(e.target.value);
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    // Master & Legacy Hiding Event Handlers
+    document.getElementById('hide-master').addEventListener('change', (e) => {
+      if (!currentSettings.hiding) currentSettings.hiding = {};
+      currentSettings.hiding.enabled = e.target.checked;
+      if (!currentSettings.dockHideSettings) currentSettings.dockHideSettings = {};
+      currentSettings.dockHideSettings.enabled = e.target.checked;
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.enabled = e.target.checked;
+      document.getElementById('dock-hide-enabled').checked = e.target.checked;
+      document.getElementById('menubar-hide-enabled').checked = e.target.checked;
+      flashControl(e.target);
       toggleHidingSubOptions(e.target.checked);
       triggerSave();
     });
 
     document.getElementById('hide-dock-mode').addEventListener('change', (e) => {
+      flashControl(e.target);
       window.settingsAPI.saveDockHidingMode(e.target.value);
     });
 
     document.getElementById('hide-menubar-island').addEventListener('change', (e) => {
+      if (!currentSettings.hiding) currentSettings.hiding = {};
       currentSettings.hiding.menuBarIsland = e.target.checked;
+      currentSettings.hiding.mode = e.target.checked ? 'collapsed' : 'fully-hide';
+
+      const hideModeRadio = document.getElementById(`hide-mode-${e.target.checked ? 'island' : 'hide'}`);
+      if (hideModeRadio) hideModeRadio.checked = true;
+      togglePillWidthSlider(e.target.checked);
+
+      flashControl(e.target);
       triggerSave();
     });
 
     document.querySelectorAll('input[name="hide-mode"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         const val = e.target.value;
+        if (!currentSettings.hiding) currentSettings.hiding = {};
         currentSettings.hiding.mode = val;
+        currentSettings.hiding.menuBarIsland = (val === 'collapsed');
+
+        document.getElementById('hide-menubar-island').checked = (val === 'collapsed');
         togglePillWidthSlider(val === 'collapsed');
+
+        flashControl(e.target);
         triggerSave();
       });
     });
 
     document.getElementById('hide-sensitivity').addEventListener('change', (e) => {
+      if (!currentSettings.hiding) currentSettings.hiding = {};
       currentSettings.hiding.sensitivity = parseInt(e.target.value);
+      flashControl(e.target);
       triggerSave();
     });
 
     document.getElementById('hide-delay').addEventListener('change', (e) => {
+      if (!currentSettings.hiding) currentSettings.hiding = {};
       currentSettings.hiding.delay = parseInt(e.target.value);
+      flashControl(e.target);
       triggerSave();
     });
 
     const pillWidthSlider = document.getElementById('hide-pill-width');
     pillWidthSlider.addEventListener('input', (e) => {
       document.getElementById('hide-pill-width-val').textContent = `${e.target.value}px`;
+      if (!currentSettings.hiding) currentSettings.hiding = {};
       currentSettings.hiding.pillWidth = parseInt(e.target.value);
+      flashControl(e.target);
       triggerSave();
     });
 
-    document.getElementById('hide-reset').addEventListener('click', () => {
-      currentSettings.hiding = {
-        enabled: true,
-        mode: "collapsed",
-        sensitivity: 100,
-        delay: 400,
-        pillWidth: 180
-      };
+    document.getElementById('hide-reset').addEventListener('click', (e) => {
+      flashControl(e.target);
+      currentSettings.dockHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+      currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+      currentSettings.hiding = { enabled: true, mode: "collapsed", sensitivity: 100, delay: 400, pillWidth: 180, menuBarIsland: false };
       
+      document.getElementById('dock-hide-enabled').checked = true;
+      document.getElementById('dock-trigger-mode').value = 'always';
+      document.getElementById('dock-hotspot-width').value = 'medium';
+      document.getElementById('dock-reveal-delay').value = 'instant';
+      document.getElementById('dock-hide-delay').value = '400';
+
+      document.getElementById('menubar-hide-enabled').checked = true;
+      document.getElementById('menubar-trigger-mode').value = 'always';
+      document.getElementById('menubar-hotspot-width').value = 'medium';
+      document.getElementById('menubar-reveal-delay').value = 'instant';
+      document.getElementById('menubar-hide-delay').value = '400';
+
       document.getElementById('hide-master').checked = true;
-      document.getElementById('hide-mode-island').checked = true;
+      const hideIslandRadio = document.getElementById('hide-mode-island');
+      if (hideIslandRadio) hideIslandRadio.checked = true;
       document.getElementById('hide-sensitivity').value = 100;
       document.getElementById('hide-delay').value = 400;
       document.getElementById('hide-pill-width').value = 180;
@@ -1651,6 +1966,7 @@
       
       toggleHidingSubOptions(true);
       togglePillWidthSlider(true);
+      window.settingsAPI.saveHideSettings({ dockHideSettings: currentSettings.dockHideSettings, menuBarHideSettings: currentSettings.menuBarHideSettings });
       triggerSave();
     });
 
@@ -1921,13 +2237,47 @@
       }
     });
 
-    document.getElementById('app-colors-reset').addEventListener('click', () => {
+    document.getElementById('app-colors-reset').addEventListener('click', (e) => {
+      flashControl(e.target);
       const colors = currentSettings.appearance.colors || {};
       Object.keys(colors).forEach(k => { colors[k] = ''; });
       colorPickers.forEach(picker => {
         const defaults = { dockBgTint: '#000000', menuBarBgTint: '#000000', notificationCenterBgTint: '#000000', accentOverride: currentSettings.appearance.accentColor || '#007aff', badgeColor: '#ff3b30', textColorOverride: '#000000' };
         document.getElementById(`app-color-${picker}`).value = defaults[picker] || '#000000';
       });
+      triggerSave();
+    });
+
+    document.getElementById('app-appearance-reset').addEventListener('click', (e) => {
+      flashControl(e.target);
+      currentSettings.appearance = {
+        theme: 'light',
+        glassIntensity: 'Standard',
+        cornerRadius: 12,
+        accentColor: '#007aff',
+        reduceMotion: false,
+        colors: {
+          dockBgTint: '',
+          menuBarBgTint: '',
+          notificationCenterBgTint: '',
+          accentOverride: '',
+          badgeColor: '',
+          textColorOverride: ''
+        }
+      };
+
+      document.getElementById('app-theme-select').value = 'light';
+      document.getElementById('app-glass-intensity').value = 'Standard';
+      document.getElementById('app-corner-radius').value = 12;
+      document.getElementById('app-corner-radius-val').textContent = '12px';
+      document.getElementById('app-accent-picker').value = '#007aff';
+      document.getElementById('app-reduce-motion').checked = false;
+
+      const defaults = { dockBgTint: '#000000', menuBarBgTint: '#000000', notificationCenterBgTint: '#000000', accentOverride: '#007aff', badgeColor: '#ff3b30', textColorOverride: '#000000' };
+      colorPickers.forEach(picker => {
+        document.getElementById(`app-color-${picker}`).value = defaults[picker];
+      });
+
       triggerSave();
     });
 

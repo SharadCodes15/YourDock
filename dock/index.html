@@ -24,11 +24,10 @@
       align-items: flex-end;
     }
 
-    /* Dock Container Styling */
     .dock-container {
       display: flex;
       align-items: flex-end;
-      background: rgba(255, 255, 255, var(--glass-opacity, 0.45));
+      background: var(--dock-bg-tint, rgba(255, 255, 255, var(--glass-opacity, 0.45)));
       backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
       -webkit-backdrop-filter: blur(var(--glass-blur, 25px)) saturate(180%) brightness(1.05);
       border: 1px solid rgba(0, 0, 0, 0.1);
@@ -93,9 +92,11 @@
 
     body.position-left .dock-item {
       transform-origin: center left;
+      margin: 8px 0;
     }
     body.position-right .dock-item {
       transform-origin: center right;
+      margin: 8px 0;
     }
 
     body.position-left .divider, body.position-right .divider {
@@ -181,7 +182,7 @@
     }
 
     body.dark-theme .dock-container {
-      background: rgba(30, 30, 30, var(--glass-opacity, 0.45));
+      background: var(--dock-bg-tint, rgba(30, 30, 30, var(--glass-opacity, 0.45)));
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
@@ -426,7 +427,7 @@
       position: absolute;
       top: -3px;
       right: -3px;
-      background: #ff3b30;
+      background: var(--badge-color, #ff3b30);
       color: white;
       font-size: 10px;
       font-weight: 700;
@@ -1376,6 +1377,26 @@
 
     function applyThemeConfig(themeData) {
       if (!themeData) return;
+      const colors = themeData.colors || {};
+      if (colors.dockBgTint) {
+        document.documentElement.style.setProperty('--dock-bg-tint', colors.dockBgTint);
+      } else {
+        document.documentElement.style.removeProperty('--dock-bg-tint');
+      }
+      if (colors.textColorOverride) {
+        document.documentElement.style.setProperty('--text-color-override', colors.textColorOverride);
+      } else {
+        document.documentElement.style.removeProperty('--text-color-override');
+      }
+      if (colors.badgeColor) {
+        document.documentElement.style.setProperty('--badge-color', colors.badgeColor);
+      } else {
+        document.documentElement.style.removeProperty('--badge-color');
+      }
+      if (colors.accentOverride) {
+        themeData.accentColor = colors.accentOverride;
+      }
+
       isLowRamMode = !!themeData.lowRamMode;
       isReduceMotion = appConfig && appConfig.appearance && !!appConfig.appearance.reduceMotion;
       if (themeData.theme === 'dark') {

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onConfigUpdated: (callback) => ipcRenderer.on('config-updated', (_event, config) => callback(config)),
   saveAutoHide: (autoHide) => ipcRenderer.send('save-auto-hide', autoHide),
   saveDockHidingMode: (mode) => ipcRenderer.send('save-dock-hiding-mode', mode),
+  getHideSettings: (target) => ipcRenderer.invoke('get-hide-settings', target),
+  saveHideSettings: (payload) => ipcRenderer.send('save-hide-settings', payload),
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   importSettings: () => ipcRenderer.invoke('import-settings'),
   exportTheme: (name) => ipcRenderer.invoke('export-theme', name),

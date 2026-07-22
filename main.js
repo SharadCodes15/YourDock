@@ -8,6 +8,16 @@ const appScanner = require('./appscanner');
 const configPaths = require('./configPaths');
 const screenshotModule = require('./screenshot');
 const { shouldShowWindowsAtStartup } = require('./startupVisibility');
+const { createDockHideController } = require('./dockHideController');
+const { createMenuBarHideController } = require('./menuBarHideController');
+const {
+  migrateSettings,
+  resolveHotspotPixels,
+  resolveRevealDelayMs,
+  sanitizeHideSettings,
+  DEFAULT_DOCK_HIDE_SETTINGS,
+  DEFAULT_MENUBAR_HIDE_SETTINGS
+} = require('./src/shared/settingsSchema');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
@@ -91,6 +101,30 @@ let weatherCache = { data: null, timestamp: 0 };
 // Cache dynamically loaded modules
 let activeWinModule = null;
 
+let dockHideCtrl = null;
+let menuBarHideCtrl = null;
+
+function initHidingControllers() {
+  if (!dockHideCtrl) {
+    dockHideCtrl = createDockHideController({
+      getWindow: () => dockWin,
+      getDockPosition: () => (settings.general && settings.general.dockPosition) || 'bottom',
+      isFocusedAppFullscreen: () => activeAppOnScreen,
+      isChildUIOpen: () => isAnyOverlayOpen()
+    });
+  }
+  if (!menuBarHideCtrl) {
+    menuBarHideCtrl = createMenuBarHideController({
+      getWindow: () => menuBarWin,
+      isMenuBarIsland: () => (settings.hiding && settings.hiding.menuBarIsland),
+      isFocusedAppFullscreen: () => activeAppOnScreen,
+      isChildUIOpen: () => isAnyOverlayOpen()
+    });
+  }
+  if (settings.dockHideSettings) dockHideCtrl.updateSettings(settings.dockHideSettings);
+  if (settings.menuBarHideSettings) menuBarHideCtrl.updateSettings(settings.menuBarHideSettings);
+}
+
 async function loadSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
@@ -110,6 +144,9 @@ async function loadSettings() {
       if (!settings.shortcuts.restart) settings.shortcuts.restart = '';
       if (!settings.shortcuts.shutDown) settings.shortcuts.shutDown = '';
       if (!settings.shortcuts.openSpotlightSearch) settings.shortcuts.openSpotlightSearch = '';
+      if (!settings.hiding) {
+        settings.hiding = { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180, menuBarIsland: false };
+      }
       if (settings.general.enableGeolocation === undefined) settings.general.enableGeolocation = false;
       if (settings.general.geolocationDontAsk === undefined) settings.general.geolocationDontAsk = false;
       if (settings.hiding.menuBarIsland === undefined) settings.hiding.menuBarIsland = false;
@@ -120,6 +157,8 @@ async function loadSettings() {
       if (!settings.general) settings.general = {};
       await fs.promises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     }
+    settings = migrateSettings(settings);
+    initHidingControllers();
   } catch (err) {
     console.error('Error loading settings:', err);
   }
@@ -540,6 +579,7 @@ function checkControlCenterCursor() {
 function setMenuBarCollapsed(collapsed) {
   if (!menuBarWin || menuBarWin.isDestroyed()) return;
   if (settings.hiding && settings.hiding.menuBarIsland) {
+    if (!menuBarWin.isVisible()) menuBarWin.show();
     menuBarWin.webContents.send('set-collapse-state', collapsed);
   } else {
     if (collapsed) {
@@ -556,7 +596,21 @@ function pollMenuBarHover() {
   
   if (!menuBarWin || menuBarWin.isDestroyed()) return;
 
-  if (!activeAppOnScreen) {
+  const mbSettings = settings.menuBarHideSettings || {};
+
+  if (mbSettings.enabled === false || (settings.hiding && settings.hiding.enabled === false)) {
+    if (menuBarState !== 'expanded') {
+      menuBarState = 'expanded';
+      setMenuBarCollapsed(false);
+    }
+    if (leaveTimeout) {
+      clearTimeout(leaveTimeout);
+      leaveTimeout = null;
+    }
+    return;
+  }
+
+  if (mbSettings.triggerMode === 'fullscreen-only' && !activeAppOnScreen) {
     if (menuBarState !== 'expanded') {
       menuBarState = 'expanded';
       setMenuBarCollapsed(false);
@@ -564,8 +618,7 @@ function pollMenuBarHover() {
     return;
   }
 
-  // Check if auto-hide is enabled globally
-  if (!settings.hiding || !settings.hiding.enabled) {
+  if (!activeAppOnScreen) {
     if (menuBarState !== 'expanded') {
       menuBarState = 'expanded';
       setMenuBarCollapsed(false);
@@ -580,19 +633,24 @@ function pollMenuBarHover() {
   const screenWidth = displayBounds.width;
   const centerX = displayBounds.x + Math.round(screenWidth / 2);
 
+  const hotspotWidthPx = resolveHotspotPixels(mbSettings.hotspotWidth);
+  const revealDelayMs = resolveRevealDelayMs(mbSettings.revealDelayMs);
+  const requiredHits = Math.max(1, Math.round(revealDelayMs / 100));
+  const hideDelayMs = mbSettings.hideDelayMs !== undefined ? mbSettings.hideDelayMs : (settings.hiding && settings.hiding.delay !== undefined ? settings.hiding.delay : 400);
+
   if (menuBarState === 'collapsed') {
     // 1. Hotspot Expand Detection
-    const sens = settings.hiding.sensitivity || 100;
+    const halfHotspot = Math.round(hotspotWidthPx / 2);
     const inHotspot = (
-      cursorPoint.x >= centerX - Math.round(sens / 2) &&
-      cursorPoint.x <= centerX + Math.round(sens / 2) &&
+      cursorPoint.x >= centerX - halfHotspot &&
+      cursorPoint.x <= centerX + halfHotspot &&
       cursorPoint.y >= displayBounds.y &&
       cursorPoint.y <= displayBounds.y + 8
     );
 
     if (inHotspot) {
       consecutiveHotspotPolls++;
-      if (consecutiveHotspotPolls >= 2) {
+      if (consecutiveHotspotPolls >= requiredHits) {
         menuBarState = 'expanded';
         consecutiveHotspotPolls = 0;
         if (leaveTimeout) {
@@ -616,7 +674,6 @@ function pollMenuBarHover() {
 
     if (!isWithinMenuBar) {
       if (!leaveTimeout) {
-        const delay = settings.hiding.delay !== undefined ? settings.hiding.delay : 400;
         leaveTimeout = setTimeout(() => {
           // Double check cursor after configured delay
           const checkCursor = screen.getCursorScreenPoint();
@@ -633,7 +690,7 @@ function pollMenuBarHover() {
             setMenuBarCollapsed(true);
           }
           leaveTimeout = null;
-        }, delay);
+        }, hideDelayMs);
       }
     } else {
       if (leaveTimeout) {
@@ -732,6 +789,28 @@ function getDockDimensions(customWidth = null, customHeight = null) {
 function pollDockHover() {
   if (!dockWin || dockWin.isDestroyed()) return;
 
+  const dockSettings = settings.dockHideSettings || {};
+
+  if (dockSettings.enabled === false) {
+    if (dockState !== 'expanded') {
+      dockState = 'expanded';
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+    if (dockLeaveTimeout) {
+      clearTimeout(dockLeaveTimeout);
+      dockLeaveTimeout = null;
+    }
+    return;
+  }
+
+  if (dockSettings.triggerMode === 'fullscreen-only' && !activeAppOnScreen) {
+    if (dockState !== 'expanded') {
+      dockState = 'expanded';
+      dockWin.webContents.send('set-collapse-state', false);
+    }
+    return;
+  }
+
   const mode = getDockHidingMode();
 
   // Mode 1: Always visible
@@ -760,29 +839,35 @@ function pollDockHover() {
   const screenHeight = displayBounds.height;
   const position = (settings.general && settings.general.dockPosition) || 'bottom';
 
+  const hotspotWidthPx = resolveHotspotPixels(dockSettings.hotspotWidth);
+  const revealDelayMs = resolveRevealDelayMs(dockSettings.revealDelayMs);
+  const requiredHits = Math.max(1, Math.round(revealDelayMs / 100));
+  const hideDelayMs = dockSettings.hideDelayMs !== undefined ? dockSettings.hideDelayMs : 400;
+
   if (dockState === 'collapsed') {
     // 1. Hotspot Expand Detection
     let inHotspot = false;
+    const halfHotspot = Math.round(hotspotWidthPx / 2);
     if (position === 'bottom') {
       const centerX = displayBounds.x + Math.round(screenWidth / 2);
       inHotspot = (
-        cursorPoint.x >= centerX - 120 &&
-        cursorPoint.x <= centerX + 120 &&
+        cursorPoint.x >= centerX - halfHotspot &&
+        cursorPoint.x <= centerX + halfHotspot &&
         cursorPoint.y >= displayBounds.y + screenHeight - 15
       );
     } else if (position === 'left') {
       const centerY = displayBounds.y + Math.round(screenHeight / 2);
       inHotspot = (
-        cursorPoint.y >= centerY - 120 &&
-        cursorPoint.y <= centerY + 120 &&
+        cursorPoint.y >= centerY - halfHotspot &&
+        cursorPoint.y <= centerY + halfHotspot &&
         cursorPoint.x >= displayBounds.x &&
         cursorPoint.x <= displayBounds.x + 15
       );
     } else if (position === 'right') {
       const centerY = displayBounds.y + Math.round(screenHeight / 2);
       inHotspot = (
-        cursorPoint.y >= centerY - 120 &&
-        cursorPoint.y <= centerY + 120 &&
+        cursorPoint.y >= centerY - halfHotspot &&
+        cursorPoint.y <= centerY + halfHotspot &&
         cursorPoint.x >= displayBounds.x + screenWidth - 15 &&
         cursorPoint.x <= displayBounds.x + screenWidth
       );
@@ -790,7 +875,7 @@ function pollDockHover() {
 
     if (inHotspot) {
       consecutiveDockHotspotPolls++;
-      if (consecutiveDockHotspotPolls >= 2) {
+      if (consecutiveDockHotspotPolls >= requiredHits) {
         dockState = 'expanded';
         consecutiveDockHotspotPolls = 0;
         if (dockLeaveTimeout) {
@@ -830,7 +915,7 @@ function pollDockHover() {
             dockWin.webContents.send('set-collapse-state', true); // Collapse visually
           }
           dockLeaveTimeout = null;
-        }, 400);
+        }, hideDelayMs);
       }
     } else {
       if (dockLeaveTimeout) {
@@ -1534,10 +1619,37 @@ function applySettings() {
   menuBarWin.setOpacity(opacityVal);
 
   // 4. Auto-Hide behavior
+  if (settings.dockHideSettings) {
+    if (dockHideCtrl) dockHideCtrl.updateSettings(settings.dockHideSettings);
+    if (!settings.dockHideSettings.enabled) {
+      dockState = 'expanded';
+      if (dockWin && !dockWin.isDestroyed()) {
+        dockWin.webContents.send('set-collapse-state', false);
+      }
+    }
+  }
+  if (settings.menuBarHideSettings) {
+    if (menuBarHideCtrl) menuBarHideCtrl.updateSettings(settings.menuBarHideSettings);
+    if (!settings.menuBarHideSettings.enabled) {
+      menuBarState = 'expanded';
+      setMenuBarCollapsed(false);
+    }
+  }
+
   const autoHideEnabled = settings.hiding && settings.hiding.enabled;
-  menuBarState = autoHideEnabled ? 'collapsed' : 'expanded';
-  // Re-evaluate menu bar state immediately based on cursor and app-on-screen status
+  if (!autoHideEnabled) {
+    menuBarState = 'expanded';
+    setMenuBarCollapsed(false);
+  }
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    if (settings.hiding && settings.hiding.menuBarIsland) {
+      if (!menuBarWin.isVisible()) menuBarWin.show();
+    } else {
+      menuBarWin.webContents.send('set-collapse-state', false);
+    }
+  }
   pollMenuBarHover();
+  pollDockHover();
 
   // Reposition and update dock dimensions immediately
   if (dockWin && !dockWin.isDestroyed()) {
@@ -1672,18 +1784,54 @@ function createTray() {
     tray = new Tray(img);
     tray.setToolTip('macOS Dock & Menu Bar');
 
-    const contextMenu = Menu.buildFromTemplate([
-      { label: 'Open Drawer', click: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); } },
-      { label: 'Open Settings', click: () => showSettingsWindow() },
-      { type: 'separator' },
-      { label: 'Quit', click: () => {
-          app.isQuitting = true;
-          app.quit();
-        }
-      }
-    ]);
+    const updateTrayMenu = () => {
+      const menuBarVisible = menuBarWin && !menuBarWin.isDestroyed() && menuBarWin.isVisible();
+      const dockVisible = dockWin && !dockWin.isDestroyed() && dockWin.isVisible();
 
-    tray.setContextMenu(contextMenu);
+      const contextMenu = Menu.buildFromTemplate([
+        { label: 'Open Drawer', click: () => { if (isDrawerOpen) closeDrawer(); else openDrawer(); } },
+        { label: 'Open Settings', click: () => showSettingsWindow() },
+        { type: 'separator' },
+        {
+          label: 'Show Menu Bar',
+          type: 'checkbox',
+          checked: menuBarVisible,
+          click: (menuItem) => {
+            if (menuBarWin && !menuBarWin.isDestroyed()) {
+              if (menuItem.checked) {
+                menuBarWin.show();
+              } else {
+                menuBarWin.hide();
+              }
+            }
+          }
+        },
+        {
+          label: 'Show Dock',
+          type: 'checkbox',
+          checked: dockVisible,
+          click: (menuItem) => {
+            if (dockWin && !dockWin.isDestroyed()) {
+              if (menuItem.checked) {
+                dockWin.show();
+              } else {
+                dockWin.hide();
+              }
+            }
+          }
+        },
+        { type: 'separator' },
+        { label: 'Quit', click: () => {
+            app.isQuitting = true;
+            app.quit();
+          }
+        }
+      ]);
+      tray.setContextMenu(contextMenu);
+    };
+
+    updateTrayMenu();
+    tray.on('mouse-enter', updateTrayMenu);
 
     tray.on('click', () => {
       if (dockWin && !dockWin.isDestroyed()) {
@@ -2588,8 +2736,35 @@ ipcMain.handle('get-settings', () => {
   return settings;
 });
 
+ipcMain.handle('get-hide-settings', (event, target) => {
+  if (target === 'dock') return settings.dockHideSettings;
+  if (target === 'menuBar') return settings.menuBarHideSettings;
+  return { dock: settings.dockHideSettings, menuBar: settings.menuBarHideSettings };
+});
+
+ipcMain.on('save-hide-settings', async (event, payload) => {
+  if (!payload) return;
+  const { target, hideSettings } = payload;
+  if (target === 'dock') {
+    settings.dockHideSettings = sanitizeHideSettings(hideSettings, DEFAULT_DOCK_HIDE_SETTINGS);
+  } else if (target === 'menuBar') {
+    settings.menuBarHideSettings = sanitizeHideSettings(hideSettings, DEFAULT_MENUBAR_HIDE_SETTINGS);
+  } else if (payload.dockHideSettings || payload.menuBarHideSettings) {
+    if (payload.dockHideSettings) settings.dockHideSettings = sanitizeHideSettings(payload.dockHideSettings, DEFAULT_DOCK_HIDE_SETTINGS);
+    if (payload.menuBarHideSettings) settings.menuBarHideSettings = sanitizeHideSettings(payload.menuBarHideSettings, DEFAULT_MENUBAR_HIDE_SETTINGS);
+  }
+
+  if (dockHideCtrl) dockHideCtrl.updateSettings(settings.dockHideSettings);
+  if (menuBarHideCtrl) menuBarHideCtrl.updateSettings(settings.menuBarHideSettings);
+
+  await saveSettings();
+  applySettings();
+});
+
 ipcMain.on('save-settings', async (event, newSettings) => {
-  settings = newSettings;
+  settings = migrateSettings(newSettings);
+  if (dockHideCtrl) dockHideCtrl.updateSettings(settings.dockHideSettings);
+  if (menuBarHideCtrl) menuBarHideCtrl.updateSettings(settings.menuBarHideSettings);
   await saveSettings();
   applySettings();
 });
