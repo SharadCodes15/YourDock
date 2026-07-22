@@ -619,6 +619,14 @@
         </div>
       </div>
 
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Magnification</div>
+          <div class="setting-desc">Enable magnifying effect on dock icons when hovered.</div>
+        </div>
+        <input type="checkbox" id="gen-magnification">
+      </div>
+
       <div class="section-title">Clock & Date</div>
 
       <div class="setting-row">
@@ -1137,6 +1145,14 @@
         <div style="font-weight: 600; font-size: 14px;" id="perf-ram-usage">Retrieving...</div>
       </div>
 
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Active Desktop Widgets</div>
+          <div class="setting-desc">Summary of active desktop widget instances and background timers.</div>
+        </div>
+        <div style="font-weight: 500; font-size: 13px; color: var(--text-muted);" id="perf-widgets-summary">Active widgets: 0</div>
+      </div>
+
       <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; justify-content: center; gap: 12px;">
         <button id="perf-clear-cache" class="btn-danger" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white; background: #8e8e93;">Clear Icon Cache</button>
         <button id="perf-view-logs" class="btn-primary" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">View Error Log</button>
@@ -1329,6 +1345,7 @@
       document.getElementById('gen-start-minimized').checked = currentSettings.general.startMinimizedToTray || false;
       document.getElementById('gen-check-updates').checked = currentSettings.general.checkForUpdatesAutomatically !== false;
       document.getElementById('gen-smart-ordering').checked = currentSettings.general.smartOrdering || false;
+      document.getElementById('gen-magnification').checked = currentSettings.general.magnificationEnabled !== false;
       document.getElementById('gen-hide-devtools').checked = currentSettings.general.hideDevTools !== false; // default ON
       document.getElementById('gen-clock-12').checked = currentSettings.general.clockFormat12h;
       document.getElementById('gen-clock-24').checked = !currentSettings.general.clockFormat12h;
@@ -1468,6 +1485,13 @@
       }).catch(err => {
         document.getElementById('perf-ram-usage').textContent = 'Error';
       });
+      if (window.settingsAPI.getWidgetActiveSummary) {
+        window.settingsAPI.getWidgetActiveSummary().then(summary => {
+          document.getElementById('perf-widgets-summary').textContent = summary || 'Active widgets: 0';
+        }).catch(() => {
+          document.getElementById('perf-widgets-summary').textContent = 'Active widgets: 0';
+        });
+      }
     }
 
     // Toggle grey-out for hiding sub options
@@ -1531,6 +1555,12 @@
 
     document.getElementById('gen-smart-ordering').addEventListener('change', (e) => {
       currentSettings.general.smartOrdering = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-magnification').addEventListener('change', (e) => {
+      currentSettings.general.magnificationEnabled = e.target.checked;
+      flashControl(e.target);
       triggerSave();
     });
 

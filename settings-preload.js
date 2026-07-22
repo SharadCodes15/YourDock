@@ -44,5 +44,6 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   writeRawSettings: (content) => ipcRenderer.invoke('write-raw-settings', content),
   getDebugInfo: () => ipcRenderer.invoke('get-debug-info'),
   setVerboseLogging: (enabled) => ipcRenderer.send('set-verbose-logging', enabled),
+  getWidgetActiveSummary: () => ipcRenderer.invoke('get-widget-active-summary'),
   onNotificationChanged: (callback) => ipcRenderer.on('notification-settings-changed', (_event, data) => callback(data))
 });

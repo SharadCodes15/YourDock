@@ -73,3 +73,7 @@ const WeatherModule = (() => {
 
   return { fetchWeather, clearCache };
 })();
+
+if (typeof module !== 'undefined') {
+  module.exports = WeatherModule;
+}

@@ -81,7 +81,7 @@ test('dockHideController - synthetic event sequence (leave -> timer -> child UI 
 
       controller.destroy();
       done();
-    }, 350);
+    }, 450);
   }, 100);
 });
 

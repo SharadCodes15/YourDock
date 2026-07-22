@@ -38,5 +38,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Notification Center
   toggleNotificationCenter: (rect) => ipcRenderer.send('toggle-notification-center', rect),
   // Screenshot
-  takeScreenshot: (mode) => ipcRenderer.send('take-screenshot', mode)
+  takeScreenshot: (mode) => ipcRenderer.send('take-screenshot', mode),
+  // Widgets
+  toggleWidgetAccessPanel: () => ipcRenderer.invoke('toggle-widget-access-panel')
 });

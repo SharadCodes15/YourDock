@@ -117,7 +117,20 @@ const VALID_IPC_CHANNELS = new Set([
   'close-context-menu',
   'play-genie',
   'toast-data',
-  'focus-input'
+  'focus-input',
+  'get-widgets',
+  'save-widgets',
+  'add-widget',
+  'remove-widget',
+  'update-widget',
+  'toggle-widget-access-panel',
+  'set-widget-edit-mode',
+  'get-widget-active-summary',
+  'select-photo-folder',
+  'widget-action',
+  'get-media-metadata',
+  'media-control',
+  'show-widget-toast'
 ]);
 
 function containsDangerousKeys(obj) {

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Widget Access Panel</title>
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: flex-end;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    .panel-container {
+      width: 330px;
+      height: 100vh;
+      background: rgba(26, 26, 32, 0.85);
+      backdrop-filter: blur(25px) saturate(180%);
+      -webkit-backdrop-filter: blur(25px) saturate(180%);
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .panel-header {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .panel-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-edit-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .toggle-edit-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .toggle-edit-btn.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .close-btn:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cards-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .cards-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .cards-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .widget-type-card {
+      background: rgba(45, 45, 52, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .widget-type-card:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .card-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .card-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .card-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Live Preview Box */
+    .live-preview-wrapper {
+      width: 100%;
+      height: 100px;
+      background: rgba(15, 15, 20, 0.6);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .live-preview-container {
+      width: 220px;
+      height: 140px;
+      transform: scale(0.65);
+      transform-origin: center center;
+      pointer-events: none;
+    }
+
+    .add-btn {
+      width: 100%;
+      padding: 7px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent-color);
+      color: white;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .add-btn:hover {
+      background: var(--accent-hover);
+    }
+  </style>
+</head>
+<body>
+  <div class="panel-container">
+    <div class="panel-header">
+      <div class="panel-title">Desktop Widgets</div>
+      <div class="panel-header-actions">
+        <button id="toggle-edit-mode" class="toggle-edit-btn">Edit Mode</button>
+        <button id="close-panel" class="close-btn">✕</button>
+      </div>
+    </div>
+    <div id="cards-list" class="cards-list">
+      <!-- Populated dynamically with live previews -->
+    </div>
+  </div>
+
+  <script src="access-panel.js"></script>
+</body>
+</html>

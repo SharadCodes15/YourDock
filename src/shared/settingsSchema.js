@@ -55,6 +55,10 @@ function sanitizeHideSettings(input, defaults) {
 
 function migrateSettings(settings = {}) {
   const updated = { ...settings };
+  if (!updated.general) updated.general = {};
+  if (updated.general.magnificationEnabled === undefined) {
+    updated.general.magnificationEnabled = true;
+  }
   if (!updated.hiding) {
     updated.hiding = {
       enabled: true,

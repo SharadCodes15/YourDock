@@ -551,6 +551,7 @@
     function startMagnificationLoop() {
       if (rAFActive) return;
       if (isLowRamMode || isReduceMotion) return;
+      if (appConfig.general && appConfig.general.magnificationEnabled === false) return;
       rAFActive = true;
       const loop = () => {
         if (!rAFActive) return;
@@ -815,6 +816,15 @@
       const data = await window.electronAPI.getConfig();
       appConfig = data.config || data;
       appIconsMap = data.appIconsMap || {};
+      try {
+        const initialSettings = await window.electronAPI.getSettings();
+        if (initialSettings) {
+          appConfig.general = initialSettings.general;
+          appConfig.appearance = initialSettings.appearance;
+        }
+      } catch (err) {
+        console.error('Error loading settings in dock:', err);
+      }
       autoHide = appConfig.autoHide !== false;
       
       document.getElementById('ctx-autohide-check').style.visibility = autoHide ? 'visible' : 'hidden';
@@ -1435,7 +1445,7 @@
       document.getElementById('ctx-autohide').querySelector('span').textContent = autoHide ? 'Turn Hiding Off' : 'Turn Hiding On';
       applyCasingStyles();
       updateDockWidth();
-      if (isReduceMotion || isLowRamMode) {
+      if (isReduceMotion || isLowRamMode || (appConfig.general && appConfig.general.magnificationEnabled === false)) {
         stopMagnificationLoop();
       } else if (isHovered) {
         startMagnificationLoop();

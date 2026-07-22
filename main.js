@@ -149,6 +149,7 @@ async function loadSettings() {
       }
       if (settings.general.enableGeolocation === undefined) settings.general.enableGeolocation = false;
       if (settings.general.geolocationDontAsk === undefined) settings.general.geolocationDontAsk = false;
+      if (settings.general.magnificationEnabled === undefined) settings.general.magnificationEnabled = true;
       if (settings.hiding.menuBarIsland === undefined) settings.hiding.menuBarIsland = false;
     } else {
       // Default settings.json
@@ -3666,6 +3667,12 @@ if (!isPrimaryInstance) {
       createDrawerWindow();
       registerGlobalShortcuts();
       startMasterTimer();
+    }
+
+    try {
+      require('./src/main/widgets').initWidgetsSubsystem();
+    } catch (err) {
+      console.error('[Widgets] Failed to initialize widgets subsystem:', err);
     }
 
     // Register display hotplug listeners (must be after app ready)

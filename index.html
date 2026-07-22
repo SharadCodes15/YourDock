@@ -1108,6 +1108,16 @@
         </div>
       </div>
 
+      <!-- Desktop Widgets -->
+      <div class="menu-item status-icon interactive" id="menu-widgets" title="Desktop Widgets">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="5" rx="1" />
+          <rect x="14" y="12" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+        </svg>
+      </div>
+
       <!-- Settings Gear -->
       <div class="menu-item status-icon interactive" id="menu-settings" title="Settings">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1233,6 +1243,17 @@
     // Menu Item click triggers
     const menuItems = document.querySelectorAll('.menu-item.interactive');
     menuItems.forEach(item => {
+      if (item.id === 'menu-widgets') {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllDropdowns();
+          if (window.electronAPI && window.electronAPI.toggleWidgetAccessPanel) {
+            window.electronAPI.toggleWidgetAccessPanel();
+          }
+        });
+        return;
+      }
+
       if (item.id === 'menu-settings') {
         item.addEventListener('click', (e) => {
           e.stopPropagation();
