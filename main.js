@@ -18,6 +18,8 @@ const {
   DEFAULT_DOCK_HIDE_SETTINGS,
   DEFAULT_MENUBAR_HIDE_SETTINGS
 } = require('./src/shared/settingsSchema');
+const taskbarReplacement = require('./taskbarReplacement');
+const { createWatchdog } = require('./watchdog');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
@@ -44,6 +46,7 @@ function logErrorToFile(error, isFatal = false) {
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   logErrorToFile(error, true);
+  taskbarReplacement.restoreTaskbarSafe();
   dialog.showErrorBox(
     'Fatal Uncaught Exception',
     `An unexpected error occurred: ${error.message || error}\n\nThis window won't crash, but the application state may be unstable. Details have been logged to logs/error.log.`
@@ -53,6 +56,7 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   logErrorToFile(reason, false);
+  taskbarReplacement.restoreTaskbarSafe();
 });
 
 // Monkey-patch ipcMain to catch and log errors in all IPC handlers systematically
@@ -103,6 +107,10 @@ let activeWinModule = null;
 
 let dockHideCtrl = null;
 let menuBarHideCtrl = null;
+let watchdog = null;
+let modalOpenRegistry = [];
+let lastUserInteractionTime = Date.now();
+let taskbarReplacementActive = false;
 
 function initHidingControllers() {
   if (!dockHideCtrl) {
@@ -162,6 +170,51 @@ async function loadSettings() {
     initHidingControllers();
   } catch (err) {
     console.error('Error loading settings:', err);
+  }
+}
+
+const JSON_SCHEMA_FILES = ['widgets.json', 'settings.json', 'config.json', 'apps.json'];
+function getExpectedSchema(fileName) {
+  if (fileName === 'settings.json') return { general: {} };
+  if (fileName === 'config.json') return { pinned: [] };
+  if (fileName === 'apps.json') return { apps: [] };
+  if (fileName === 'widgets.json') return { widgets: [] };
+  return {};
+}
+function integrityCheckJSONFile(filePath, schemaFile) {
+  try {
+    if (!fs.existsSync(filePath)) return;
+    const content = fs.readFileSync(filePath, 'utf8');
+    JSON.parse(content);
+  } catch (err) {
+    console.warn(`[Integrity] Corrupted ${schemaFile}: ${err.message}. Backing up and resetting.`);
+    try {
+      const backupPath = filePath + '.bak.' + Date.now();
+      if (fs.existsSync(filePath)) {
+        fs.copyFileSync(filePath, backupPath);
+      }
+      const defaults = getExpectedSchema(schemaFile);
+      fs.writeFileSync(filePath, JSON.stringify(defaults, null, 2), 'utf8');
+    } catch (backupErr) {
+      console.error(`[Integrity] Failed to backup/reset ${schemaFile}:`, backupErr);
+    }
+  }
+}
+function runStartupIntegrityChecks(userDataPath) {
+  const filesToCheck = ['settings.json', 'widgets.json', 'apps.json', 'config.json'];
+  const configFilePath = configPaths.configPath;
+  const appsJsonFilePath = configPaths.appsJsonPath;
+  const widgetsFilePath = path.join(userDataPath, 'widgets.json');
+  const filePaths = {
+    'settings.json': settingsPath,
+    'config.json': configFilePath,
+    'apps.json': appsJsonFilePath,
+    'widgets.json': widgetsFilePath
+  };
+  for (const f of filesToCheck) {
+    if (filePaths[f] && fs.existsSync(filePaths[f])) {
+      integrityCheckJSONFile(filePaths[f], f);
+    }
   }
 }
 
@@ -996,6 +1049,28 @@ function registerGlobalShortcuts() {
   } catch (err) {
     console.error('Failed to register spotlight shortcut:', err);
   }
+
+  // Built-in taskbar restore shortcut (always registered, default: Ctrl+Shift+Alt+T)
+  try {
+    globalShortcut.register('CommandOrControl+Shift+Alt+T', () => {
+      console.log('[GlobalShortcut] Force taskbar restore triggered');
+      taskbarReplacement.restoreTaskbarSafe();
+    });
+  } catch (err) {
+    console.error('Failed to register taskbar restore shortcut:', err);
+  }
+
+  // Built-in Force Reset UI shortcut (always registered, default: Ctrl+Shift+Alt+R)
+  try {
+    globalShortcut.register('CommandOrControl+Shift+Alt+R', () => {
+      console.log('[GlobalShortcut] Force Reset UI triggered');
+      if (watchdog && typeof watchdog.forceResetUI === 'function') {
+        watchdog.forceResetUI();
+      }
+    });
+  } catch (err) {
+    console.error('Failed to register force reset UI shortcut:', err);
+  }
 }
 
 // Notification Center Window
@@ -1822,6 +1897,21 @@ function createTray() {
           }
         },
         { type: 'separator' },
+        {
+          label: 'Restore Windows Taskbar',
+          click: () => {
+            taskbarReplacement.restoreTaskbarSafe();
+          }
+        },
+        {
+          label: 'Force Reset UI',
+          click: () => {
+            if (watchdog && typeof watchdog.forceResetUI === 'function') {
+              watchdog.forceResetUI();
+            }
+          }
+        },
+        { type: 'separator' },
         { label: 'Quit', click: () => {
             app.isQuitting = true;
             app.quit();
@@ -1979,6 +2069,7 @@ function startMasterTimer() {
     const activeAppThreshold = isLowRam ? 25 : 8; // 3s vs 1s
     const processThreshold = isLowRam ? 250 : 66; // 30s vs 8s
     const sysinfoThreshold = isLowRam ? 1000 : 250; // 2min vs 30s
+    const watchdogThreshold = 125; // ~15s at 120ms interval
     
     // 1. Menu Bar Notch reveal hover check (120ms)
     if (menuBarWin && !menuBarWin.isDestroyed() && settings.hiding && settings.hiding.enabled) {
@@ -2009,6 +2100,11 @@ function startMasterTimer() {
       if (ccOpen || menuExpanded) {
         pollSystemData();
       }
+    }
+
+    // 6. Watchdog periodic check
+    if (watchdog && tickCount % watchdogThreshold === 0) {
+      try { watchdog.tick(); } catch (e) { console.error('[Watchdog] tick error:', e); }
     }
     
     if (tickCount >= 10000) {
@@ -2055,6 +2151,12 @@ function createMenuBarWindow() {
 
   menuBarWin.webContents.on('render-process-gone', (_event, details) => {
     console.log('[renderer][menuBar] render process gone', details);
+    if (taskbarReplacementActive) {
+      taskbarReplacement.restoreTaskbarSafe();
+      if (watchdog && typeof watchdog.forceResetUI === 'function') {
+        watchdog.forceResetUI();
+      }
+    }
   });
 
   // Enable macOS menu bar vibrancy
@@ -2148,6 +2250,12 @@ function createDockWindow() {
 
   dockWin.webContents.on('render-process-gone', (_event, details) => {
     console.log('[renderer][dock] render process gone', details);
+    if (taskbarReplacementActive) {
+      taskbarReplacement.restoreTaskbarSafe();
+      if (watchdog && typeof watchdog.forceResetUI === 'function') {
+        watchdog.forceResetUI();
+      }
+    }
   });
 
   dockWin.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
@@ -2468,6 +2576,23 @@ ipcMain.on('set-dock-width', (event, dockWidth) => {
 let isDockContextMenuOpen = false;
 ipcMain.on('context-menu-state', (event, isOpen) => {
   isDockContextMenuOpen = isOpen;
+  if (isOpen) {
+    modalOpenRegistry = modalOpenRegistry.filter(m => m.id !== 'dock-context-menu');
+    modalOpenRegistry.push({ id: 'dock-context-menu', openSince: Date.now() });
+  } else {
+    modalOpenRegistry = modalOpenRegistry.filter(m => m.id !== 'dock-context-menu');
+  }
+  lastUserInteractionTime = Date.now();
+});
+
+ipcMain.on('modal-state', (event, { id, open }) => {
+  if (open) {
+    modalOpenRegistry = modalOpenRegistry.filter(m => m.id !== id);
+    modalOpenRegistry.push({ id, openSince: Date.now() });
+  } else {
+    modalOpenRegistry = modalOpenRegistry.filter(m => m.id !== id);
+  }
+  lastUserInteractionTime = Date.now();
 });
 
 ipcMain.on('escape-pressed', () => {
@@ -2539,6 +2664,8 @@ function forceCollapseAll() {
   if (notificationWin && !notificationWin.isDestroyed() && notificationWin.isVisible()) {
     notificationWin.hide();
   }
+
+  lastUserInteractionTime = Date.now();
 }
 
 
@@ -3651,6 +3778,27 @@ if (!isPrimaryInstance) {
     await loadConfig();
     await loadSettings();
     ensureIconsFolder();
+
+    runStartupIntegrityChecks(app.getPath('userData'));
+
+    // Check stale taskbar-hidden flag from previous crash
+    if (settings.general && settings.general.taskbarReplacementEnabled) {
+      console.warn('[Startup] Stale taskbarReplacementEnabled=true found from previous session. Restoring taskbar.');
+      taskbarReplacement.restoreTaskbarSafe();
+      settings.general.taskbarReplacementEnabled = false;
+      await saveSettings();
+    }
+
+    // Write restore script on startup regardless
+    try {
+      taskbarReplacement.writeRestoreScript(app.getPath('userData'));
+      const desktopPath = path.join(app.getPath('home'), 'Desktop');
+      if (fs.existsSync(desktopPath)) {
+        taskbarReplacement.writeRestoreScript(desktopPath);
+      }
+    } catch (err) {
+      console.error('[Startup] Failed to write restore script:', err);
+    }
     createAboutWindow();
     createForceQuitWindow();
     createTray();
@@ -3673,6 +3821,30 @@ if (!isPrimaryInstance) {
       require('./src/main/widgets').initWidgetsSubsystem();
     } catch (err) {
       console.error('[Widgets] Failed to initialize widgets subsystem:', err);
+    }
+
+    try {
+      watchdog = createWatchdog({
+        stateControllers: [],
+        tickIntervalMs: 15000,
+        animationDurationMs: 250,
+        modalStuckThresholdMs: 10 * 60 * 1000,
+        getOpenModals: () => modalOpenRegistry,
+        getLastUserInteractionTime: () => lastUserInteractionTime,
+        onResetUI: () => {
+          if (ccWin && !ccWin.isDestroyed()) { try { ccWin.hide(); } catch (e) {} }
+          if (spotlightWin && !spotlightWin.isDestroyed()) { try { spotlightWin.hide(); } catch (e) {} }
+          if (notificationWin && !notificationWin.isDestroyed() && notificationWin.isVisible()) { try { notificationWin.hide(); } catch (e) {} }
+          if (drawerWin && !drawerWin.isDestroyed() && isDrawerOpen) { try { closeDrawer(); } catch (e) {} }
+          forceCollapseAll();
+        },
+        getDebug: () => DEBUG
+      });
+      if (dockHideCtrl) { try { watchdog.stateControllers.push(dockHideCtrl); } catch (e) {} }
+      if (menuBarHideCtrl) { try { watchdog.stateControllers.push(menuBarHideCtrl); } catch (e) {} }
+      watchdog.start();
+    } catch (err) {
+      console.error('[Watchdog] Failed to initialize:', err);
     }
 
     // Register display hotplug listeners (must be after app ready)
@@ -3698,6 +3870,8 @@ app.isQuitting = false;
 app.on('before-quit', () => {
   console.log('[shutdown] before-quit');
   app.isQuitting = true;
+  taskbarReplacement.restoreTaskbarSafe();
+  if (watchdog) { try { watchdog.destroy(); } catch (e) {} }
   stopCursorPolling();
   stopDockCursorPolling();
   globalShortcut.unregisterAll();
@@ -4412,6 +4586,63 @@ ipcMain.on('take-screenshot', (event, mode) => {
 ipcMain.on('close-toast', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win && !win.isDestroyed()) win.destroy();
+});
+
+ipcMain.on('user-interaction', () => {
+  lastUserInteractionTime = Date.now();
+});
+
+// ==========================================
+// TASKBAR REPLACEMENT IPC
+// ==========================================
+ipcMain.handle('taskbar-get-state', () => {
+  return { hidden: taskbarReplacement.isTaskbarHidden() };
+});
+
+ipcMain.handle('taskbar-hide', async () => {
+  try {
+    await taskbarReplacement.hideTaskbar();
+    taskbarReplacementActive = taskbarReplacement.isTaskbarHidden();
+    return { success: taskbarReplacementActive };
+  } catch (err) {
+    console.error('[IPC] taskbar-hide error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('taskbar-show', async () => {
+  try {
+    await taskbarReplacement.showTaskbar();
+    taskbarReplacementActive = false;
+    return { success: true };
+  } catch (err) {
+    console.error('[IPC] taskbar-show error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('taskbar-write-restore-script', () => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const path1 = taskbarReplacement.writeRestoreScript(userDataPath);
+    const desktopPath = path.join(app.getPath('home'), 'Desktop');
+    let path2 = null;
+    if (fs.existsSync(desktopPath)) {
+      path2 = taskbarReplacement.writeRestoreScript(desktopPath);
+    }
+    return { success: true, paths: [path1, path2].filter(Boolean) };
+  } catch (err) {
+    console.error('[IPC] taskbar-write-restore-script error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('force-reset-ui', () => {
+  if (watchdog && typeof watchdog.forceResetUI === 'function') {
+    watchdog.forceResetUI();
+    return { success: true };
+  }
+  return { success: false, reason: 'watchdog not initialized' };
 });
 
 // Weather IPC

@@ -45,7 +45,7 @@
       left: 0;
       z-index: 9999;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-      transition: all 0.25s ease-out;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, background 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
     }
 
     .menu-bar.collapsed {
@@ -267,7 +267,7 @@
       color: #1d1d1f;
       font-size: 12px;
       outline: none;
-      transition: width 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.25s ease;
+      transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.25s ease;
       padding: 0;
     }
 
@@ -405,7 +405,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.25s;
+      transition: background 0.25s, color 0.25s;
     }
 
     .cc-net-icon.active {
@@ -441,7 +441,7 @@
       align-items: center;
       justify-content: center;
       color: #1d1d1f;
-      transition: all 0.25s;
+      transition: background 0.25s, color 0.25s;
     }
 
     .cc-focus-icon.active {
@@ -1805,6 +1805,22 @@
         menuBar.classList.remove('collapsed');
       }
     });
+  </script>
+  <script>
+    (function() {
+      var el = document.querySelector('.menu-bar');
+      if (!el) return;
+      var activeTransforms = 0;
+      el.addEventListener('transitionstart', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms++; this.style.willChange = 'transform'; }
+      });
+      el.addEventListener('transitionend', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms--; if (activeTransforms <= 0) { this.style.willChange = ''; activeTransforms = 0; } }
+      });
+      el.addEventListener('transitioncancel', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms--; if (activeTransforms <= 0) { this.style.willChange = ''; activeTransforms = 0; } }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -36,7 +36,7 @@
       border-radius: var(--corner-radius, 20px);
       padding: 6px 10px;
       margin-bottom: 6px;
-      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), background 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), padding 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), background 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1);
       transform-origin: bottom center;
       --icon-size: 48px;
     }
@@ -283,7 +283,7 @@
       background: rgba(0, 0, 0, 0.15);
       margin: 0 8px 4px 8px;
       align-self: flex-end;
-      transition: margin 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     /* Running Dot Indicator */
@@ -1475,6 +1475,22 @@
 
     // Startup Init
     loadDock();
+  </script>
+  <script>
+    (function() {
+      var el = document.querySelector('.dock-container');
+      if (!el) return;
+      var activeTransforms = 0;
+      el.addEventListener('transitionstart', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms++; this.style.willChange = 'transform'; }
+      });
+      el.addEventListener('transitionend', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms--; if (activeTransforms <= 0) { this.style.willChange = ''; activeTransforms = 0; } }
+      });
+      el.addEventListener('transitioncancel', function(e) {
+        if (e.propertyName === 'transform') { activeTransforms--; if (activeTransforms <= 0) { this.style.willChange = ''; activeTransforms = 0; } }
+      });
+    })();
   </script>
 </body>
 </html>

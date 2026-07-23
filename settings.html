@@ -482,6 +482,10 @@
       </svg>
       <span>Performance</span>
     </div>
+    <div class="sidebar-item" data-panel="systemshell">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M8 10l4 4 4-4" stroke-width="2"/></svg>
+      <span>System Shell</span>
+    </div>
     <div class="sidebar-item" data-panel="about">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       <span>About</span>
@@ -1202,6 +1206,53 @@
       </div>
     </div>
 
+    <!-- SYSTEM SHELL PANEL -->
+    <div class="panel" id="panel-systemshell">
+      <h2>System Shell</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Replace the real Windows taskbar with this app's Dock and Menu Bar.</p>
+
+      <div style="background: rgba(255, 59, 48, 0.08); border: 1px solid rgba(255, 59, 48, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+        <div style="font-weight: 600; color: #ff3b30; margin-bottom: 6px;">Warning</div>
+        <div style="font-size: 11px; line-height: 1.5; color: var(--text-muted);">
+          Hides the real Windows taskbar while this app runs. If the app crashes, use the tray icon or
+          <strong>Win+R &rarr; run the restore command</strong> to bring it back.
+          A restore script is written to your Desktop before hiding.
+        </div>
+      </div>
+
+      <div class="setting-row" id="row-taskbar-replacement">
+        <div>
+          <div class="setting-label">Replace Windows Taskbar (Advanced)</div>
+          <div class="setting-desc">Hide the native Windows taskbar so Dock + Menu Bar are the only visible shell.</div>
+        </div>
+        <input type="checkbox" id="sys-taskbar-replace">
+      </div>
+
+      <div class="setting-row" id="row-taskbar-status" style="border-top: 1px dashed var(--border-color); margin-top: 8px; padding-top: 12px;">
+        <div>
+          <div class="setting-label">Taskbar Status</div>
+          <div class="setting-desc">Current taskbar visibility state.</div>
+        </div>
+        <span id="sys-taskbar-status-text" style="font-weight: 600; font-size: 12px; padding: 3px 10px; border-radius: 4px; background: var(--bg-color);">Checking...</span>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Restore Taskbar</div>
+          <div class="setting-desc">Restore the native taskbar if it was hidden by this app.</div>
+        </div>
+        <button id="sys-taskbar-restore" style="padding: 6px 14px;">Restore Now</button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Force Reset UI</div>
+          <div class="setting-desc">Close all popovers and reset Dock/Menu Bar to default state.</div>
+        </div>
+        <button id="sys-force-reset-ui" style="padding: 6px 14px;">Reset Now</button>
+      </div>
+    </div>
+
     <!-- ABOUT PANEL -->
     <div class="panel" id="panel-about">
       <h2>About</h2>
@@ -1460,6 +1511,27 @@
       loadExperimentalFlags();
       document.getElementById('experimental-debug-overlay').checked = (currentSettings.performance && currentSettings.performance.debugOverlay) || false;
       document.getElementById('experimental-verbose-logging').checked = (currentSettings.performance && currentSettings.performance.verboseLogging) || false;
+
+      // System Shell Bindings
+      const taskbarReplaceEnabled = currentSettings.general && currentSettings.general.taskbarReplacementEnabled;
+      document.getElementById('sys-taskbar-replace').checked = taskbarReplaceEnabled || false;
+      (async () => {
+        try {
+          const state = await window.settingsAPI.taskbarGetState();
+          const statusEl = document.getElementById('sys-taskbar-status-text');
+          if (state && state.hidden) {
+            statusEl.textContent = 'Hidden';
+            statusEl.style.background = 'rgba(255, 59, 48, 0.15)';
+            statusEl.style.color = '#ff3b30';
+          } else {
+            statusEl.textContent = 'Visible';
+            statusEl.style.background = 'rgba(52, 199, 89, 0.15)';
+            statusEl.style.color = '#34c759';
+          }
+        } catch (err) {
+          console.error('Failed to get taskbar state:', err);
+        }
+      })();
 
       // Per-element color pickers
       const colors = currentSettings.appearance.colors || {};
@@ -2085,6 +2157,63 @@
     document.getElementById('app-reduce-motion').addEventListener('change', (e) => {
       currentSettings.appearance.reduceMotion = e.target.checked;
       triggerSave();
+    });
+
+    // System Shell panel
+    document.getElementById('sys-taskbar-restore').addEventListener('click', async () => {
+      try {
+        await window.settingsAPI.taskbarShow();
+        document.getElementById('sys-taskbar-status-text').textContent = 'Visible';
+        document.getElementById('sys-taskbar-status-text').style.background = 'rgba(52, 199, 89, 0.15)';
+        document.getElementById('sys-taskbar-status-text').style.color = '#34c759';
+      } catch (err) {
+        console.error('Failed to restore taskbar:', err);
+      }
+    });
+
+    document.getElementById('sys-force-reset-ui').addEventListener('click', async () => {
+      try {
+        await window.settingsAPI.forceResetUI();
+      } catch (err) {
+        console.error('Failed to force reset UI:', err);
+      }
+    });
+
+    document.getElementById('sys-taskbar-replace').addEventListener('change', async (e) => {
+      if (e.target.checked) {
+        const confirmed = window.confirm(
+          'Hides the real Windows taskbar while this app runs. If the app crashes, use the tray icon or Win+R -> run the restore command to bring it back.\n\nProceed with enabling taskbar replacement?'
+        );
+        if (!confirmed) {
+          e.target.checked = false;
+          return;
+        }
+        try {
+          await window.settingsAPI.taskbarWriteRestoreScript();
+          const result = await window.settingsAPI.taskbarHide();
+          if (result && result.success) {
+            document.getElementById('sys-taskbar-status-text').textContent = 'Hidden';
+            document.getElementById('sys-taskbar-status-text').style.background = 'rgba(255, 59, 48, 0.15)';
+            document.getElementById('sys-taskbar-status-text').style.color = '#ff3b30';
+          }
+          currentSettings.general.taskbarReplacementEnabled = true;
+          triggerSave();
+        } catch (err) {
+          console.error('Failed to hide taskbar:', err);
+          e.target.checked = false;
+        }
+      } else {
+        try {
+          await window.settingsAPI.taskbarShow();
+          document.getElementById('sys-taskbar-status-text').textContent = 'Visible';
+          document.getElementById('sys-taskbar-status-text').style.background = 'rgba(52, 199, 89, 0.15)';
+          document.getElementById('sys-taskbar-status-text').style.color = '#34c759';
+          currentSettings.general.taskbarReplacementEnabled = false;
+          triggerSave();
+        } catch (err) {
+          console.error('Failed to restore taskbar:', err);
+        }
+      }
     });
 
     // Shortcuts Rendering

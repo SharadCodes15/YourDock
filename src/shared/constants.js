@@ -130,7 +130,15 @@ const VALID_IPC_CHANNELS = new Set([
   'widget-action',
   'get-media-metadata',
   'media-control',
-  'show-widget-toast'
+  'show-widget-toast',
+  'taskbar-get-state',
+  'taskbar-hide',
+  'taskbar-show',
+  'taskbar-restore',
+  'taskbar-write-restore-script',
+  'force-reset-ui',
+  'user-interaction',
+  'modal-state'
 ]);
 
 function containsDangerousKeys(obj) {

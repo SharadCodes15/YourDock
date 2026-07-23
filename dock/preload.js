@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOpenWindows: (appId) => ipcRenderer.invoke('get-open-windows', appId),
   focusWindow: (pid) => ipcRenderer.send('focus-window', pid),
   contextMenuState: (isOpen) => ipcRenderer.send('context-menu-state', isOpen),
-  onCloseContextMenu: (callback) => ipcRenderer.on('close-context-menu', () => callback())
+  onCloseContextMenu: (callback) => ipcRenderer.on('close-context-menu', () => callback()),
+  userInteraction: () => ipcRenderer.send('user-interaction'),
+  modalState: (id, open) => ipcRenderer.send('modal-state', { id, open })
 });
 

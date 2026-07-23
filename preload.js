@@ -40,5 +40,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Screenshot
   takeScreenshot: (mode) => ipcRenderer.send('take-screenshot', mode),
   // Widgets
-  toggleWidgetAccessPanel: () => ipcRenderer.invoke('toggle-widget-access-panel')
+  toggleWidgetAccessPanel: () => ipcRenderer.invoke('toggle-widget-access-panel'),
+  userInteraction: () => ipcRenderer.send('user-interaction'),
+  modalState: (id, open) => ipcRenderer.send('modal-state', { id, open }),
+  signalReady: () => ipcRenderer.send('user-interaction')
 });

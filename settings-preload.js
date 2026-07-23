@@ -45,5 +45,10 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getDebugInfo: () => ipcRenderer.invoke('get-debug-info'),
   setVerboseLogging: (enabled) => ipcRenderer.send('set-verbose-logging', enabled),
   getWidgetActiveSummary: () => ipcRenderer.invoke('get-widget-active-summary'),
-  onNotificationChanged: (callback) => ipcRenderer.on('notification-settings-changed', (_event, data) => callback(data))
+  onNotificationChanged: (callback) => ipcRenderer.on('notification-settings-changed', (_event, data) => callback(data)),
+  taskbarGetState: () => ipcRenderer.invoke('taskbar-get-state'),
+  taskbarHide: () => ipcRenderer.invoke('taskbar-hide'),
+  taskbarShow: () => ipcRenderer.invoke('taskbar-show'),
+  taskbarWriteRestoreScript: () => ipcRenderer.invoke('taskbar-write-restore-script'),
+  forceResetUI: () => ipcRenderer.invoke('force-reset-ui')
 });
