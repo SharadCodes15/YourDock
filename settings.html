@@ -1251,6 +1251,14 @@
         </div>
         <button id="sys-force-reset-ui" style="padding: 6px 14px;">Reset Now</button>
       </div>
+
+      <div class="setting-row" id="row-smart-positioning" style="border-top: 1px dashed var(--border-color); margin-top: 8px; padding-top: 12px;">
+        <div>
+          <div class="setting-label">Smart App Positioning</div>
+          <div class="setting-desc">Automatically position launched app windows between the Menu Bar and Dock when both are visible.</div>
+        </div>
+        <input type="checkbox" id="sys-smart-positioning">
+      </div>
     </div>
 
     <!-- ABOUT PANEL -->
@@ -1515,6 +1523,8 @@
       // System Shell Bindings
       const taskbarReplaceEnabled = currentSettings.general && currentSettings.general.taskbarReplacementEnabled;
       document.getElementById('sys-taskbar-replace').checked = taskbarReplaceEnabled || false;
+      document.getElementById('sys-smart-positioning').checked =
+        currentSettings.general && currentSettings.general.smartAppPositioning !== false;
       (async () => {
         try {
           const state = await window.settingsAPI.taskbarGetState();
@@ -2177,6 +2187,12 @@
       } catch (err) {
         console.error('Failed to force reset UI:', err);
       }
+    });
+
+    document.getElementById('sys-smart-positioning').addEventListener('change', (e) => {
+      if (!currentSettings.general) currentSettings.general = {};
+      currentSettings.general.smartAppPositioning = e.target.checked;
+      triggerSave();
     });
 
     document.getElementById('sys-taskbar-replace').addEventListener('change', async (e) => {

@@ -20,6 +20,7 @@ const {
 } = require('./src/shared/settingsSchema');
 const taskbarReplacement = require('./taskbarReplacement');
 const { createWatchdog } = require('./watchdog');
+const windowManager = require('./windowManager');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
@@ -168,6 +169,7 @@ async function loadSettings() {
     }
     settings = migrateSettings(settings);
     initHidingControllers();
+    windowManager.initialize({ getSettings: () => settings });
   } catch (err) {
     console.error('Error loading settings:', err);
   }
@@ -1711,6 +1713,10 @@ function applySettings() {
       setMenuBarCollapsed(false);
     }
   }
+
+  windowManager.setEnabled(
+    settings.general && settings.general.smartAppPositioning !== false
+  );
 
   const autoHideEnabled = settings.hiding && settings.hiding.enabled;
   if (!autoHideEnabled) {
@@ -3659,8 +3665,9 @@ ipcMain.on('launch-app', async (event, appId) => {
   const targetPath = process.platform === 'win32' ? appConfig.win : appConfig.mac;
   if (!targetPath) return;
 
+  const processName = (appConfig.process || path.basename(targetPath)).replace(/\.exe$/i, '').toLowerCase();
+
   // Try focusing first if the app is already running
-  const processName = appConfig.process || path.basename(targetPath);
   if (processName) {
     const focused = await focusRunningApp(processName);
     if (focused) {
@@ -3681,6 +3688,8 @@ ipcMain.on('launch-app', async (event, appId) => {
       }
     });
   }
+
+  windowManager.constrainWindow(processName).catch(() => {});
   
   setTimeout(pollProcesses, 1500);
 });
