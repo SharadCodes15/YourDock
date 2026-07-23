@@ -1,4 +1,4 @@
-﻿# 🚀 YourDock
+# 🚀 YourDock
 
 <div align="center">
 
@@ -18,7 +18,7 @@
 
 ## 📖 Overview
 
-**YourDock** is a lightweight desktop dock inspired by **macOS**, designed for **Windows** and **Linux**. It provides a smooth application launcher, customizable dock, and a modern top menu bar while maintaining low RAM usage.
+**YourDock** is a lightweight desktop dock inspired by **macOS**, designed for **Windows** and **Linux**. It provides a smooth application launcher, customizable dock, top menu bar, and a robust widget system while maintaining low RAM usage.
 
 Built entirely using:
 
@@ -33,11 +33,19 @@ No frontend frameworks are used, making the project easy to understand, customiz
 
 # 📷 Preview
 
-Place your screenshot inside the project root.
+Place your screenshots inside the project root and reference them below.
 
+<!-- Main application screenshot -->
+![Demo](Demo_v2.0.0.png)
 
-![Demo](Demo.png)
+<!-- Placeholder for Widgets Panel screenshot -->
+<!-- ![Widgets Panel](widgets_preview.png) -->
 
+<!-- Placeholder for Control Center screenshot -->
+<!-- ![Control Center](controlcenter_preview.png) -->
+
+<!-- Placeholder for Settings Panel screenshot -->
+<!-- ![Settings Panel](settings_preview.png) -->
 
 ---
 
@@ -107,10 +115,10 @@ The application includes a modern Settings page with multiple configuration cate
 
 ### Hiding
 
-- Auto Hide Dock
-- Auto Hide Menu Bar
-- Hide Delay
-- Reveal Animation
+- Auto Hide Dock & Menu Bar with state-machine-backed hide/reveal transition control
+- Custom Reveal Delays and Edge Hotspot activation
+- Hiding watchdog safety daemon to prevent stuck/partially hidden states
+- Escape-key global override to instantly hide active panel layers
 - Intelligent Hide
 
 ---
@@ -174,8 +182,25 @@ The application includes a modern Settings page with multiple configuration cate
 
 ---
 
+## 🧩 Widgets System
 
-# 🛠 Tech Stack
+- **Widget Access Panel**: A dedicated overlay displaying multiple integrated widgets.
+- **Widget Host Windows**: Floating, customizable desktop widgets.
+- **Included Widgets**:
+  - 📅 **Calendar**: View monthly layout.
+  - ⏰ **Clock**: Modern time display.
+  - 🌤️ **Weather**: Current weather updates.
+  - 📊 **System Monitor**: CPU, RAM, and system resource indicators.
+  - 📝 **Sticky Notes**: Quick notepad on your desktop.
+  - 🚀 **Quick Launch**: Desktop app shortcuts.
+  - ⏳ **Countdown**: Event timers.
+  - 🎵 **Now Playing**: Current music track controller.
+  - 🖼️ **Photo Slideshow**: Image carousel.
+  - 💬 **Quote of the Day**: Inspirational updates.
+
+---
+
+## 🛠 Tech Stack
 
 | Technology | Usage |
 |------------|------|
@@ -213,18 +238,14 @@ dock
 │   ├── main.js
 │   ├── package.json
 │   └── preload.js
+├── dockHideController.js
 ├── experimental-flags.json
 ├── focusForwarder.js
 ├── forcequit.html
-├── get_request.js
-├── get_step0.js
-├── index.html
-├── list_inputs.js
 ├── main.js
+├── menuBarHideController.js
 ├── notificationcenter-preload.js
 ├── notificationcenter.html
-├── original_request.txt
-├── original_request_full.txt
 ├── package.json
 ├── preload.js
 ├── screenshot-overlay-preload.js
@@ -237,18 +258,32 @@ dock
 ├── settings.json
 ├── spotlight-preload.js
 ├── spotlight.html
+├── src
+│   ├── main
+│   │   ├── config
+│   │   ├── ipc
+│   │   ├── state
+│   │   ├── system
+│   │   ├── widgets
+│   │   │   ├── index.js
+│   │   │   ├── widgetAccessPanel.js
+│   │   │   ├── widgetHostWindow.js
+│   │   │   ├── widgetRegistry.js
+│   │   │   └── widgetsStore.js
+│   │   └── windows
+│   ├── renderer
+│   └── shared
+│       ├── constants.js
+│       ├── hideStateMachine.js
+│       └── settingsSchema.js
 ├── startupVisibility.js
+├── taskbarReplacement.js
 ├── tests
-│   ├── appscanner.test.js
-│   ├── config.test.js
-│   ├── devToolsBlacklist.test.js
-│   ├── dock-animations.test.js
-│   ├── focusForwarder.test.js
-│   ├── public-safe.test.js
-│   └── startupVisibility.test.js
 ├── theme-export.js
+├── watchdog.js
 ├── weather.js
-└── welcome.html
+├── welcome.html
+└── windowManager.js
 ```
 
 ---
@@ -289,22 +324,21 @@ npm start
 
 # 📦 Build
 
-Windows
+To bundle and package the application into production-ready executables, use the following scripts:
 
+Build unpacked directory (for local testing):
 ```bash
-npm run build-win
+npm run pack
 ```
 
-Linux
-
+Build production installers and distributions:
 ```bash
-npm run build-linux
+npm run dist
 ```
 
-macOS
-
+Build portable executable (Windows):
 ```bash
-npm run build-mac
+npm run dist:portable
 ```
 
 ---
@@ -318,12 +352,14 @@ npm run build-mac
 - [x] Blur Effects
 - [x] Tray Support
 - [x] Multi Display Support
-- [x] Auto Hide
-- [ ] Widgets
-- [ ] Weather Widget
-- [ ] Music Controls
-- [ ] Calendar
-- [ ] Notification Center
+- [x] Auto Hide & Transition State Machine
+- [x] Widgets System
+  - [x] Weather Widget
+  - [x] Calendar
+  - [x] System Monitor
+  - [x] Music Controls (Now Playing)
+- [x] Notification Center
+- [x] Taskbar Replacement
 - [ ] Virtual Desktops
 - [ ] Plugin System
 - [ ] Themes Marketplace
