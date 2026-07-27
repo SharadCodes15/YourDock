@@ -420,6 +420,10 @@ Inspired by
 
 ---
 
+Notes
+Google Antigravity was used to create most of this as a fun side-project of mine. Do NOT expect super clean code or great organization, it was never the goal. Feel free to refactor things that need refactoring, and submit a PR if something is bothering you.
+I claim NO copyright over any of the assets used in this project. Most of them belong to AI, and there is no goal to do anything illegal with them. This is just a nostalgia project for all us Mac Os fans.
+
 <div align="center">
 
 ### ⭐ If you like this project, give it a Star!
