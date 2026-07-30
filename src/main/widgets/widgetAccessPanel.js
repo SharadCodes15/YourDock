@@ -40,6 +40,12 @@ function createAccessPanelWindow(store, onToggleCallback) {
     }
   });
 
+  panelWindow.on('blur', () => {
+    if (panelWindow && !panelWindow.isDestroyed() && panelWindow.isVisible()) {
+      closeAccessPanel(store, onToggleCallback);
+    }
+  });
+
   panelWindow.on('closed', () => {
     panelWindow = null;
   });

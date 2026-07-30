@@ -43,5 +43,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleWidgetAccessPanel: () => ipcRenderer.invoke('toggle-widget-access-panel'),
   userInteraction: () => ipcRenderer.send('user-interaction'),
   modalState: (id, open) => ipcRenderer.send('modal-state', { id, open }),
-  signalReady: () => ipcRenderer.send('user-interaction')
+  signalReady: () => ipcRenderer.send('user-interaction'),
+  closeOtherWindows: () => ipcRenderer.send('close-other-windows')
 });

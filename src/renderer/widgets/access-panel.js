@@ -69,13 +69,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateEditBtnState(newEditMode);
   };
 
+  function closePanel() {
+    ipcRenderer.invoke('close-widget-access-panel');
+  }
+
   closeBtn.onclick = () => {
-    ipcRenderer.invoke('toggle-widget-access-panel');
+    closePanel();
   };
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      ipcRenderer.invoke('toggle-widget-access-panel');
+      closePanel();
     }
   });
 

@@ -28,8 +28,21 @@ let currentWidgets = [];
 let isEditMode = false;
 let activePopoverWidgetId = null;
 
+let appSettings = {};
+
 document.addEventListener('DOMContentLoaded', async () => {
   const canvasEl = document.getElementById('widget-canvas');
+
+  // Fetch initial settings
+  try {
+    appSettings = await ipcRenderer.invoke('get-settings');
+  } catch (err) {
+    console.error('Failed to fetch settings:', err);
+  }
+
+  ipcRenderer.on('settings-changed', (event, settings) => {
+    appSettings = settings;
+  });
 
   // Mouse move region detection for forwarding click-through
   window.addEventListener('mousemove', (e) => {
@@ -56,95 +69,166 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentWidgets = widgets || [];
     isEditMode = Boolean(editMode);
 
-    // Save open popover before clearing canvas
-    const openPopover = document.querySelector('.widget-settings-popover');
+    const newIds = currentWidgets.map(w => w.id);
+    const existingBoxes = Array.from(canvasEl.querySelectorAll('.widget-box'));
 
-    canvasEl.innerHTML = '';
+    // 1. Remove widgets that no longer exist in the new list
+    existingBoxes.forEach(box => {
+      if (!newIds.includes(box.dataset.id)) {
+        const contentBox = box.querySelector('.widget-content-box');
+        if (contentBox && typeof contentBox._widgetCleanup === 'function') {
+          contentBox._widgetCleanup();
+        }
+        box.remove();
+      }
+    });
 
+    // 2. Create or update widgets in-place
     currentWidgets.forEach(widget => {
-      const widgetBox = document.createElement('div');
+      let widgetBox = canvasEl.querySelector(`[data-id="${widget.id}"]`);
+      const mod = WIDGET_MODULES[widget.type];
+
+      if (!widgetBox) {
+        widgetBox = document.createElement('div');
+        widgetBox.dataset.id = widget.id;
+        widgetBox.style.pointerEvents = 'auto';
+
+        widgetBox.addEventListener('mouseenter', () => {
+          ipcRenderer.send('set-ignore-mouse', false);
+        });
+        widgetBox.addEventListener('mouseleave', () => {
+          if (!isEditMode && !document.querySelector('.widget-settings-popover')) {
+            ipcRenderer.send('set-ignore-mouse', true);
+          }
+        });
+
+        const contentBox = document.createElement('div');
+        contentBox.className = 'widget-content-box';
+        contentBox.style.width = '100%';
+        contentBox.style.height = '100%';
+        contentBox.style.overflow = 'hidden';
+
+        widgetBox.appendChild(contentBox);
+        canvasEl.appendChild(widgetBox);
+      }
+
+      // Update basic visual properties
       widgetBox.className = `widget-box ${isEditMode ? 'mode-edit' : 'mode-view'}`;
       widgetBox.style.left = `${widget.x}px`;
       widgetBox.style.top = `${widget.y}px`;
       widgetBox.style.width = `${widget.width}px`;
       widgetBox.style.height = `${widget.height}px`;
-      widgetBox.dataset.id = widget.id;
-      widgetBox.style.pointerEvents = 'auto';
 
-      widgetBox.addEventListener('mouseenter', () => {
-        ipcRenderer.send('set-ignore-mouse', false);
-      });
-      widgetBox.addEventListener('mouseleave', () => {
-        if (!isEditMode && !document.querySelector('.widget-settings-popover')) {
-          ipcRenderer.send('set-ignore-mouse', true);
+      const contentBox = widgetBox.querySelector('.widget-content-box');
+
+      // Update inner content if it hasn't been rendered yet, OR if settings changed
+      const settingsStr = JSON.stringify(widget.settings);
+      if (widgetBox.dataset.renderedSettings !== settingsStr) {
+        if (contentBox._widgetCleanup) {
+          contentBox._widgetCleanup();
+          contentBox._widgetCleanup = null;
         }
-      });
 
-      const mod = WIDGET_MODULES[widget.type];
-
-      // Inner Content Box
-      const contentBox = document.createElement('div');
-      contentBox.className = 'widget-content-box';
-      contentBox.style.width = '100%';
-      contentBox.style.height = '100%';
-      contentBox.style.overflow = 'hidden';
-
-      if (mod && typeof mod.render === 'function') {
-        mod.render(contentBox, widget, false, (settingsUpdate) => {
-          ipcRenderer.invoke('update-widget', { id: widget.id, updates: { settings: settingsUpdate } });
-        });
+        contentBox.innerHTML = '';
+        if (mod && typeof mod.render === 'function') {
+          mod.render(contentBox, widget, false, (settingsUpdate) => {
+            ipcRenderer.invoke('update-widget', { id: widget.id, updates: { settings: settingsUpdate } });
+          });
+        }
+        widgetBox.dataset.renderedSettings = settingsStr;
       }
-      widgetBox.appendChild(contentBox);
 
-      // EDIT Mode Controls
+      // Manage Edit Mode controls
+      let editBar = widgetBox.querySelector('.widget-edit-controls');
       if (isEditMode) {
-        const editBar = document.createElement('div');
-        editBar.className = 'widget-edit-controls';
+        if (!editBar) {
+          editBar = document.createElement('div');
+          editBar.className = 'widget-edit-controls';
+          editBar.innerHTML = `
+            <button class="edit-btn-icon btn-gear" title="Settings">⚙</button>
+            <span style="font-size:10px; font-weight:600; opacity:0.8;">${widget.type}</span>
+            <button class="edit-btn-icon btn-delete" title="Remove">×</button>
+          `;
 
-        editBar.innerHTML = `
-          <button class="edit-btn-icon btn-gear" title="Settings">⚙</button>
-          <span style="font-size:10px; font-weight:600; opacity:0.8;">${widget.type}</span>
-          <button class="edit-btn-icon btn-delete" title="Remove">×</button>
-        `;
+          const gearBtn = editBar.querySelector('.btn-gear');
+          const deleteBtn = editBar.querySelector('.btn-delete');
 
-        const gearBtn = editBar.querySelector('.btn-gear');
-        const deleteBtn = editBar.querySelector('.btn-delete');
+          let hoverOpenTimeout = null;
 
-        gearBtn.onclick = (e) => {
-          e.stopPropagation();
-          toggleSettingsPopover(widget, widgetBox);
-        };
+          gearBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleSettingsPopover(widget, widgetBox);
+          };
 
-        deleteBtn.onclick = async (e) => {
-          e.stopPropagation();
-          await ipcRenderer.invoke('remove-widget', widget.id);
-        };
+          gearBtn.addEventListener('mouseenter', () => {
+            isHoveringGear = true;
+            if (appSettings.general && appSettings.general.enableHoverPreview && appSettings.general.applyHoverToWidgets) {
+              if (hoverOpenTimeout) clearTimeout(hoverOpenTimeout);
+              hoverOpenTimeout = setTimeout(() => {
+                if (isHoveringGear) {
+                  const existing = document.querySelector('.widget-settings-popover');
+                  if (!existing || activePopoverWidgetId !== widget.id) {
+                    toggleSettingsPopover(widget, widgetBox);
+                  }
+                }
+              }, 400);
+            }
+          });
 
-        widgetBox.appendChild(editBar);
+          gearBtn.addEventListener('mouseleave', () => {
+            isHoveringGear = false;
+            if (hoverOpenTimeout) {
+              clearTimeout(hoverOpenTimeout);
+              hoverOpenTimeout = null;
+            }
+            if (appSettings.general && appSettings.general.enableHoverPreview && appSettings.general.applyHoverToWidgets) {
+              checkWidgetHoverClose(widget, widgetBox);
+            }
+          });
 
-        // Drag Handler
-        setupDragHandler(widgetBox, editBar, widget);
+          deleteBtn.onclick = async (e) => {
+            e.stopPropagation();
+            await ipcRenderer.invoke('remove-widget', widget.id);
+          };
 
-        // Resize Handle
-        const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'widget-resize-handle';
-        widgetBox.appendChild(resizeHandle);
+          widgetBox.appendChild(editBar);
 
-        setupResizeHandler(widgetBox, resizeHandle, widget, mod ? mod.minW : 150, mod ? mod.minH : 100);
+          // Drag Handler
+          setupDragHandler(widgetBox, editBar, widget);
+
+          // Resize Handle
+          let resizeHandle = widgetBox.querySelector('.widget-resize-handle');
+          if (!resizeHandle) {
+            resizeHandle = document.createElement('div');
+            resizeHandle.className = 'widget-resize-handle';
+            widgetBox.appendChild(resizeHandle);
+          }
+          setupResizeHandler(widgetBox, resizeHandle, widget, mod ? mod.minW : 150, mod ? mod.minH : 100);
+        }
+      } else {
+        if (editBar) {
+          editBar.remove();
+        }
+        const resizeHandle = widgetBox.querySelector('.widget-resize-handle');
+        if (resizeHandle) {
+          resizeHandle.remove();
+        }
       }
-
-      canvasEl.appendChild(widgetBox);
     });
 
-    // Re-attach popover if it was open
-    if (openPopover && activePopoverWidgetId && isEditMode) {
-      const activeBox = canvasEl.querySelector(`[data-id="${activePopoverWidgetId}"]`);
-      if (activeBox) {
-        openPopover.style.left = `${activeBox.offsetLeft}px`;
-        openPopover.style.top = `${activeBox.offsetTop + activeBox.offsetHeight + 6}px`;
-        canvasEl.appendChild(openPopover);
-      } else {
+    // Check if the open popover's widget was removed or we exited edit mode
+    const openPopover = document.querySelector('.widget-settings-popover');
+    if (openPopover && activePopoverWidgetId) {
+      if (!newIds.includes(activePopoverWidgetId) || !isEditMode) {
+        openPopover.remove();
         activePopoverWidgetId = null;
+        ipcRenderer.send('set-popover-active', false);
+      } else {
+        const activeBox = canvasEl.querySelector(`[data-id="${activePopoverWidgetId}"]`);
+        if (activeBox) {
+          openPopover.style.left = `${activeBox.offsetLeft}px`;
+          openPopover.style.top = `${activeBox.offsetTop + activeBox.offsetHeight + 6}px`;
+        }
       }
     }
   }
@@ -220,16 +304,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
+  let isHoveringGear = false;
+  let isHoveringPopover = false;
+
+  function checkWidgetHoverClose(widget, anchorEl) {
+    setTimeout(() => {
+      if (!isHoveringGear && !isHoveringPopover) {
+        const popover = document.querySelector('.widget-settings-popover');
+        if (popover && activePopoverWidgetId === widget.id) {
+          popover.remove();
+          activePopoverWidgetId = null;
+          ipcRenderer.send('set-popover-active', false);
+        }
+      }
+    }, 50);
+  }
+
   function toggleSettingsPopover(widget, anchorEl) {
     const existing = document.querySelector('.widget-settings-popover');
     if (existing) existing.remove();
 
     if (activePopoverWidgetId === widget.id) {
       activePopoverWidgetId = null;
+      ipcRenderer.send('set-popover-active', false);
       return;
     }
 
     activePopoverWidgetId = widget.id;
+    ipcRenderer.send('set-popover-active', true);
     const mod = WIDGET_MODULES[widget.type];
     if (!mod || typeof mod.settings !== 'function') return;
 
@@ -237,6 +339,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     popover.className = 'widget-settings-popover';
     popover.style.left = `${anchorEl.offsetLeft}px`;
     popover.style.top = `${anchorEl.offsetTop + anchorEl.offsetHeight + 6}px`;
+
+    popover.addEventListener('mouseenter', () => {
+      isHoveringPopover = true;
+    });
+
+    popover.addEventListener('mouseleave', () => {
+      isHoveringPopover = false;
+      if (appSettings.general && appSettings.general.enableHoverPreview && appSettings.general.applyHoverToWidgets) {
+        checkWidgetHoverClose(widget, anchorEl);
+      }
+    });
 
     popover.innerHTML = `
       <div class="popover-header">
@@ -249,6 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     popover.querySelector('.popover-close').onclick = () => {
       popover.remove();
       activePopoverWidgetId = null;
+      ipcRenderer.send('set-popover-active', false);
     };
 
     if (typeof mod.bind === 'function') {
@@ -261,11 +375,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (widgetBox) {
           const contentBox = widgetBox.querySelector('.widget-content-box');
           if (contentBox && typeof mod.render === 'function') {
+            if (contentBox._widgetCleanup) {
+              contentBox._widgetCleanup();
+              contentBox._widgetCleanup = null;
+            }
             contentBox.innerHTML = '';
             mod.render(contentBox, widget, false, (innerUpdate) => {
               ipcRenderer.invoke('update-widget', { id: widget.id, updates: { settings: innerUpdate } });
             });
           }
+          widgetBox.dataset.renderedSettings = JSON.stringify(widget.settings);
         }
 
         // Persist to store

@@ -9,6 +9,21 @@ const weatherModule = require('../../../weather');
 let storeInstance = null;
 let registryInstance = null;
 let isInitialized = false;
+let isPopoverOpen = false;
+
+function updateClickThroughState() {
+  const hostWin = getHostWindow();
+  if (!hostWin || hostWin.isDestroyed()) return;
+
+  const panelOpen = isAccessPanelOpen();
+  const editMode = storeInstance ? storeInstance.getEditMode() : false;
+
+  if (panelOpen || editMode || isPopoverOpen) {
+    hostWin.setIgnoreMouseEvents(false);
+  } else {
+    hostWin.setIgnoreMouseEvents(true, { forward: true });
+  }
+}
 
 function initWidgetsSubsystem() {
   if (isInitialized) return;
@@ -32,6 +47,7 @@ function initWidgetsSubsystem() {
         editMode: storeInstance.getEditMode()
       });
     }
+    updateClickThroughState();
   };
 
   // Create host window ONLY if widgets already exist on startup
@@ -93,6 +109,18 @@ function initWidgetsSubsystem() {
     return isAccessPanelOpen();
   });
 
+  ipcMain.handle('close-widget-access-panel', () => {
+    closeAccessPanel(storeInstance, (editMode) => {
+      onStateChange();
+    });
+    return true;
+  });
+
+  ipcMain.on('set-popover-active', (_event, active) => {
+    isPopoverOpen = !!active;
+    updateClickThroughState();
+  });
+
   ipcMain.handle('get-widget-active-summary', () => {
     return registryInstance.getActiveSummary();
   });
@@ -122,12 +150,18 @@ function initWidgetsSubsystem() {
   ipcMain.on('set-ignore-mouse', (_event, ignore) => {
     const hostWin = getHostWindow();
     if (hostWin && !hostWin.isDestroyed()) {
-      if (ignore) {
-        hostWin.setIgnoreMouseEvents(true, { forward: true });
-      } else {
+      const panelOpen = isAccessPanelOpen();
+      const editMode = storeInstance ? storeInstance.getEditMode() : false;
+      if (panelOpen || editMode || isPopoverOpen) {
         hostWin.setIgnoreMouseEvents(false);
-        if (!hostWin.isFocused()) {
-          hostWin.focus();
+      } else {
+        if (ignore) {
+          hostWin.setIgnoreMouseEvents(true, { forward: true });
+        } else {
+          hostWin.setIgnoreMouseEvents(false);
+          if (!hostWin.isFocused()) {
+            hostWin.focus();
+          }
         }
       }
     }

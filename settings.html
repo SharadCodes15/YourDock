@@ -435,6 +435,63 @@
       background: rgba(255, 149, 0, 0.15);
       color: #ff9500;
     }
+
+    /* Hover Preview Flyouts */
+    #sidebar-preview-flyout, #theme-preview-flyout {
+      position: absolute;
+      z-index: 10000;
+      background: var(--panel-bg, #252526);
+      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      padding: 10px;
+      color: var(--text-color, #ffffff);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      transform: scale(0.95);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+    #sidebar-preview-flyout.active, #theme-preview-flyout.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+    #theme-preview-flyout {
+      pointer-events: auto;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .reduce-motion #sidebar-preview-flyout,
+    .reduce-motion #theme-preview-flyout {
+      transition: none !important;
+      transform: none !important;
+    }
+    .preview-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 4px;
+      color: var(--accent-color);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .preview-item {
+      padding: 2px 0;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .preview-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent-color);
+    }
   </style>
 </head>
 <body>
@@ -548,6 +605,22 @@
           <div class="setting-desc">Suppress the location prompt in Notification Center when weather needs a city.</div>
         </div>
         <input type="checkbox" id="gen-geolocation-dontask">
+      </div>
+
+      <div class="section-title">Hover Interactions</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enable hover-to-preview in Settings</div>
+          <div class="setting-desc">Hovering sidebar categories or theme/action rows previews them.</div>
+        </div>
+        <input type="checkbox" id="gen-hover-preview">
+      </div>
+      <div class="setting-row" id="row-hover-widgets" style="margin-left: 20px; border-top: none; padding-top: 0;">
+        <div>
+          <div class="setting-label">Also apply to Widget settings popovers</div>
+          <div class="setting-desc">Hovering a widget's settings gear icon opens its popover.</div>
+        </div>
+        <input type="checkbox" id="gen-hover-widgets">
       </div>
 
       <div class="section-title">Pinned App Executables</div>
@@ -1289,6 +1362,9 @@
 
   </div>
 
+  <div id="sidebar-preview-flyout"></div>
+  <div id="theme-preview-flyout"></div>
+
   <script src="closeOnEscape.js"></script>
   <script>
     let currentSettings = {};
@@ -1421,6 +1497,8 @@
       // Location Permission
       document.getElementById('gen-enable-geolocation').checked = currentSettings.general.enableGeolocation || false;
       document.getElementById('gen-geolocation-dontask').checked = currentSettings.general.geolocationDontAsk || false;
+      document.getElementById('gen-hover-preview').checked = currentSettings.general.enableHoverPreview || false;
+      document.getElementById('gen-hover-widgets').checked = currentSettings.general.applyHoverToWidgets || false;
 
       // Pinned Apps Exec List
       window.settingsAPI.getDockConfig().then(dockCfg => {
@@ -1452,6 +1530,11 @@
       document.getElementById('app-corner-radius-val').textContent = `${currentSettings.appearance.cornerRadius || 12}px`;
       document.getElementById('app-accent-picker').value = currentSettings.appearance.accentColor || '#007aff';
       document.getElementById('app-reduce-motion').checked = currentSettings.appearance.reduceMotion || false;
+      if (currentSettings.appearance.reduceMotion) {
+        document.documentElement.classList.add('reduce-motion');
+      } else {
+        document.documentElement.classList.remove('reduce-motion');
+      }
 
       // Hiding Bindings
       if (!currentSettings.dockHideSettings) {
@@ -1677,6 +1760,16 @@
 
     document.getElementById('gen-geolocation-dontask').addEventListener('change', (e) => {
       currentSettings.general.geolocationDontAsk = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-hover-preview').addEventListener('change', (e) => {
+      currentSettings.general.enableHoverPreview = e.target.checked;
+      triggerSave();
+    });
+
+    document.getElementById('gen-hover-widgets').addEventListener('change', (e) => {
+      currentSettings.general.applyHoverToWidgets = e.target.checked;
       triggerSave();
     });
 
@@ -2166,6 +2259,11 @@
     // Appearance: Reduce Motion
     document.getElementById('app-reduce-motion').addEventListener('change', (e) => {
       currentSettings.appearance.reduceMotion = e.target.checked;
+      if (e.target.checked) {
+        document.documentElement.classList.add('reduce-motion');
+      } else {
+        document.documentElement.classList.remove('reduce-motion');
+      }
       triggerSave();
     });
 
@@ -2840,6 +2938,18 @@
               loadAppIconsList();
             }
           });
+          changeBtn.addEventListener('mouseenter', () => {
+            if (!currentSettings.general || !currentSettings.general.enableHoverPreview) return;
+            const tip = document.createElement('span');
+            tip.className = 'icon-hover-tip';
+            tip.style.cssText = 'font-size:10px; color:var(--text-muted); margin-left:8px;';
+            tip.textContent = 'Click to browse PNG/JPG icon override';
+            buttons.appendChild(tip);
+          });
+          changeBtn.addEventListener('mouseleave', () => {
+            const tip = buttons.querySelector('.icon-hover-tip');
+            if (tip) tip.remove();
+          });
           buttons.appendChild(changeBtn);
 
           if (app.iconSource === 'manual') {
@@ -3047,6 +3157,277 @@
       window.settingsAPI.onThemeChanged(applyThemeConfig);
       window.settingsAPI.getThemeConfig().then(applyThemeConfig).catch(console.error);
     }
+
+    // Hover Preview Interaction Logic
+    const PANEL_PREVIEWS = {
+      general: {
+        title: 'General Settings',
+        items: ['Launch at Login', 'Show in Dock / Taskbar', 'Start Minimized to Tray', 'Smart Ordering']
+      },
+      appearance: {
+        title: 'Appearance',
+        items: ['Theme Presets', 'Accent Color Override', 'Glass Blur Intensity', 'Window Opacity', 'Corner Radius']
+      },
+      hiding: {
+        title: 'Hiding & Hotspots',
+        items: ['Auto-hide Dock / Menu Bar', 'Trigger Mode (Always / Fullscreen)', 'Hotspot Sensitivity', 'Reveal & Hide Delays']
+      },
+      menuitems: {
+        title: 'Menu Bar Items',
+        items: ['Visible Status Icons', 'Icon Reordering Layout']
+      },
+      appicons: {
+        title: 'App Icons Customization',
+        items: ['Dock Icon Size', 'Start Menu Scan Overrides', 'Pinned Dock App Overrides']
+      },
+      displays: {
+        title: 'Monitor Placement',
+        items: ['Dock Target Display', 'Menu Bar Target Display', 'All-Displays Visibility']
+      },
+      shortcuts: {
+        title: 'Global Hotkeys',
+        items: ['Show/Hide Menu Bar', 'Show/Hide Dock', 'Open Settings & Drawer', 'Trigger Screenshot Overlay']
+      },
+      experimental: {
+        title: 'Experimental Features',
+        items: ['Directional Reveal', 'Weather Widget Toggle']
+      },
+      performance: {
+        title: 'Performance & Logs',
+        items: ['Low RAM Mode Toggle', 'Clear Cached App Icons', 'View Error logs']
+      },
+      systemshell: {
+        title: 'System Integration',
+        items: ['Windows Taskbar Replacement', 'Smart Application Positioning']
+      },
+      about: {
+        title: 'About YourDock',
+        items: ['Version Info', 'Reset All Settings to Defaults']
+      }
+    };
+
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    const sidebarFlyout = document.getElementById('sidebar-preview-flyout');
+    let sidebarTimeout = null;
+
+    sidebarItems.forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        if (!currentSettings.general || !currentSettings.general.enableHoverPreview) return;
+        
+        const panel = item.getAttribute('data-panel');
+        const data = PANEL_PREVIEWS[panel];
+        if (!data) return;
+
+        sidebarTimeout = setTimeout(() => {
+          let html = `<div class="preview-title">${data.title}</div>`;
+          data.items.forEach(itm => {
+            html += `<div class="preview-item"><span class="preview-dot"></span>${itm}</div>`;
+          });
+          sidebarFlyout.innerHTML = html;
+
+          const rect = item.getBoundingClientRect();
+          sidebarFlyout.style.top = `${window.scrollY + rect.top}px`;
+          sidebarFlyout.style.left = `${window.scrollX + rect.right + 10}px`;
+          sidebarFlyout.style.display = 'block';
+          
+          setTimeout(() => {
+            sidebarFlyout.classList.add('active');
+          }, 10);
+        }, 400);
+      });
+
+      item.addEventListener('mouseleave', () => {
+        if (sidebarTimeout) {
+          clearTimeout(sidebarTimeout);
+          sidebarTimeout = null;
+        }
+        sidebarFlyout.classList.remove('active');
+        setTimeout(() => {
+          if (!sidebarFlyout.classList.contains('active')) {
+            sidebarFlyout.style.display = 'none';
+          }
+        }, 150);
+      });
+    });
+
+    let themeFlyout = document.getElementById('theme-preview-flyout');
+    let themeShowTimeout = null;
+    let themeHideTimeout = null;
+
+    function setupThemeHoverPreview(selectId, getOptions, onHover, onClick, onLeave) {
+      const selectEl = document.getElementById(selectId);
+      if (!selectEl) return;
+
+      selectEl.addEventListener('mouseenter', () => {
+        if (!currentSettings.general || !currentSettings.general.enableHoverPreview) return;
+        if (themeHideTimeout) {
+          clearTimeout(themeHideTimeout);
+          themeHideTimeout = null;
+        }
+        themeShowTimeout = setTimeout(() => {
+          const options = getOptions();
+          
+          themeFlyout.innerHTML = '';
+          const titleDiv = document.createElement('div');
+          titleDiv.className = 'preview-title';
+          titleDiv.textContent = 'Hover to Preview, Click to Select';
+          themeFlyout.appendChild(titleDiv);
+
+          options.forEach(opt => {
+            const btn = document.createElement('div');
+            btn.style.cssText = `
+              padding: 6px 12px;
+              border-radius: 4px;
+              font-size: 11px;
+              color: var(--text-color);
+              cursor: pointer;
+              background: rgba(255,255,255,0.06);
+              transition: background 0.1s ease;
+              white-space: nowrap;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            `;
+            btn.textContent = opt.name;
+            
+            btn.addEventListener('mouseenter', () => {
+              btn.style.background = 'var(--accent-color-translucent)';
+              onHover(opt);
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.background = 'rgba(255,255,255,0.06)';
+              onLeave();
+            });
+            btn.addEventListener('click', () => {
+              onClick(opt);
+              hideThemePreviewFlyout();
+            });
+            themeFlyout.appendChild(btn);
+          });
+
+          const rect = selectEl.getBoundingClientRect();
+          themeFlyout.style.top = `${window.scrollY + rect.top}px`;
+          themeFlyout.style.left = `${window.scrollX + rect.right + 10}px`;
+          themeFlyout.style.display = 'flex';
+          
+          setTimeout(() => {
+            themeFlyout.classList.add('active');
+          }, 10);
+        }, 400);
+      });
+
+      selectEl.addEventListener('mouseleave', () => {
+        if (themeShowTimeout) {
+          clearTimeout(themeShowTimeout);
+          themeShowTimeout = null;
+        }
+        themeHideTimeout = setTimeout(() => {
+          hideThemePreviewFlyout();
+        }, 100);
+      });
+    }
+
+    function hideThemePreviewFlyout() {
+      if (themeFlyout) {
+        themeFlyout.classList.remove('active');
+        window.settingsAPI.previewTheme(null);
+        setTimeout(() => {
+          if (!themeFlyout.classList.contains('active')) {
+            themeFlyout.style.display = 'none';
+          }
+        }, 150);
+      }
+    }
+
+    themeFlyout.addEventListener('mouseenter', () => {
+      if (themeHideTimeout) {
+        clearTimeout(themeHideTimeout);
+        themeHideTimeout = null;
+      }
+    });
+    themeFlyout.addEventListener('mouseleave', () => {
+      hideThemePreviewFlyout();
+    });
+
+    setupThemeHoverPreview(
+      'app-theme-select',
+      () => {
+        const base = [
+          { name: 'Light', value: 'light', theme: 'light' },
+          { name: 'Dark', value: 'dark', theme: 'dark' },
+          { name: 'Auto', value: 'auto', theme: 'auto' }
+        ];
+        const custom = (currentSettings.themePresets || []).map(p => ({
+          name: p.name,
+          value: p.name,
+          theme: p.theme,
+          accentColor: p.accentColor,
+          glassIntensity: p.glassIntensity,
+          cornerRadius: p.cornerRadius
+        }));
+        return base.concat(custom);
+      },
+      (opt) => {
+        const temp = {
+          theme: opt.theme,
+          accentColor: opt.accentColor,
+          glassIntensity: opt.glassIntensity,
+          cornerRadius: opt.cornerRadius,
+          colors: opt.colors || {}
+        };
+        window.settingsAPI.previewTheme(temp);
+      },
+      (opt) => {
+        const select = document.getElementById('app-theme-select');
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change'));
+      },
+      () => {
+        window.settingsAPI.previewTheme(null);
+      }
+    );
+
+    setupThemeHoverPreview(
+      'app-builtin-themes',
+      () => {
+        return (currentSettings.builtinThemes || []).map(t => ({
+          name: t.name,
+          value: t.name,
+          theme: t.theme,
+          accentColor: t.accentColor,
+          glassIntensity: t.glassIntensity,
+          cornerRadius: t.cornerRadius,
+          colors: t.colors
+        }));
+      },
+      (opt) => {
+        const temp = {
+          theme: opt.theme,
+          accentColor: opt.accentColor,
+          glassIntensity: opt.glassIntensity,
+          cornerRadius: opt.cornerRadius,
+          colors: opt.colors || {}
+        };
+        window.settingsAPI.previewTheme(temp);
+      },
+      async (opt) => {
+        const select = document.getElementById('app-builtin-themes');
+        select.value = opt.value;
+        const res = await window.settingsAPI.applyBuiltinTheme(opt.value);
+        if (res.success) {
+          await loadSettings();
+          if (res.hasBackup) {
+            document.getElementById('app-theme-revert').style.display = '';
+          }
+        } else {
+          alert(res.error || 'Failed to apply theme.');
+        }
+        select.value = '';
+      },
+      () => {
+        window.settingsAPI.previewTheme(null);
+      }
+    );
 
     // Init
     loadSettings();

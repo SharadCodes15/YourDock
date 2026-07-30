@@ -50,5 +50,6 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   taskbarHide: () => ipcRenderer.invoke('taskbar-hide'),
   taskbarShow: () => ipcRenderer.invoke('taskbar-show'),
   taskbarWriteRestoreScript: () => ipcRenderer.invoke('taskbar-write-restore-script'),
-  forceResetUI: () => ipcRenderer.invoke('force-reset-ui')
+  forceResetUI: () => ipcRenderer.invoke('force-reset-ui'),
+  previewTheme: (tempAppearance) => ipcRenderer.send('preview-theme', tempAppearance)
 });

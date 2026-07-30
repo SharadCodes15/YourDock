@@ -1101,6 +1101,9 @@ function createNotificationCenterWindow() {
   notificationWin.loadFile(path.join(__dirname, 'notificationcenter.html'));
   notificationWin.on('blur', () => {
     if (notificationWin && !notificationWin.isDestroyed()) notificationWin.hide();
+    if (menuBarWin && !menuBarWin.isDestroyed()) {
+      menuBarWin.webContents.send('menu-session-ended');
+    }
   });
   notificationWin.on('closed', () => {
     if (notificationWin) { try { notificationWin.removeAllListeners(); } catch (err) {} }
@@ -1738,6 +1741,17 @@ function applySettings() {
     const bounds = getDockDimensions();
     dockWin.setBounds(bounds);
     dockWin.webContents.send('settings-changed', settings);
+  }
+
+  // Send settings to widget host if open
+  try {
+    const { getHostWindow } = require('./src/main/widgets/widgetHostWindow');
+    const hostWin = getHostWindow();
+    if (hostWin && !hostWin.isDestroyed()) {
+      hostWin.webContents.send('settings-changed', settings);
+    }
+  } catch (err) {
+    console.error('[Widgets] Failed to send settings update to widget host window:', err);
   }
 }
 
@@ -2895,7 +2909,41 @@ ipcMain.on('save-hide-settings', async (event, payload) => {
   applySettings();
 });
 
+let originalAppearance = null;
+
+ipcMain.on('preview-theme', (event, tempAppearance) => {
+  if (tempAppearance) {
+    if (!originalAppearance) {
+      originalAppearance = JSON.parse(JSON.stringify(settings.appearance || {}));
+    }
+    settings.appearance = {
+      ...(settings.appearance || {}),
+      ...tempAppearance
+    };
+    broadcastThemeConfig();
+  } else {
+    if (originalAppearance) {
+      settings.appearance = originalAppearance;
+      originalAppearance = null;
+      broadcastThemeConfig();
+    }
+  }
+});
+
+ipcMain.on('close-other-windows', () => {
+  if (ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
+    ccWin.hide();
+  }
+  if (spotlightWin && !spotlightWin.isDestroyed() && spotlightWin.isVisible()) {
+    spotlightWin.hide();
+  }
+  if (notificationWin && !notificationWin.isDestroyed() && notificationWin.isVisible()) {
+    notificationWin.hide();
+  }
+});
+
 ipcMain.on('save-settings', async (event, newSettings) => {
+  originalAppearance = null; // Clear any pending preview fallback
   settings = migrateSettings(newSettings);
   if (dockHideCtrl) dockHideCtrl.updateSettings(settings.dockHideSettings);
   if (menuBarHideCtrl) menuBarHideCtrl.updateSettings(settings.menuBarHideSettings);
@@ -4012,6 +4060,9 @@ function createControlCenterWindow() {
 
   ccWin.on('blur', () => {
     ccWin.hide();
+    if (menuBarWin && !menuBarWin.isDestroyed()) {
+      menuBarWin.webContents.send('menu-session-ended');
+    }
   });
 
   ccWin.on('closed', () => {
@@ -4541,6 +4592,9 @@ function createSpotlightWindow() {
 
   spotlightWin.on('blur', () => {
     spotlightWin.hide();
+    if (menuBarWin && !menuBarWin.isDestroyed()) {
+      menuBarWin.webContents.send('menu-session-ended');
+    }
   });
 
   spotlightWin.on('closed', () => {

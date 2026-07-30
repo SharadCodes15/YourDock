@@ -1187,11 +1187,14 @@
     });
 
     // Dropdown Logic
+    let menuSessionActive = false;
+
     function openDropdown(menuItem) {
       closeAllDropdowns();
       
       menuItem.classList.add('active');
       activeDropdown = menuItem;
+      menuSessionActive = true;
 
       // Lock mouse ignore to false so the transparent backdrop can capture click-outs
       window.electronAPI.setIgnoreMouse(false);
@@ -1214,6 +1217,7 @@
         activeDropdown.classList.remove('active');
         activeDropdown = null;
       }
+      menuSessionActive = false;
       // Set window size back to menu bar height (28px)
       ipcRendererSend('set-window-height', 28);
       
@@ -1237,6 +1241,41 @@
       // Let's call `window.electronAPI.setWindowHeight(data)` in our JS, and we will update preload.js!
       if (window.electronAPI && window.electronAPI.setWindowHeight) {
         window.electronAPI.setWindowHeight(data);
+      }
+    }
+
+    function onHoverSwitch(item) {
+      if (!menuSessionActive) return;
+      if (activeDropdown === item) return;
+
+      if (window.electronAPI && window.electronAPI.closeOtherWindows) {
+        window.electronAPI.closeOtherWindows();
+      }
+
+      if (item.id === 'menu-cc') {
+        closeAllDropdowns();
+        menuSessionActive = true;
+        const rect = item.getBoundingClientRect();
+        window.electronAPI.toggleControlCenter({
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+          width: rect.width, height: rect.height
+        });
+      } else if (item.id === 'spotlight-container') {
+        closeAllDropdowns();
+        menuSessionActive = true;
+        window.electronAPI.toggleSpotlight();
+      } else if (item.id === 'menu-notification') {
+        closeAllDropdowns();
+        menuSessionActive = true;
+        const rect = item.getBoundingClientRect();
+        window.electronAPI.toggleNotificationCenter({
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+          width: rect.width, height: rect.height
+        });
+      } else if (item.id === 'menu-widgets' || item.id === 'menu-settings') {
+        // Do nothing on hover for widgets/settings
+      } else {
+        openDropdown(item);
       }
     }
 
@@ -1267,6 +1306,7 @@
         item.addEventListener('click', (e) => {
           e.stopPropagation();
           closeAllDropdowns();
+          menuSessionActive = true;
           const rect = document.getElementById('menu-notification').getBoundingClientRect();
           window.electronAPI.toggleNotificationCenter({
             left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
@@ -1284,12 +1324,13 @@
           openDropdown(item);
         }
       });
+    });
 
-      // Hover-switching dropdowns when one is already active
+    // Hover-switching dropdowns when one is active
+    const allHoverableItems = document.querySelectorAll('.menu-item.interactive');
+    allHoverableItems.forEach(item => {
       item.addEventListener('mouseenter', () => {
-        if (activeDropdown && activeDropdown !== item) {
-          openDropdown(item);
-        }
+        onHoverSwitch(item);
       });
     });
 
@@ -1297,6 +1338,7 @@
     document.querySelectorAll('.screenshot-action').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
+        menuSessionActive = false;
         closeAllDropdowns();
         const mode = el.getAttribute('data-mode');
         window.electronAPI.takeScreenshot(mode);
@@ -1305,10 +1347,22 @@
 
     // Close on clicking the backdrop/outside
     document.addEventListener('click', (e) => {
-      if (activeDropdown && !e.target.closest('.menu-item')) {
+      if (!e.target.closest('.menu-item')) {
+        menuSessionActive = false;
         closeAllDropdowns();
+        if (window.electronAPI && window.electronAPI.closeOtherWindows) {
+          window.electronAPI.closeOtherWindows();
+        }
       }
     });
+
+    // Listen for menu session ended from popover blur
+    if (window.electronAPI && window.electronAPI.onMenuSessionEnded) {
+      window.electronAPI.onMenuSessionEnded(() => {
+        menuSessionActive = false;
+        closeAllDropdowns();
+      });
+    }
 
     let currentSettings = null;
 
@@ -1668,6 +1722,7 @@
     spotlightContainer.addEventListener('click', (e) => {
       e.stopPropagation();
       closeAllDropdowns();
+      menuSessionActive = true;
       window.electronAPI.toggleSpotlight();
     });
 
@@ -1675,6 +1730,7 @@
     document.getElementById('menu-cc').addEventListener('click', (e) => {
       e.stopPropagation();
       closeAllDropdowns();
+      menuSessionActive = true;
       const rect = document.getElementById('menu-cc').getBoundingClientRect();
       window.electronAPI.toggleControlCenter({
         left: rect.left,

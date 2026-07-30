@@ -1,3 +1,42 @@
+// Mock electron for testing in headless Node environments
+try {
+  require('electron');
+} catch (e) {
+  const Module = require('module');
+  const originalRequire = Module.prototype.require;
+  Module.prototype.require = function(id) {
+    if (id === 'electron') {
+      return {
+        app: {
+          getPath: () => __dirname,
+          getAppPath: () => __dirname
+        },
+        ipcMain: {
+          on: () => {},
+          handle: () => {}
+        },
+        BrowserWindow: class {
+          constructor() {}
+          loadURL() {}
+          loadFile() {}
+          on() {}
+          once() {}
+          webContents = {
+            send: () => {}
+          }
+          setIgnoreMouseEvents() {}
+        },
+        screen: {
+          getPrimaryDisplay: () => ({
+            bounds: { x: 0, y: 0, width: 1920, height: 1080 }
+          })
+        }
+      };
+    }
+    return originalRequire.apply(this, arguments);
+  };
+}
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHideStateMachine, STATES } = require('../src/shared/hideStateMachine');
