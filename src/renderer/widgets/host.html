@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Desktop Widget Host</title>
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="../../../shared/theme.css">
   <style>
     body {
       width: 100vw;
@@ -29,5 +30,31 @@
 <body>
   <div id="widget-canvas"></div>
   <script src="host.js"></script>
+  <script>
+    // Style Mode — rendering-layer-only theme sync (nodeIntegration window)
+    (() => {
+      const { ipcRenderer } = require('electron');
+      const STYLE_CLASSES = ['style-liquid-glass','style-neumorphism','style-glassmorphism-aero','style-neobrutalism','style-claymorphism','style-fluent-acrylic'];
+      const INTENSITY_CLASSES = ['style-intensity-subtle','style-intensity-standard','style-intensity-bold'];
+      const STYLE_ACCENT_MAP = { liquidGlass:'--accent-liquid-glass', neumorphism:'--accent-neumorphism', glassmorphismAero:'--accent-glassmorphism-aero', neobrutalism:'--accent-neobrutalism', claymorphism:'--accent-claymorphism', fluentAcrylic:'--accent-fluent-acrylic', custom:'--accent-custom' };
+      function applyThemeConfig(themeData) {
+        if (!themeData) return;
+        document.body.classList.toggle('dark-theme', themeData.theme === 'dark');
+        STYLE_CLASSES.forEach(c => document.body.classList.remove(c));
+        if (themeData.styleClass) document.body.classList.add(themeData.styleClass);
+        INTENSITY_CLASSES.forEach(c => document.body.classList.remove(c));
+        if (themeData.intensityClass) document.body.classList.add(themeData.intensityClass);
+        document.body.classList.toggle('low-ram-mode', !!themeData.lowRamMode);
+        if (themeData.accentColor) document.documentElement.style.setProperty('--accent-color', themeData.accentColor);
+        if (themeData.accentByStyle) {
+          Object.keys(themeData.accentByStyle).forEach(k => {
+            if (STYLE_ACCENT_MAP[k]) document.documentElement.style.setProperty(STYLE_ACCENT_MAP[k], themeData.accentByStyle[k]);
+          });
+        }
+      }
+      ipcRenderer.on('theme-changed', (_e, d) => applyThemeConfig(d));
+      ipcRenderer.invoke('get-theme-config').then(applyThemeConfig).catch(console.error);
+    })();
+  </script>
 </body>
 </html>

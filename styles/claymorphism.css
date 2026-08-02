@@ -1,0 +1,603 @@
+/* =====================================================================
+   STYLE MODE — CLAYMORPHISM  (3D, soft, colorful)
+   ---------------------------------------------------------------------
+   Technique:
+   • Dual-shadow extrusion like neumorphism BUT color-tinted: light shadow
+     in a lighter shade of the accent, dark shadow in a deeper shade —
+     never neutral gray.
+   • Dramatic corner rounding (24-32px) — closer to "blob" shapes.
+   • Larger, softer blur radius (14-20px) for a pillowy 3D feel.
+   • Inner top highlight: subtle inset light highlight simulating glossy
+     clay/rubber catching light.
+   • Vibrant saturated palette REQUIRED — accent saturation is boosted by
+     main.js (--accent-claymorphism).
+   ===================================================================== */
+
+/* ---------- Root variables (light) ---------- */
+.style-claymorphism {
+  --glass-blur: 0px;
+  --glass-opacity: 1;
+  --corner-radius: 28px;
+  --radius-sm: 18px;
+  --radius-md: 24px;
+  --radius-lg: 30px;
+
+  --clay-blur: 16px;
+  --clay-ink: color-mix(in srgb, var(--accent-color) 62%, #000000);
+  --clay-paper: color-mix(in srgb, var(--accent-color) 14%, #fdfbff);
+  --clay-soft: color-mix(in srgb, var(--accent-color) 10%, #ffffff);
+  --clay-strong: color-mix(in srgb, var(--accent-color) 26%, #ffffff);
+  --clay-shadow-out: -8px -8px var(--clay-blur) color-mix(in srgb, var(--accent-color) 34%, #ffffff),
+                      10px 10px var(--clay-blur) var(--clay-ink);
+  --clay-shadow-out-sm: -6px -6px 12px color-mix(in srgb, var(--accent-color) 30%, #ffffff),
+                         7px 7px 12px color-mix(in srgb, var(--accent-color) 58%, #000000);
+  --clay-shadow-in: inset 6px 6px 14px color-mix(in srgb, var(--accent-color) 42%, #000000),
+                    inset -6px -6px 14px color-mix(in srgb, var(--accent-color) 22%, #ffffff);
+  --clay-shadow-in-sm: inset 4px 4px 10px color-mix(in srgb, var(--accent-color) 38%, #000000),
+                       inset -4px -4px 10px color-mix(in srgb, var(--accent-color) 20%, #ffffff);
+  --clay-highlight: inset 0 2px 6px rgba(255, 255, 255, 0.55), inset 0 -3px 8px color-mix(in srgb, var(--accent-color) 18%, transparent);
+
+  --shadow-resting: var(--clay-shadow-out);
+  --shadow-raised: var(--clay-shadow-out);
+  --shadow-floating: -10px -10px 24px color-mix(in srgb, var(--accent-color) 36%, #ffffff),
+                     14px 16px 26px var(--clay-ink);
+  --shadow-sm: var(--clay-shadow-out-sm);
+  --shadow-lg: var(--clay-shadow-floating, var(--clay-shadow-out));
+
+  --font-weight: 600;
+
+  --text-strong: color-mix(in srgb, var(--accent-color) 45%, #1c1c1e);
+  --text-soft: color-mix(in srgb, var(--accent-color) 30%, #4a4a4f);
+  --text-color: color-mix(in srgb, var(--accent-color) 45%, #1c1c1e);
+  --text-muted: color-mix(in srgb, var(--accent-color) 26%, #6e6e73);
+  --border-color: rgba(255, 255, 255, 0.35);
+  --bg-color: var(--clay-paper);
+  --panel-bg: var(--clay-paper);
+  --sidebar-bg: var(--clay-soft);
+  --sidebar-border: rgba(255, 255, 255, 0.4);
+  --hover-bg: rgba(255, 255, 255, 0.5);
+  --selected-bg: color-mix(in srgb, var(--accent-color) 20%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  --glass-bg: var(--clay-soft);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --text-main: color-mix(in srgb, var(--accent-color) 45%, #1c1c1e);
+  --card-bg: var(--clay-soft);
+  --card-hover: var(--clay-strong);
+
+  --accent-color: var(--accent-claymorphism, var(--accent-color));
+  --accent-color-translucent: color-mix(in srgb, var(--accent-claymorphism, #007aff) 20%, transparent);
+}
+
+/* ---------- Dark ---------- */
+.style-claymorphism.dark-theme {
+  --clay-ink: color-mix(in srgb, var(--accent-color) 58%, #000000);
+  --clay-paper: color-mix(in srgb, var(--accent-color) 16%, #121216);
+  --clay-soft: color-mix(in srgb, var(--accent-color) 12%, #1b1b22);
+  --clay-strong: color-mix(in srgb, var(--accent-color) 22%, #24242c);
+  --clay-shadow-out: -8px -8px var(--clay-blur) color-mix(in srgb, var(--accent-color) 16%, #26262e),
+                      10px 10px var(--clay-blur) color-mix(in srgb, #000000 72%, transparent);
+  --clay-shadow-out-sm: -6px -6px 12px color-mix(in srgb, var(--accent-color) 14%, #26262e),
+                         7px 7px 12px color-mix(in srgb, #000000 66%, transparent);
+  --clay-shadow-in: inset 6px 6px 14px color-mix(in srgb, #000000 55%, transparent),
+                    inset -6px -6px 14px color-mix(in srgb, var(--accent-color) 14%, transparent);
+  --clay-shadow-in-sm: inset 4px 4px 10px color-mix(in srgb, #000000 48%, transparent),
+                       inset -4px -4px 10px color-mix(in srgb, var(--accent-color) 12%, transparent);
+  --clay-highlight: inset 0 2px 6px color-mix(in srgb, var(--accent-color) 26%, #ffffff 0%), inset 0 -3px 8px color-mix(in srgb, var(--accent-color) 16%, transparent);
+
+  --text-strong: #f5f5f7;
+  --text-soft: rgba(245, 245, 247, 0.72);
+  --text-color: #f5f5f7;
+  --text-muted: #98989f;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --bg-color: var(--clay-paper);
+  --panel-bg: var(--clay-paper);
+  --sidebar-bg: var(--clay-soft);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --selected-bg: color-mix(in srgb, var(--accent-color) 26%, transparent);
+  --glass-bg: var(--clay-soft);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --text-main: #f5f5f7;
+  --card-bg: var(--clay-soft);
+  --card-hover: var(--clay-strong);
+}
+
+/* ---------- Intensity ---------- */
+.style-claymorphism.style-intensity-subtle {
+  --clay-blur: 10px;
+  --corner-radius: 24px;
+  --clay-shadow-out: -6px -6px var(--clay-blur) color-mix(in srgb, var(--accent-color) 30%, #ffffff),
+                       8px 8px var(--clay-blur) color-mix(in srgb, var(--accent-color) 56%, #000000);
+  --clay-shadow-in: inset 4px 4px 10px color-mix(in srgb, var(--accent-color) 36%, #000000),
+                    inset -4px -4px 10px color-mix(in srgb, var(--accent-color) 18%, #ffffff);
+}
+.style-claymorphism.style-intensity-bold {
+  --clay-blur: 22px;
+  --corner-radius: 32px;
+  --clay-shadow-out: -10px -10px var(--clay-blur) color-mix(in srgb, var(--accent-color) 40%, #ffffff),
+                       14px 14px var(--clay-blur) var(--clay-ink);
+  --clay-shadow-in: inset 8px 8px 18px color-mix(in srgb, var(--accent-color) 48%, #000000),
+                    inset -8px -8px 18px color-mix(in srgb, var(--accent-color) 26%, #ffffff);
+}
+
+/* =====================================================================
+   CLAY SURFACE PRIMITIVE — pillowy gradient + colored shadows + top glow
+   ===================================================================== */
+.style-claymorphism .dock-container,
+.style-claymorphism .dropdown-menu,
+.style-claymorphism .context-menu,
+.style-claymorphism .cc-panel,
+.style-claymorphism #panel,
+.style-claymorphism .spotlight-results,
+.style-claymorphism .favorites-sidebar,
+.style-claymorphism .glass-container,
+.style-claymorphism .widget-box.mode-view,
+.style-claymorphism .widget-settings-popover,
+.style-claymorphism .panel-container,
+.style-claymorphism .widget-card,
+.style-claymorphism .cc-box,
+.style-claymorphism .cc-slider-box,
+.style-claymorphism .cc-now-playing,
+.style-claymorphism .toast {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+}
+
+/* ---------- Pressed / inset ---------- */
+.style-claymorphism .menu-item.active,
+.style-claymorphism .dropdown-item:active,
+.style-claymorphism .context-menu-item:active,
+.style-claymorphism .menu-item-custom:active,
+.style-claymorphism .cc-icon.active,
+.style-claymorphism .switch input:checked + .slider,
+.style-claymorphism .cc-net-icon.active,
+.style-claymorphism .cc-focus-icon.active,
+.style-claymorphism .toggle-edit-btn.active,
+.style-claymorphism .cal-day.today,
+.style-claymorphism button:active,
+.style-claymorphism .fav-item:active,
+.style-claymorphism .refresh-btn:active,
+.style-claymorphism .search-bar:focus {
+  box-shadow: var(--clay-shadow-in) !important;
+}
+
+/* =====================================================================
+   MENU BAR  (index.html)
+   ===================================================================== */
+.style-claymorphism .menu-bar {
+  background: linear-gradient(180deg, var(--clay-strong), var(--clay-soft));
+  border-bottom: none;
+  box-shadow: var(--clay-highlight), 0 6px 16px color-mix(in srgb, var(--accent-color) 30%, transparent);
+  opacity: 1 !important;
+}
+.style-claymorphism .menu-item {
+  border-radius: 12px;
+  font-weight: var(--font-weight);
+}
+.style-claymorphism .menu-item:hover {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: var(--clay-shadow-out-sm);
+}
+.style-claymorphism .menu-item.active {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .menu-item svg,
+.style-claymorphism .menu-item img {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.style-claymorphism .menu-item:hover svg,
+.style-claymorphism .menu-item:hover img {
+  transform: scale(1.08);
+}
+.style-claymorphism .dropdown-item {
+  border-radius: 14px;
+}
+.style-claymorphism .dropdown-item:hover {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 70%, #ffffff), var(--accent-color)) !important;
+  color: #fff;
+}
+.style-claymorphism .dropdown-divider {
+  background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  height: 2px;
+  border-radius: 2px;
+}
+.style-claymorphism .dropdown-header {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+.style-claymorphism .cc-box,
+.style-claymorphism .cc-box-wide {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border: none;
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .cc-net-icon,
+.style-claymorphism .cc-focus-icon {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .cc-net-icon.active,
+.style-claymorphism .cc-focus-icon.active {
+  background: var(--accent-color);
+  box-shadow: var(--clay-shadow-in) !important;
+}
+.style-claymorphism .spotlight-container {
+  border-radius: 14px;
+}
+.style-claymorphism .spotlight-container:hover {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: var(--clay-shadow-out-sm);
+}
+.style-claymorphism .spotlight-result-item:hover {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 70%, #ffffff), var(--accent-color));
+  color: #fff;
+}
+.style-claymorphism .toast-message {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 78%, #ffffff), var(--accent-color));
+  border-radius: 18px;
+  box-shadow: var(--clay-shadow-out-sm);
+  color: #fff;
+}
+
+/* =====================================================================
+   DOCK  (dock/index.html)
+   ===================================================================== */
+.style-claymorphism .dock-container {
+  border-radius: calc(var(--corner-radius) * 0.92);
+}
+.style-claymorphism .dock-icon {
+  border-radius: calc(var(--corner-radius) * 0.62);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 16%, #ffffff), color-mix(in srgb, var(--accent-color) 30%, #ffffff));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism.dark-theme .dock-icon {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+}
+.style-claymorphism .dock-item:hover .dock-icon {
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+}
+.style-claymorphism .dock-item.active .dock-icon {
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .divider {
+  background: color-mix(in srgb, var(--accent-color) 24%, transparent);
+  width: 2px;
+  border-radius: 2px;
+}
+.style-claymorphism .dot-indicator-sub {
+  background: color-mix(in srgb, var(--accent-color) 55%, #ffffff);
+}
+.style-claymorphism.dark-theme .dot-indicator-sub {
+  background: color-mix(in srgb, var(--accent-color) 60%, #000000);
+}
+.style-claymorphism .badge {
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: var(--clay-shadow-out-sm);
+}
+.style-claymorphism .menu-item-custom {
+  border-radius: 12px;
+}
+.style-claymorphism .menu-item-custom:hover {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 70%, #ffffff), var(--accent-color)) !important;
+  color: #fff;
+}
+.style-claymorphism .menu-item-custom:active {
+  box-shadow: var(--clay-shadow-in) !important;
+}
+.style-claymorphism .menu-divider-custom {
+  background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  height: 2px;
+  border-radius: 2px;
+}
+
+/* Collapsed pill */
+.style-claymorphism .dock-container.collapsed {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft)) !important;
+  border: none !important;
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight) !important;
+}
+.style-claymorphism .menu-bar.collapsed {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft)) !important;
+}
+
+/* =====================================================================
+   DRAWER  (dock/drawer.html)
+   ===================================================================== */
+.style-claymorphism .favorites-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+}
+.style-claymorphism .search-bar,
+.style-claymorphism .refresh-btn {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border: none;
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .search-bar:focus {
+  box-shadow: var(--clay-shadow-in) !important;
+}
+.style-claymorphism .refresh-btn {
+  border-radius: 50%;
+}
+.style-claymorphism .app-icon,
+.style-claymorphism .app-icon-fallback,
+.style-claymorphism .fav-icon,
+.style-claymorphism .fav-icon-fallback,
+.style-claymorphism .folder-tile {
+  border-radius: 20px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 16%, #ffffff), color-mix(in srgb, var(--accent-color) 32%, #ffffff));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism.dark-theme .app-icon,
+.style-claymorphism.dark-theme .app-icon-fallback,
+.style-claymorphism.dark-theme .fav-icon,
+.style-claymorphism.dark-theme .fav-icon-fallback,
+.style-claymorphism.dark-theme .folder-tile {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+}
+.style-claymorphism .add-app-icon {
+  background: var(--clay-soft);
+  border: 3px dashed color-mix(in srgb, var(--accent-color) 40%, transparent) !important;
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-out-sm);
+}
+.style-claymorphism .fav-item,
+.style-claymorphism .fav-icon {
+  border-radius: 16px;
+}
+.style-claymorphism .dot {
+  background: color-mix(in srgb, var(--accent-color) 45%, #ffffff);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+.style-claymorphism .dot.active {
+  background: var(--accent-color);
+}
+.style-claymorphism .context-menu-item:hover {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 70%, #ffffff), var(--accent-color));
+  color: #fff !important;
+}
+.style-claymorphism #folder-box {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft)) !important;
+  border: none !important;
+  border-radius: 32px;
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+}
+.style-claymorphism .toast {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border-radius: 24px;
+  box-shadow: var(--clay-shadow-out-sm);
+}
+
+/* =====================================================================
+   CONTROL CENTER  (controlcenter.html)
+   ===================================================================== */
+.style-claymorphism .cc-panel {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft)) !important;
+  border: none !important;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+}
+.style-claymorphism .cc-box,
+.style-claymorphism .cc-slider-box,
+.style-claymorphism .cc-now-playing {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border: none;
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .cc-icon {
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .cc-icon.active {
+  background: var(--accent-color) !important;
+  box-shadow: var(--clay-shadow-in) !important;
+}
+.style-claymorphism .cc-icon.active.dnd-color {
+  background: #5856d6 !important;
+}
+.style-claymorphism .error-text {
+  color: color-mix(in srgb, var(--accent-color) 40%, #ff453a);
+}
+
+/* =====================================================================
+   NOTIFICATION CENTER  (notificationcenter.html)
+   ===================================================================== */
+.style-claymorphism #panel {
+  border-left: none;
+}
+.style-claymorphism .panel-header {
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+.style-claymorphism .widget-card {
+  border-radius: 24px;
+}
+.style-claymorphism .edit-btn,
+.style-claymorphism .cal-nav button,
+.style-claymorphism .widget-edit-actions button {
+  background: var(--clay-soft);
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .edit-btn:hover,
+.style-claymorphism .cal-nav button:hover,
+.style-claymorphism .widget-edit-actions button:hover {
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .edit-done-btn {
+  background: var(--accent-color);
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+  color: #fff;
+}
+.style-claymorphism .cal-day.today {
+  background: var(--accent-color);
+  color: #fff;
+}
+.style-claymorphism .edit-overlay {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  box-shadow: var(--clay-shadow-out);
+}
+
+/* =====================================================================
+   WIDGETS  (theme.css surfaces + access panel)
+   ===================================================================== */
+.style-claymorphism .glass-container {
+  border-radius: var(--radius-md);
+}
+.style-claymorphism .widget-box.mode-view {
+  border-radius: var(--radius-md);
+}
+.style-claymorphism .widget-box.mode-edit {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft)) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.style-claymorphism .widget-settings-popover {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border-radius: var(--radius-md);
+}
+.style-claymorphism .popover-header {
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+.style-claymorphism .popover-row input[type="text"],
+.style-claymorphism .popover-row select {
+  background: var(--clay-paper);
+  border: none;
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .edit-btn-icon {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .edit-btn-icon:hover {
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .widget-edit-controls {
+  background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+.style-claymorphism .panel-container {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+}
+.style-claymorphism .widget-type-card {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .widget-type-card:hover {
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+}
+.style-claymorphism .toggle-edit-btn {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism .add-btn {
+  background: var(--accent-color);
+  border-radius: 14px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+  color: #fff;
+}
+.style-claymorphism .live-preview-wrapper {
+  background: var(--clay-paper);
+  border-radius: 16px;
+  box-shadow: var(--clay-shadow-in-sm);
+}
+
+/* =====================================================================
+   SETTINGS WINDOW CHROME  (settings.html)
+   ===================================================================== */
+.style-claymorphism .sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+}
+.style-claymorphism.dark-theme .sidebar {
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+.style-claymorphism .content-area {
+  background-color: var(--panel-bg);
+}
+.style-claymorphism .sidebar-item:hover {
+  background-color: var(--hover-bg);
+  box-shadow: var(--clay-shadow-in-sm);
+}
+.style-claymorphism .sidebar-item.active {
+  background-color: var(--selected-bg);
+  box-shadow: var(--clay-shadow-in);
+}
+.style-claymorphism h2 {
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-color) 22%, transparent);
+}
+.style-claymorphism .setting-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+.style-claymorphism.dark-theme .setting-row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.style-claymorphism button {
+  background-color: var(--clay-soft);
+  border: none;
+  color: var(--text-color);
+  border-radius: 14px;
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism button:hover {
+  background-color: var(--clay-strong);
+}
+.style-claymorphism button:active {
+  box-shadow: var(--clay-shadow-in) !important;
+}
+.style-claymorphism .slider-container input[type="range"] {
+  accent-color: var(--accent-color);
+}
+.style-claymorphism #sidebar-preview-flyout,
+.style-claymorphism #theme-preview-flyout {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+  color: var(--text-color);
+}
+
+/* =====================================================================
+   MINI PREVIEW  (Settings → Appearance gallery cards)
+   ===================================================================== */
+.style-claymorphism .mini-dock {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+  border-radius: 22px;
+  box-shadow: var(--clay-shadow-out), var(--clay-highlight);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+}
+.style-claymorphism .mini-dock-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent-color) 16%, #ffffff), color-mix(in srgb, var(--accent-color) 34%, #ffffff));
+  box-shadow: var(--clay-shadow-out-sm), var(--clay-highlight);
+}
+.style-claymorphism.dark-theme .mini-dock-icon {
+  background: linear-gradient(145deg, var(--clay-strong), var(--clay-soft));
+}
+.style-claymorphism .mini-dock-icon.active {
+  background: var(--accent-color);
+  box-shadow: var(--clay-shadow-in-sm) !important;
+}
+.style-claymorphism .mini-dock-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-color) 55%, #ffffff);
+}

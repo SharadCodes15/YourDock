@@ -152,6 +152,7 @@
     }
     .toast-message.show { opacity: 1; }
   </style>
+  <link rel="stylesheet" href="shared/theme.css">
 </head>
 <body>
   <div class="panel" id="panel">
@@ -207,6 +208,22 @@
       }
       document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r},${g},${b},0.15)`);
       document.documentElement.style.setProperty('--accent-rgb', `${r},${g},${b}`);
+
+      // Style Mode — swap root style classes live (rendering layer only)
+      if (document.body) {
+        ['style-liquid-glass','style-neumorphism','style-glassmorphism-aero','style-neobrutalism','style-claymorphism','style-fluent-acrylic'].forEach(c => document.body.classList.remove(c));
+        if (themeData.styleClass) document.body.classList.add(themeData.styleClass);
+        ['style-intensity-subtle','style-intensity-standard','style-intensity-bold'].forEach(c => document.body.classList.remove(c));
+        if (themeData.intensityClass) document.body.classList.add(themeData.intensityClass);
+        if (themeData.lowRamMode) document.body.classList.add('low-ram-mode');
+        else document.body.classList.remove('low-ram-mode');
+      }
+      if (themeData.accentByStyle) {
+        const styleAccentMap = { liquidGlass:'--accent-liquid-glass', neumorphism:'--accent-neumorphism', glassmorphismAero:'--accent-glassmorphism-aero', neobrutalism:'--accent-neobrutalism', claymorphism:'--accent-claymorphism', fluentAcrylic:'--accent-fluent-acrylic', custom:'--accent-custom' };
+        Object.keys(themeData.accentByStyle).forEach(k => {
+          if (styleAccentMap[k]) document.documentElement.style.setProperty(styleAccentMap[k], themeData.accentByStyle[k]);
+        });
+      }
     }
 
     window.notificationAPI.onThemeChanged(applyThemeConfig);

@@ -158,6 +158,8 @@ async function loadSettings() {
       // Ensure new sections exist with defaults for upgrade compatibility
       if (!settings.displays) settings.displays = { dockDisplayId: null, menuBarDisplayId: null, dockOnAllDisplays: false, menuBarOnAllDisplays: false };
       if (!settings.appearance.colors) settings.appearance.colors = { dockBgTint: '', menuBarBgTint: '', notificationCenterBgTint: '', accentOverride: '', badgeColor: '', textColorOverride: '' };
+      if (!settings.appearance.styleMode) settings.appearance.styleMode = 'custom';
+      if (!settings.appearance.styleIntensity) settings.appearance.styleIntensity = 'standard';
       if (!settings.builtinThemes) settings.builtinThemes = [];
       if (!settings.experimental) settings.experimental = { unlocked: false, featureFlags: { directionalReveal: true, autoArrangeByUsage: false, weatherWidget: true } };
       if (!settings.performance) settings.performance = { lowRamMode: true, debugOverlay: false, verboseLogging: false };
@@ -1251,6 +1253,110 @@ function showSettingsWindow() {
 
 
 
+// --- Style Mode helpers -------------------------------------------------
+// Style id (camelCase from settings) -> root CSS class (kebab-case)
+const STYLE_MODE_IDS = ['liquidGlass', 'neumorphism', 'glassmorphismAero', 'neobrutalism', 'claymorphism', 'fluentAcrylic'];
+const STYLE_MODE_CLASSES = ['liquid-glass', 'neumorphism', 'glassmorphism-aero', 'neobrutalism', 'claymorphism', 'fluent-acrylic'];
+const STYLE_INTENSITIES = ['subtle', 'standard', 'bold'];
+
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  if (h.length !== 6) return null;
+  const n = parseInt(h, 16);
+  if (isNaN(n)) return null;
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function rgbToHex(r, g, b) {
+  const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+  return '#' + [clamp(r), clamp(g), clamp(b)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return { r: r * 255, g: g * 255, b: b * 255 };
+}
+
+// Per-style accent transforms (muting for Neumorphism, saturation boost for
+// Claymorphism, high-contrast clamp for Neobrutalism). Everything else keeps
+// the user's chosen accent untouched.
+function adjustAccentForStyle(hex, styleMode, isDark) {
+  const rgb = hexToRgb(hex);
+  if (!rgb || !styleMode || styleMode === 'custom') return hex;
+  if (styleMode === 'neumorphism') {
+    // Clamp saturation + lightness into a muted, soft-UI range.
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const targetS = Math.min(hsl.s, isDark ? 26 : 20);
+    const targetL = isDark ? Math.min(Math.max(hsl.l, 46), 58) : Math.min(Math.max(hsl.l, 62), 74);
+    const out = hslToRgb(hsl.h, targetS, targetL);
+    return rgbToHex(out.r, out.g, out.b);
+  }
+  if (styleMode === 'claymorphism') {
+    // Boost saturation to make the palette read vibrant / "clay".
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const targetS = Math.min(100, hsl.s * 1.45 + 8);
+    const out = hslToRgb(hsl.h, targetS, hsl.l);
+    return rgbToHex(out.r, out.g, out.b);
+  }
+  if (styleMode === 'neobrutalism') {
+    // Keep hues strong but ensure enough contrast against flat surfaces.
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const targetS = Math.max(hsl.s, 70);
+    const targetL = isDark ? Math.min(Math.max(hsl.l, 52), 62) : Math.min(Math.max(hsl.l, 44), 56);
+    const out = hslToRgb(hsl.h, targetS, targetL);
+    return rgbToHex(out.r, out.g, out.b);
+  }
+  return hex;
+}
+
+function resolveStyleMode() {
+  const raw = (settings.appearance && settings.appearance.styleMode) || 'custom';
+  const styleMode = STYLE_MODE_IDS.includes(raw) ? raw : 'custom';
+  const intensity = (settings.appearance && settings.appearance.styleIntensity) || 'standard';
+  const styleIntensity = STYLE_INTENSITIES.includes(intensity) ? intensity : 'standard';
+  const idx = STYLE_MODE_IDS.indexOf(styleMode);
+  return {
+    styleMode,
+    styleIntensity,
+    styleClass: idx >= 0 ? 'style-' + STYLE_MODE_CLASSES[idx] : '',
+    intensityClass: 'style-intensity-' + styleIntensity
+  };
+}
+
 // Resolve resolved theme values (Light/Dark, opacity, blur, cornerRadius)
 function resolveThemeConfig() {
   let activeTheme = (settings.appearance && settings.appearance.theme) || 'light';
@@ -1283,10 +1389,27 @@ function resolveThemeConfig() {
   if (activeTheme === 'auto') {
     themeValue = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
   }
-  
+  const isDark = themeValue === 'dark';
+
+  // Style Mode resolution
+  const style = resolveStyleMode();
+  const effectiveAccent = adjustAccentForStyle(accentColor, style.styleMode, isDark);
+
+  // Per-style adjusted accents so live gallery previews render accurately.
+  const accentByStyle = {};
+  STYLE_MODE_IDS.forEach(id => {
+    accentByStyle[id] = adjustAccentForStyle(accentColor, id, isDark);
+  });
+  accentByStyle.custom = accentColor;
+
   return {
     theme: themeValue,
-    accentColor,
+    accentColor: effectiveAccent,
+    accentByStyle,
+    styleMode: style.styleMode,
+    styleIntensity: style.styleIntensity,
+    styleClass: style.styleClass,
+    intensityClass: style.intensityClass,
     glassIntensity,
     cornerRadius,
     lowRamMode: !!(settings.performance && settings.performance.lowRamMode),
@@ -1321,6 +1444,24 @@ function broadcastThemeConfig() {
     if (w && !w.isDestroyed()) {
       w.webContents.send('theme-changed', resolved);
     }
+  }
+  // Style Mode is a rendering-layer-only concern, but widget surfaces render
+  // their own glass/panels — keep their style classes in sync too.
+  try {
+    const { getHostWindow } = require('./src/main/widgets/widgetHostWindow');
+    const { isAccessPanelOpen } = require('./src/main/widgets/widgetAccessPanel');
+    const widgetWin = getHostWindow();
+    if (widgetWin && !widgetWin.isDestroyed()) {
+      widgetWin.webContents.send('theme-changed', resolved);
+    }
+    if (isAccessPanelOpen()) {
+      const panelWin = require('./src/main/widgets/widgetAccessPanel').getAccessPanelWindow();
+      if (panelWin && !panelWin.isDestroyed()) {
+        panelWin.webContents.send('theme-changed', resolved);
+      }
+    }
+  } catch (err) {
+    // Widget subsystem may not be initialized yet — that's fine.
   }
 }
 

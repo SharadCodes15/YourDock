@@ -1,0 +1,700 @@
+/* =====================================================================
+   STYLE MODE — LIQUID GLASS  (Apple visionOS / iOS 18+)
+   ---------------------------------------------------------------------
+   Technique:
+   • Layered translucency: base backdrop blur/saturate/brightness plus a
+     low-opacity specular "sheen" pseudo-layer (simulates light catching).
+   • Dynamic edge highlight: 1px gradient border ring drawn via the
+     background padding-box/border-box technique — bright top-left fading
+     to transparent bottom-right (light source from top-left).
+   • Refraction-style hover: subtle scale+skew micro-transform on icons,
+     eased with the app's spring curve.
+   • Squircle approximation: generous border-radius + inset highlight ring
+     to fake continuous curvature.
+   • Auto-tint: very low opacity overlay of the current accent color so
+     content behind the glass appears to influence the perceived tint.
+   ===================================================================== */
+
+/* ---------- Root variables (light) ---------- */
+.style-liquid-glass {
+  --glass-blur: 24px;
+  --glass-opacity: 0.82;
+  --corner-radius: 26px;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+
+  --shadow-resting: 0 2px 6px rgba(0, 0, 0, 0.08), 0 10px 28px rgba(0, 0, 0, 0.14);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.1), 0 18px 44px rgba(0, 0, 0, 0.18);
+  --shadow-floating: 0 8px 18px rgba(0, 0, 0, 0.12), 0 30px 70px rgba(0, 0, 0, 0.24);
+  --shadow-sm: var(--shadow-resting);
+  --shadow-lg: var(--shadow-floating);
+
+  --font-weight: 500;
+  --border-width: 1px;
+
+  --surface-grad-a: rgba(255, 255, 255, 0.52);
+  --surface-grad-b: rgba(255, 255, 255, 0.38);
+  --surface-alt-a: rgba(255, 255, 255, 0.34);
+  --surface-alt-b: rgba(255, 255, 255, 0.2);
+  --edge-hi: rgba(255, 255, 255, 0.8);
+  --edge-mid: rgba(255, 255, 255, 0.22);
+  --edge-lo: rgba(255, 255, 255, 0.06);
+  --sheen: 0.09;
+  --tint-alpha: 5%;
+
+  --text-strong: #1d1d1f;
+  --text-soft: rgba(29, 29, 31, 0.72);
+  --text-color: #1d1d1f;
+  --text-muted: #6e6e73;
+  --border-color: rgba(0, 0, 0, 0.06);
+  --glass-bg: rgba(255, 255, 255, 0.42);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --text-main: #1d1d1f;
+  --card-bg: rgba(255, 255, 255, 0.3);
+  --card-hover: rgba(255, 255, 255, 0.45);
+  --bg-color: #e8e8ee;
+  --panel-bg: #f2f2f6;
+  --sidebar-bg: #e4e4ea;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --selected-bg: rgba(0, 122, 255, 0.14);
+  --accent-soft: rgba(0, 122, 255, 0.12);
+}
+
+/* ---------- Root variables (dark) ---------- */
+.style-liquid-glass.dark-theme {
+  --surface-grad-a: rgba(40, 40, 46, 0.6);
+  --surface-grad-b: rgba(28, 28, 34, 0.48);
+  --surface-alt-a: rgba(255, 255, 255, 0.1);
+  --surface-alt-b: rgba(255, 255, 255, 0.05);
+  --edge-hi: rgba(255, 255, 255, 0.3);
+  --edge-mid: rgba(255, 255, 255, 0.1);
+  --edge-lo: rgba(255, 255, 255, 0.03);
+  --sheen: 0.06;
+  --text-strong: #f5f5f7;
+  --text-soft: rgba(245, 245, 247, 0.72);
+  --text-color: #f5f5f7;
+  --text-muted: #98989f;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(30, 30, 36, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --text-main: #f5f5f7;
+  --card-bg: rgba(255, 255, 255, 0.08);
+  --card-hover: rgba(255, 255, 255, 0.14);
+  --bg-color: #1c1c1e;
+  --panel-bg: #232326;
+  --sidebar-bg: #1a1a1c;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --selected-bg: rgba(10, 132, 255, 0.3);
+  --accent-soft: rgba(10, 132, 255, 0.22);
+}
+
+/* ---------- Intensity ---------- */
+.style-liquid-glass.style-intensity-subtle {
+  --glass-blur: 16px;
+  --glass-opacity: 0.88;
+  --sheen: 0.05;
+  --tint-alpha: 3%;
+  --edge-hi: rgba(255, 255, 255, 0.6);
+  --edge-mid: rgba(255, 255, 255, 0.14);
+}
+.style-liquid-glass.style-intensity-subtle.dark-theme {
+  --edge-hi: rgba(255, 255, 255, 0.22);
+  --edge-mid: rgba(255, 255, 255, 0.06);
+}
+.style-liquid-glass.style-intensity-bold {
+  --glass-blur: 34px;
+  --glass-opacity: 0.76;
+  --sheen: 0.13;
+  --tint-alpha: 8%;
+  --edge-hi: rgba(255, 255, 255, 0.95);
+  --edge-mid: rgba(255, 255, 255, 0.3);
+  --shadow-resting: 0 3px 8px rgba(0, 0, 0, 0.09), 0 14px 36px rgba(0, 0, 0, 0.17);
+  --shadow-raised: 0 6px 16px rgba(0, 0, 0, 0.12), 0 22px 52px rgba(0, 0, 0, 0.22);
+  --shadow-floating: 0 10px 22px rgba(0, 0, 0, 0.14), 0 36px 84px rgba(0, 0, 0, 0.28);
+  --shadow-sm: var(--shadow-resting);
+  --shadow-lg: var(--shadow-floating);
+}
+
+/* ---------- Low RAM fallback (drop sheen layer + reduce blur) ---------- */
+.style-liquid-glass.low-ram-mode {
+  --glass-blur: 10px;
+  --sheen: 0;
+  --tint-alpha: 0%;
+}
+.style-liquid-glass.low-ram-mode .menu-bar::before,
+.style-liquid-glass.low-ram-mode .dock-container::before,
+.style-liquid-glass.low-ram-mode .dropdown-menu::before,
+.style-liquid-glass.low-ram-mode .context-menu::before,
+.style-liquid-glass.low-ram-mode .cc-panel::before,
+.style-liquid-glass.low-ram-mode #panel::before,
+.style-liquid-glass.low-ram-mode .spotlight-results::before,
+.style-liquid-glass.low-ram-mode .favorites-sidebar::before,
+.style-liquid-glass.low-ram-mode .glass-container::before,
+.style-liquid-glass.low-ram-mode .widget-box.mode-view::before,
+.style-liquid-glass.low-ram-mode .widget-settings-popover::before,
+.style-liquid-glass.low-ram-mode .panel-container::before,
+.style-liquid-glass.low-ram-mode .search-bar::before,
+.style-liquid-glass.low-ram-mode .refresh-btn::before {
+  display: none !important;
+}
+
+/* =====================================================================
+   SHARED GLASS SURFACES — layered translucency + gradient edge ring
+   ===================================================================== */
+.style-liquid-glass .dock-container,
+.style-liquid-glass .dropdown-menu,
+.style-liquid-glass .context-menu,
+.style-liquid-glass .cc-panel,
+.style-liquid-glass #panel,
+.style-liquid-glass .spotlight-results,
+.style-liquid-glass .favorites-sidebar,
+.style-liquid-glass .glass-container,
+.style-liquid-glass .widget-box.mode-view,
+.style-liquid-glass .widget-settings-popover,
+.style-liquid-glass .panel-container {
+  position: relative;
+  background:
+    linear-gradient(var(--surface-grad-a), var(--surface-grad-b)) padding-box,
+    linear-gradient(135deg, var(--edge-hi) 0%, var(--edge-mid) 38%, transparent 62%, var(--edge-lo) 100%) border-box;
+  border: var(--border-width) solid transparent;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  box-shadow:
+    var(--shadow-resting),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 2px 12px rgba(255, 255, 255, 0.1);
+}
+
+/* Specular sheen + accent auto-tint overlay */
+.style-liquid-glass .menu-bar::before,
+.style-liquid-glass .dock-container::before,
+.style-liquid-glass .dropdown-menu::before,
+.style-liquid-glass .context-menu::before,
+.style-liquid-glass .cc-panel::before,
+.style-liquid-glass #panel::before,
+.style-liquid-glass .spotlight-results::before,
+.style-liquid-glass .favorites-sidebar::before,
+.style-liquid-glass .glass-container::before,
+.style-liquid-glass .widget-box.mode-view::before,
+.style-liquid-glass .widget-settings-popover::before,
+.style-liquid-glass .panel-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, var(--sheen)) 0%, rgba(255, 255, 255, 0) 42%),
+    color-mix(in srgb, var(--accent-color) var(--tint-alpha), transparent);
+}
+
+/* =====================================================================
+   MENU BAR  (index.html)
+   ===================================================================== */
+.style-liquid-glass .menu-bar {
+  background: linear-gradient(rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.6));
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  border-bottom: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.05);
+  opacity: 1 !important;
+}
+.style-liquid-glass .menu-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, var(--sheen)) 0%, rgba(255, 255, 255, 0) 55%),
+    color-mix(in srgb, var(--accent-color) var(--tint-alpha), transparent);
+}
+.style-liquid-glass .menu-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--edge-hi), rgba(0, 0, 0, 0.06) 40%, rgba(0, 0, 0, 0.06) 60%, var(--edge-hi));
+  pointer-events: none;
+}
+.style-liquid-glass.dark-theme .menu-bar {
+  background: linear-gradient(rgba(38, 38, 44, 0.74), rgba(28, 28, 34, 0.6));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+/* Menu items */
+.style-liquid-glass .menu-item {
+  border-radius: 8px;
+  font-weight: var(--font-weight);
+}
+.style-liquid-glass .menu-item:hover {
+  background-color: rgba(120, 120, 128, 0.14);
+}
+.style-liquid-glass .menu-item.active {
+  background-color: rgba(120, 120, 128, 0.2);
+}
+.style-liquid-glass .menu-item svg,
+.style-liquid-glass .menu-item img {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.style-liquid-glass .menu-item:hover svg,
+.style-liquid-glass .menu-item:hover img {
+  transform: scale(1.08) skewX(-1.5deg);
+}
+
+/* Dropdowns */
+.style-liquid-glass .dropdown-menu {
+  border-radius: var(--corner-radius);
+}
+.style-liquid-glass .dropdown-item {
+  border-radius: 9px;
+}
+.style-liquid-glass .dropdown-item:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 85%, #ffffff), color-mix(in srgb, var(--accent-color) 80%, #000000)) !important;
+  color: #fff;
+}
+.style-liquid-glass .dropdown-divider {
+  background: rgba(0, 0, 0, 0.08);
+}
+.style-liquid-glass.dark-theme .dropdown-divider {
+  background: rgba(255, 255, 255, 0.12);
+}
+.style-liquid-glass .dropdown-header {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+/* Inline control-center surfaces */
+.style-liquid-glass .cc-dropdown {
+  background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.46)) !important;
+  border-radius: 16px !important;
+}
+.style-liquid-glass.dark-theme .cc-dropdown {
+  background: linear-gradient(rgba(40, 40, 46, 0.72), rgba(28, 28, 34, 0.6)) !important;
+}
+.style-liquid-glass .cc-box,
+.style-liquid-glass .cc-box-wide {
+  background: linear-gradient(var(--surface-alt-a), var(--surface-alt-b));
+  border: none;
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+.style-liquid-glass .cc-net-icon,
+.style-liquid-glass .cc-focus-icon {
+  background: rgba(120, 120, 128, 0.16);
+}
+.style-liquid-glass .cc-net-icon.active,
+.style-liquid-glass .cc-focus-icon.active {
+  background: var(--accent-color);
+}
+
+/* Spotlight */
+.style-liquid-glass .spotlight-container {
+  border-radius: 9px;
+}
+.style-liquid-glass .spotlight-container:hover {
+  background: rgba(120, 120, 128, 0.14);
+}
+.style-liquid-glass .spotlight-results {
+  border-radius: var(--corner-radius);
+}
+.style-liquid-glass .spotlight-result-item:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 85%, #ffffff), color-mix(in srgb, var(--accent-color) 80%, #000000));
+  color: #fff;
+}
+
+/* Toast */
+.style-liquid-glass .toast-message {
+  background: color-mix(in srgb, var(--accent-color) 78%, #ffffff 0%);
+  border-radius: 14px;
+  box-shadow: var(--shadow-resting);
+}
+
+/* =====================================================================
+   DOCK  (dock/index.html)
+   ===================================================================== */
+.style-liquid-glass .dock-container {
+  border-radius: calc(var(--corner-radius) * 0.95);
+  transform-origin: bottom center;
+}
+.style-liquid-glass .dock-icon {
+  border-radius: calc(var(--corner-radius) * 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 3px 8px rgba(0, 0, 0, 0.14);
+  transition: box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.style-liquid-glass .dock-item:hover .dock-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: scale(1.04) skewX(-1.2deg) skewY(0.4deg);
+}
+.style-liquid-glass .divider {
+  background: linear-gradient(180deg, transparent, rgba(120, 120, 128, 0.35) 50%, transparent);
+}
+.style-liquid-glass .dot-indicator-sub {
+  background: rgba(120, 120, 128, 0.65);
+}
+.style-liquid-glass.dark-theme .dot-indicator-sub {
+  background: rgba(255, 255, 255, 0.75);
+}
+.style-liquid-glass .badge {
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Dock context menu */
+.style-liquid-glass .context-menu {
+  border-radius: var(--corner-radius);
+}
+.style-liquid-glass .menu-item-custom {
+  border-radius: 9px;
+}
+.style-liquid-glass .menu-item-custom:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 85%, #ffffff), color-mix(in srgb, var(--accent-color) 80%, #000000)) !important;
+  color: #fff;
+}
+.style-liquid-glass .menu-divider-custom {
+  background: linear-gradient(90deg, transparent, rgba(120, 120, 128, 0.3) 50%, transparent);
+}
+.style-liquid-glass.dark-theme .menu-divider-custom {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16) 50%, transparent);
+}
+
+/* Tooltip */
+.style-liquid-glass .tooltip {
+  background: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.82));
+  backdrop-filter: blur(16px) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.style-liquid-glass.dark-theme .tooltip {
+  background: linear-gradient(rgba(46, 46, 52, 0.94), rgba(38, 38, 44, 0.9));
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Collapsed pill */
+.style-liquid-glass .dock-container.collapsed {
+  background: linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.42)) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1) !important;
+  border: none !important;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+.style-liquid-glass.dark-theme .dock-container.collapsed {
+  background: linear-gradient(rgba(40, 40, 46, 0.72), rgba(28, 28, 34, 0.6)) !important;
+}
+
+/* =====================================================================
+   DRAWER  (dock/drawer.html)
+   ===================================================================== */
+.style-liquid-glass .favorites-sidebar {
+  border-right: 1px solid rgba(120, 120, 128, 0.18);
+}
+.style-liquid-glass .search-bar,
+.style-liquid-glass .refresh-btn {
+  background: linear-gradient(var(--surface-alt-a), var(--surface-alt-b)) padding-box,
+    linear-gradient(135deg, var(--edge-hi), var(--edge-lo)) border-box;
+  border: var(--border-width) solid transparent;
+  border-radius: 18px;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+}
+.style-liquid-glass .search-bar:focus {
+  background: linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.3)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 70%, #fff), var(--edge-lo)) border-box;
+  border-color: transparent;
+}
+.style-liquid-glass .app-icon,
+.style-liquid-glass .app-icon-fallback,
+.style-liquid-glass .fav-icon,
+.style-liquid-glass .fav-icon-fallback,
+.style-liquid-glass .folder-tile {
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.style-liquid-glass .add-app-icon {
+  background: var(--surface-alt-a);
+  border: 2px dashed rgba(120, 120, 128, 0.4);
+  border-radius: 18px;
+}
+.style-liquid-glass .fav-item,
+.style-liquid-glass .fav-icon {
+  border-radius: 14px;
+}
+.style-liquid-glass .dot {
+  background: rgba(120, 120, 128, 0.4);
+}
+.style-liquid-glass .dot.active {
+  background: #ffffff;
+}
+.style-liquid-glass .toast {
+  background: rgba(20, 20, 22, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 22px;
+  box-shadow: var(--shadow-resting);
+}
+.style-liquid-glass .context-menu {
+  border-radius: var(--corner-radius);
+}
+.style-liquid-glass .context-menu-item:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 85%, #ffffff), color-mix(in srgb, var(--accent-color) 80%, #000000));
+}
+#folder-box.style-liquid-glass-folder,
+.style-liquid-glass #folder-box {
+  background: linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.22));
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%) brightness(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 26px;
+}
+.style-liquid-glass.dark-theme #folder-box {
+  background: linear-gradient(rgba(42, 42, 48, 0.78), rgba(30, 30, 36, 0.66));
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* =====================================================================
+   CONTROL CENTER  (controlcenter.html)
+   ===================================================================== */
+.style-liquid-glass .cc-panel {
+  background:
+    linear-gradient(var(--surface-grad-a), var(--surface-grad-b)) padding-box,
+    linear-gradient(135deg, var(--edge-hi), var(--edge-lo)) border-box !important;
+  border: var(--border-width) solid transparent !important;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--shadow-raised), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.style-liquid-glass .cc-box,
+.style-liquid-glass .cc-slider-box,
+.style-liquid-glass .cc-now-playing {
+  background: var(--surface-alt-a);
+  border: none;
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.style-liquid-glass .cc-icon {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.style-liquid-glass .cc-icon.active {
+  background: var(--accent-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+.style-liquid-glass .cc-icon.active.dnd-color {
+  background: #5856d6;
+}
+.style-liquid-glass .cc-np-art {
+  border-radius: 8px;
+}
+.style-liquid-glass .error-text {
+  color: #ff453a;
+}
+
+/* =====================================================================
+   NOTIFICATION CENTER  (notificationcenter.html)
+   ===================================================================== */
+.style-liquid-glass #panel {
+  border-left: none;
+}
+.style-liquid-glass .panel-header {
+  border-bottom: 1px solid rgba(120, 120, 128, 0.25);
+}
+.style-liquid-glass .widget-card {
+  background: var(--surface-alt-a);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+.style-liquid-glass.dark-theme .widget-card {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+.style-liquid-glass .edit-btn,
+.style-liquid-glass .cal-nav button,
+.style-liquid-glass .widget-edit-actions button {
+  border-radius: 8px;
+}
+.style-liquid-glass .cal-day.today {
+  background: var(--accent-color);
+}
+.style-liquid-glass .edit-done-btn {
+  background: var(--accent-color);
+  border-radius: 8px;
+}
+.style-liquid-glass .edit-overlay {
+  background: linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.82));
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+}
+.style-liquid-glass.dark-theme .edit-overlay {
+  background: linear-gradient(rgba(40, 40, 46, 0.94), rgba(30, 30, 36, 0.9));
+}
+
+/* =====================================================================
+   WIDGETS  (theme.css surfaces + access panel)
+   ===================================================================== */
+.style-liquid-glass .glass-container {
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(var(--surface-grad-a), var(--surface-grad-b)) padding-box,
+    linear-gradient(135deg, var(--edge-hi), var(--edge-lo)) border-box;
+}
+.style-liquid-glass .widget-box.mode-view {
+  border-radius: var(--radius-md);
+}
+.style-liquid-glass .widget-settings-popover {
+  background:
+    linear-gradient(rgba(40, 40, 46, 0.96), rgba(30, 30, 36, 0.92)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.04)) border-box;
+  border-radius: var(--radius-md);
+  color: #f5f5f7;
+}
+.style-liquid-glass .popover-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.style-liquid-glass .edit-btn-icon {
+  background: rgba(255, 255, 255, 0.16);
+}
+.style-liquid-glass .widget-edit-controls {
+  background: rgba(0, 0, 0, 0.36);
+}
+.style-liquid-glass .panel-container {
+  background:
+    linear-gradient(rgba(28, 28, 34, 0.86), rgba(22, 22, 26, 0.84)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)) border-box;
+  border-radius: 0;
+}
+.style-liquid-glass .widget-type-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+}
+.style-liquid-glass .widget-type-card:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.style-liquid-glass .toggle-edit-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+}
+.style-liquid-glass .toggle-edit-btn.active,
+.style-liquid-glass .add-btn {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+.style-liquid-glass .live-preview-wrapper {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+/* =====================================================================
+   SETTINGS WINDOW CHROME  (settings.html)
+   ===================================================================== */
+.style-liquid-glass .sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+}
+.style-liquid-glass .content-area {
+  background-color: var(--panel-bg);
+}
+.style-liquid-glass .sidebar-item:hover {
+  background-color: var(--hover-bg);
+}
+.style-liquid-glass .sidebar-item.active {
+  background-color: var(--selected-bg);
+}
+.style-liquid-glass h2 {
+  border-bottom-color: var(--border-color);
+}
+.style-liquid-glass .setting-row {
+  border-bottom-color: var(--border-color);
+}
+.style-liquid-glass button {
+  border-color: var(--border-color);
+  background-color: var(--panel-bg);
+  color: var(--text-color);
+  border-radius: 8px;
+}
+.style-liquid-glass button:hover {
+  background-color: var(--hover-bg);
+}
+.style-liquid-glass #sidebar-preview-flyout,
+.style-liquid-glass #theme-preview-flyout {
+  background: var(--panel-bg);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 14px;
+  box-shadow: var(--shadow-raised);
+}
+.style-liquid-glass .settings-status-badge {
+  border-radius: 12px;
+}
+
+/* =====================================================================
+   TYPography + misc
+   ===================================================================== */
+.style-liquid-glass .section-title {
+  font-weight: 700;
+}
+.style-liquid-glass .app-label {
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* =====================================================================
+   MINI PREVIEW  (Settings → Appearance gallery cards)
+   ===================================================================== */
+.style-liquid-glass .mini-dock {
+  background:
+    linear-gradient(var(--surface-grad-a), var(--surface-grad-b)) padding-box,
+    linear-gradient(135deg, var(--edge-hi), var(--edge-lo)) border-box;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  box-shadow: var(--shadow-resting), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  position: relative;
+}
+.style-liquid-glass .mini-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, var(--sheen)), transparent 42%),
+    color-mix(in srgb, var(--accent-color) var(--tint-alpha), transparent);
+  pointer-events: none;
+}
+.style-liquid-glass .mini-dock-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 80%, #fff), color-mix(in srgb, var(--accent-color) 70%, #000));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.style-liquid-glass .mini-dock-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(120, 120, 128, 0.7);
+}
+
+/* =====================================================================
+   REDUCE MOTION guard
+   ===================================================================== */
+.style-liquid-glass.reduce-motion .menu-item svg,
+.style-liquid-glass.reduce-motion .menu-item img,
+.style-liquid-glass.reduce-motion .dock-item:hover .dock-icon {
+  transform: none !important;
+  transition: none !important;
+}

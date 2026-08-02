@@ -478,6 +478,7 @@
       transform: translateX(180px) !important;
     }
   </style>
+  <link rel="stylesheet" href="../shared/theme.css">
 </head>
 <body>
   
@@ -507,6 +508,28 @@
   <script>
     let appConfig = {};
     let appIconsMap = {};
+    const iconFallbackSrc = 'icons/preferences.svg';
+    const iconSrcCache = {};          // appId -> resolved (working) src
+    const pendingIconResolutions = {}; // appId -> [callbacks]
+    function getStableIconSrc(appId, preferred, cb) {
+      if (iconSrcCache[appId]) { cb(iconSrcCache[appId]); return; }
+      if (pendingIconResolutions[appId]) { pendingIconResolutions[appId].push(cb); return; }
+      pendingIconResolutions[appId] = [cb];
+      const probe = new Image();
+      probe.onload = () => {
+        iconSrcCache[appId] = preferred;
+        const cbs = pendingIconResolutions[appId];
+        delete pendingIconResolutions[appId];
+        cbs.forEach(c => c(preferred));
+      };
+      probe.onerror = () => {
+        iconSrcCache[appId] = iconFallbackSrc;
+        const cbs = pendingIconResolutions[appId];
+        delete pendingIconResolutions[appId];
+        cbs.forEach(c => c(iconFallbackSrc));
+      };
+      probe.src = preferred;
+    }
     let isLowRamMode = false;
     let isReduceMotion = false;
     let autoHide = false;
@@ -548,10 +571,28 @@
       return rAFActive;
     }
 
+    // Cached dock geometry so the rAF loop never forces layout per frame.
+    let dockLayoutCache = null;
+
+    function refreshDockLayout() {
+      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      const items = document.querySelectorAll('.dock-item');
+      const isHorizontal = position === 'bottom';
+      const layoutItems = [];
+      items.forEach(item => {
+        const rect = item.getBoundingClientRect();
+        const size = isHorizontal ? rect.width : rect.height;
+        const center = isHorizontal ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+        layoutItems.push({ center, size });
+      });
+      dockLayoutCache = { isHorizontal, items: layoutItems };
+    }
+
     function startMagnificationLoop() {
       if (rAFActive) return;
       if (isLowRamMode || isReduceMotion) return;
       if (appConfig.general && appConfig.general.magnificationEnabled === false) return;
+      refreshDockLayout();
       rAFActive = true;
       const loop = () => {
         if (!rAFActive) return;
@@ -576,36 +617,22 @@
     }
 
     function updateMagnification() {
-      const position = (appConfig.general && appConfig.general.dockPosition) || 'bottom';
+      if (!dockLayoutCache || !dockLayoutCache.items.length) refreshDockLayout();
+      const layout = dockLayoutCache;
       const items = document.querySelectorAll('.dock-item');
       if (items.length === 0) return;
 
-      const isHorizontal = position === 'bottom';
-      const sizes = [];
+      const isHorizontal = layout.isHorizontal;
       const centers = [];
-      let totalWidth = 0;
-
-      items.forEach((item, i) => {
-        const rect = item.getBoundingClientRect();
-        const size = isHorizontal ? rect.width : rect.height;
-        const center = isHorizontal ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
-        sizes.push(size);
-        centers.push(center);
-        totalWidth += size + 12;
+      layout.items.forEach(it => {
+        centers.push(it.center);
       });
 
       const cursorPos = isHorizontal ? mouseX : mouseY;
       const scales = [];
-      const baseSizes = [];
-
-      items.forEach((item, i) => {
-        const rect = item.getBoundingClientRect();
-        const size = isHorizontal ? rect.width : rect.height;
-        baseSizes.push(size);
-        const center = centers[i];
-        const d = Math.abs(cursorPos - center);
-        const s = parabolicScale(d, R);
-        scales.push(s);
+      layout.items.forEach(it => {
+        const d = Math.abs(cursorPos - it.center);
+        scales.push(parabolicScale(d, R));
       });
 
       if (isLowRamMode || isReduceMotion) {
@@ -628,13 +655,13 @@
         let shift = 0;
         if (i < cursorItemIndex) {
           for (let j = i + 1; j <= cursorItemIndex; j++) {
-            const grown = baseSizes[j] * scales[j];
-            shift -= (grown - baseSizes[j]) / 2;
+            const grown = layout.items[j].size * scales[j];
+            shift -= (grown - layout.items[j].size) / 2;
           }
         } else if (i > cursorItemIndex) {
           for (let j = cursorItemIndex; j < i; j++) {
-            const grown = baseSizes[j] * scales[j];
-            shift += (grown - baseSizes[j]) / 2;
+            const grown = layout.items[j].size * scales[j];
+            shift += (grown - layout.items[j].size) / 2;
           }
         }
         offsets[i] = shift;
@@ -896,13 +923,13 @@
 
       const img = document.createElement('img');
       img.className = 'dock-icon';
-      if (isTemp) {
-        img.src = data.iconPath || 'icons/preferences.svg';
-        img.onerror = () => { img.onerror = null; img.src = 'icons/preferences.svg'; };
+      const preferred = isTemp
+        ? (data.iconPath || iconFallbackSrc)
+        : ((appIconsMap && appIconsMap[appId]) || `icons/${appId}.svg`);
+      if (iconSrcCache[appId]) {
+        img.src = iconSrcCache[appId];
       } else {
-        const customIcon = appIconsMap && appIconsMap[appId];
-        img.src = customIcon || `icons/${appId}.svg`;
-        img.onerror = () => { img.onerror = null; img.src = 'icons/preferences.svg'; };
+        getStableIconSrc(appId, preferred, src => { img.src = src; });
       }
       img.alt = data.name;
       img.draggable = false;
@@ -979,6 +1006,7 @@
       } else {
         window.electronAPI.setDockWidth(rect.height + 24);
       }
+      refreshDockLayout();
     }
 
     // =====================
@@ -1075,13 +1103,21 @@
       isHovered = false;
       stopMagnificationLoop();
       if (!selectedCtxAppId) {
-        window.electronAPI.setIgnoreMouse(true);
+        applyIgnoreMouse(true, true);
       }
     });
 
+    let lastIgnoreMouseState = null;
+
+    function applyIgnoreMouse(next, force) {
+      if (!force && next === lastIgnoreMouseState) return;
+      lastIgnoreMouseState = next;
+      window.electronAPI.setIgnoreMouse(next);
+    }
+
     function checkMouseIgnore(e) {
       if (selectedCtxAppId) {
-        window.electronAPI.setIgnoreMouse(false);
+        applyIgnoreMouse(false, true);
         return;
       }
       const target = e ? e.target : null;
@@ -1089,7 +1125,7 @@
         target.closest('.interactive') !== null ||
         target.closest('.context-menu') !== null
       );
-      window.electronAPI.setIgnoreMouse(!isOverInteractive);
+      applyIgnoreMouse(!isOverInteractive, false);
     }
 
     // =====================
@@ -1127,7 +1163,7 @@
       }
 
       window.electronAPI.setDockHeight(300);
-      window.electronAPI.setIgnoreMouse(false);
+      applyIgnoreMouse(false, true);
       window.electronAPI.contextMenuState(true);
 
       ctxMenu.style.display = 'block';
@@ -1193,7 +1229,6 @@
       window.electronAPI.contextMenuState(false);
       checkMouseIgnore();
     }
-
     document.getElementById('ctx-open').addEventListener('click', () => {
       if (selectedCtxAppId) {
         const el = document.querySelector(`.dock-item[data-app-id="${selectedCtxAppId}"]`);
@@ -1429,6 +1464,22 @@
         else if (hex.length === 6) { r = parseInt(hex.substring(0,2),16); g = parseInt(hex.substring(2,4),16); b = parseInt(hex.substring(4,6),16); }
       }
       document.documentElement.style.setProperty('--accent-color-translucent', `rgba(${r},${g},${b},0.15)`);
+
+      // Style Mode — swap root style classes live (rendering layer only)
+      if (document.body) {
+        ['style-liquid-glass','style-neumorphism','style-glassmorphism-aero','style-neobrutalism','style-claymorphism','style-fluent-acrylic'].forEach(c => document.body.classList.remove(c));
+        if (themeData.styleClass) document.body.classList.add(themeData.styleClass);
+        ['style-intensity-subtle','style-intensity-standard','style-intensity-bold'].forEach(c => document.body.classList.remove(c));
+        if (themeData.intensityClass) document.body.classList.add(themeData.intensityClass);
+        if (themeData.lowRamMode) document.body.classList.add('low-ram-mode');
+        else document.body.classList.remove('low-ram-mode');
+      }
+      if (themeData.accentByStyle) {
+        const styleAccentMap = { liquidGlass:'--accent-liquid-glass', neumorphism:'--accent-neumorphism', glassmorphismAero:'--accent-glassmorphism-aero', neobrutalism:'--accent-neobrutalism', claymorphism:'--accent-claymorphism', fluentAcrylic:'--accent-fluent-acrylic', custom:'--accent-custom' };
+        Object.keys(themeData.accentByStyle).forEach(k => {
+          if (styleAccentMap[k]) document.documentElement.style.setProperty(styleAccentMap[k], themeData.accentByStyle[k]);
+        });
+      }
     }
 
     if (window.electronAPI.onThemeChanged) {

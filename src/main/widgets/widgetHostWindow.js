@@ -1,15 +1,16 @@
 const { BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('node:path');
+const { pinWindowToWallpaper } = require('./wallpaperPinner');
 
 /**
  * WIDGET HOST WINDOW MANAGEMENT
  *
  * Safe Electron-Only Implementation Note:
  * True "pinned to desktop, always behind everything" wallpaper behavior like Wallpaper Engine
- * requires a native Win32 WorkerW-parenting hack via a native C++ addon (SetParent).
- * That is explicitly OUT OF SCOPE here to prevent app instability and native platform crashes.
- * This module provides the safe, Electron-only best-effort transparent overlay window, using
- * non-alwaysOnTop z-ordering so it naturally falls behind focused application windows.
+ * requires the Win32 WorkerW wallpaper-parenting technique. This module performs that parenting
+ * via a PowerShell + embedded C# P/Invoke helper (wallpaperPinner.js) so no native addon is
+ * shipped. If the helper fails, the window degrades to a normal transparent window with a
+ * moveBottom() fallback so it still sinks behind regular app windows.
  *
  * Zero-Cost Requirement Guarantee:
  * This window is created ONLY when at least 1 widget is placed.
@@ -56,11 +57,29 @@ function createHostWindow(store, registry, onStateChangeCallback) {
   // Default click-through except over widget elements
   hostWindow.setIgnoreMouseEvents(true, { forward: true });
 
+  function pinToWallpaper() {
+    if (!hostWindow || hostWindow.isDestroyed()) return;
+    pinWindowToWallpaper(hostWindow).then((pinned) => {
+      if (!pinned && hostWindow && !hostWindow.isDestroyed()) {
+        // Fallback: sink below regular app windows as best as Electron allows.
+        try { hostWindow.moveBottom(); } catch (e) { /* noop */ }
+      }
+    }).catch(() => {
+      try { if (hostWindow && !hostWindow.isDestroyed()) hostWindow.moveBottom(); } catch (e) { /* noop */ }
+    });
+  }
+
   hostWindow.once('ready-to-show', () => {
     if (hostWindow && !hostWindow.isDestroyed()) {
       hostWindow.showInactive();
       isHostWindowVisible = true;
+      pinToWallpaper();
     }
+  });
+
+  // Re-pin on every show in case Explorer recreated the WorkerW (wallpaper change).
+  hostWindow.on('show', () => {
+    pinToWallpaper();
   });
 
   hostWindow.on('minimize', () => {

@@ -1,0 +1,587 @@
+/* =====================================================================
+   STYLE MODE — NEOBRUTALISM  (bold, flat, high-contrast)
+   ---------------------------------------------------------------------
+   Technique:
+   • Zero blur, zero gradients, zero soft shadows — flat solid colors.
+   • Hard drop shadows: solid-color offset with NO blur radius
+     (box-shadow: 4px 4px 0 0 #000).
+   • Thick visible borders (2px solid black) on every major element.
+   • Pressed state: shift element 2px toward the shadow + reduce the
+     shadow offset to 2px — snappy, not eased.
+   • Bold typography (700+) for titles / labels.
+   • Single intensity (no slider) — the style is intentionally blunt.
+   ===================================================================== */
+
+/* ---------- Root variables ---------- */
+.style-neobrutalism {
+  --glass-blur: 0px;
+  --glass-opacity: 1;
+  --corner-radius: 6px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --nb-ink: #000000;
+  --nb-shadow: 0, 0, 0;
+  --nb-shadow-offset: 4px;
+  --nb-border: 2px;
+  --nb-bg: #f2f2ef;
+  --nb-surface: #ffffff;
+  --nb-surface-alt: #ffffff;
+  --nb-accent-border: #000000;
+
+  --shadow-resting: 4px 4px 0 0 rgb(var(--nb-shadow));
+  --shadow-raised: 4px 4px 0 0 rgb(var(--nb-shadow));
+  --shadow-floating: 5px 6px 0 0 rgb(var(--nb-shadow));
+  --shadow-sm: 3px 3px 0 0 rgb(var(--nb-shadow));
+  --shadow-lg: 5px 6px 0 0 rgb(var(--nb-shadow));
+
+  --font-weight: 700;
+
+  --text-strong: #000000;
+  --text-soft: #1f1f1f;
+  --text-color: #000000;
+  --text-muted: #444444;
+  --border-color: #000000;
+  --bg-color: #f2f2ef;
+  --panel-bg: #ffffff;
+  --sidebar-bg: #e8e8e4;
+  --sidebar-border: #000000;
+  --hover-bg: #ffde59;
+  --selected-bg: #ffde59;
+  --accent-soft: #ffde59;
+  --glass-bg: #ffffff;
+  --glass-border: #000000;
+  --text-main: #000000;
+  --card-bg: #ffffff;
+  --card-hover: #ffde59;
+  --danger-color: #ff3b30;
+
+  --accent-color: var(--accent-neobrutalism, var(--accent-color));
+  --accent-color-translucent: color-mix(in srgb, var(--accent-neobrutalism, #ffde59) 45%, transparent);
+}
+
+/* ---------- Dark ---------- */
+.style-neobrutalism.dark-theme {
+  --nb-ink: #f5f5f5;
+  --nb-shadow: 0, 0, 0;
+  --nb-bg: #141414;
+  --nb-surface: #222222;
+  --nb-surface-alt: #262626;
+  --nb-accent-border: #f5f5f5;
+
+  --text-strong: #f5f5f5;
+  --text-soft: #dddddd;
+  --text-color: #f5f5f5;
+  --text-muted: #aaaaaa;
+  --border-color: #f5f5f5;
+  --bg-color: #141414;
+  --panel-bg: #1c1c1c;
+  --sidebar-bg: #101010;
+  --sidebar-border: #f5f5f5;
+  --hover-bg: #ffde59;
+  --selected-bg: #ffde59;
+  --glass-bg: #1c1c1c;
+  --glass-border: #f5f5f5;
+  --text-main: #f5f5f5;
+  --card-bg: #1c1c1c;
+  --card-hover: #ffde59;
+}
+
+/* =====================================================================
+   BRUTAL SURFACE PRIMITIVE
+   ===================================================================== */
+.style-neobrutalism .dock-container,
+.style-neobrutalism .dropdown-menu,
+.style-neobrutalism .context-menu,
+.style-neobrutalism .cc-panel,
+.style-neobrutalism #panel,
+.style-neobrutalism .spotlight-results,
+.style-neobrutalism .favorites-sidebar,
+.style-neobrutalism .glass-container,
+.style-neobrutalism .widget-box.mode-view,
+.style-neobrutalism .widget-settings-popover,
+.style-neobrutalism .panel-container,
+.style-neobrutalism .tooltip,
+.style-neobrutalism .widget-card,
+.style-neobrutalism .cc-box,
+.style-neobrutalism .cc-slider-box,
+.style-neobrutalism .cc-now-playing,
+.style-neobrutalism .toast {
+  background: var(--nb-surface);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: var(--nb-border) solid var(--nb-ink);
+  border-radius: var(--corner-radius);
+  box-shadow: var(--shadow-resting);
+}
+
+/* Hard shadow uses the accent color at full opacity on interactive tiles */
+.style-neobrutalism .cc-icon,
+.style-neobrutalism .dock-icon,
+.style-neobrutalism .app-icon,
+.style-neobrutalism .app-icon-fallback,
+.style-neobrutalism .fav-icon,
+.style-neobrutalism .fav-icon-fallback,
+.style-neobrutalism .folder-tile,
+.style-neobrutalism .search-bar,
+.style-neobrutalism .refresh-btn,
+.style-neobrutalism button,
+.style-neobrutalism .slider-container,
+.style-neobrutalism .mini-dock-icon {
+  border: var(--nb-border) solid var(--nb-ink);
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* =====================================================================
+   PRESSED STATE — push into the hard shadow, snappy
+   ===================================================================== */
+.style-neobrutalism button:active,
+.style-neobrutalism .dropdown-item:active,
+.style-neobrutalism .menu-item-custom:active,
+.style-neobrutalism .context-menu-item:active,
+.style-neobrutalism .fav-item:active,
+.style-neobrutalism .refresh-btn:active,
+.style-neobrutalism .dock-item:active .dock-icon,
+.style-neobrutalism .toggle-edit-btn.active,
+.style-neobrutalism .cal-day.today,
+.style-neobrutalism .cc-icon.active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow)) !important;
+  transition: none;
+}
+
+/* =====================================================================
+   TYPOGRAPHY — heavy weights
+   ===================================================================== */
+.style-neobrutalism h2,
+.style-neobrutalism .section-title,
+.style-neobrutalism .dropdown-header,
+.style-neobrutalism .panel-header,
+.style-neobrutalism .setting-label,
+.style-neobrutalism .menu-item,
+.style-neobrutalism .dropdown-item,
+.style-neobrutalism .menu-item-custom,
+.style-neobrutalism .context-menu-item,
+.style-neobrutalism .app-label,
+.style-neobrutalism .widget-title,
+.style-neobrutalism .cc-desc {
+  font-weight: 700;
+}
+
+/* =====================================================================
+   MENU BAR  (index.html)
+   ===================================================================== */
+.style-neobrutalism .menu-bar {
+  background: var(--nb-bg);
+  border-bottom: var(--nb-border) solid var(--nb-ink);
+  box-shadow: none;
+  opacity: 1 !important;
+}
+.style-neobrutalism .menu-item {
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+.style-neobrutalism .menu-item:hover {
+  background: var(--hover-bg);
+  border-color: var(--nb-ink);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .menu-item.active {
+  background: var(--hover-bg);
+  border-color: var(--nb-ink);
+}
+.style-neobrutalism .menu-item svg,
+.style-neobrutalism .menu-item img {
+  transition: none;
+}
+.style-neobrutalism .dropdown-item {
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+.style-neobrutalism .dropdown-item:hover {
+  background: var(--hover-bg) !important;
+  border-color: var(--nb-ink);
+  color: var(--nb-ink) !important;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .dropdown-divider {
+  background: var(--nb-ink);
+  height: 2px;
+}
+.style-neobrutalism .cc-box,
+.style-neobrutalism .cc-box-wide {
+  background: var(--nb-surface);
+  border: var(--nb-border) solid var(--nb-ink);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .cc-net-icon,
+.style-neobrutalism .cc-focus-icon {
+  background: var(--nb-surface);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .cc-net-icon.active,
+.style-neobrutalism .cc-focus-icon.active {
+  background: var(--accent-color);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .spotlight-container {
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+.style-neobrutalism .spotlight-container:hover {
+  background: var(--hover-bg);
+  border-color: var(--nb-ink);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .spotlight-result-item:hover {
+  background: var(--hover-bg);
+  color: var(--nb-ink);
+}
+.style-neobrutalism .toast-message {
+  background: var(--nb-ink);
+  color: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 0 var(--nb-accent-border);
+}
+
+/* =====================================================================
+   DOCK  (dock/index.html)
+   ===================================================================== */
+.style-neobrutalism .dock-container {
+  border-radius: 8px;
+}
+.style-neobrutalism .dock-icon {
+  border-radius: 8px;
+  background: var(--nb-surface);
+}
+.style-neobrutalism .dock-item:hover .dock-icon {
+  box-shadow: 4px 4px 0 0 rgb(var(--nb-shadow)) !important;
+}
+.style-neobrutalism .divider {
+  background: var(--nb-ink);
+  width: 2px;
+}
+.style-neobrutalism .dot-indicator-sub {
+  background: var(--nb-ink);
+}
+.style-neobrutalism.dark-theme .dot-indicator-sub {
+  background: #f5f5f5;
+}
+.style-neobrutalism .badge {
+  border: 2px solid var(--nb-surface);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .menu-item-custom {
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+.style-neobrutalism .menu-item-custom:hover {
+  background: var(--hover-bg);
+  border-color: var(--nb-ink);
+  color: var(--nb-ink) !important;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .menu-divider-custom {
+  background: var(--nb-ink);
+  height: 2px;
+}
+
+/* Collapsed pill */
+.style-neobrutalism .dock-container.collapsed {
+  background: var(--nb-bg) !important;
+  border: var(--nb-border) solid var(--nb-ink) !important;
+  box-shadow: 4px 0 0 0 rgb(var(--nb-shadow)) !important;
+}
+.style-neobrutalism .menu-bar.collapsed {
+  background: var(--nb-bg) !important;
+  box-shadow: 0 4px 0 0 rgb(var(--nb-shadow)) !important;
+}
+
+/* =====================================================================
+   DRAWER  (dock/drawer.html)
+   ===================================================================== */
+.style-neobrutalism .favorites-sidebar {
+  border-right: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .search-bar {
+  border-radius: 8px;
+  color: var(--nb-ink);
+}
+.style-neobrutalism .search-bar:focus {
+  border-color: var(--accent-color);
+  box-shadow: 3px 3px 0 0 var(--accent-color) !important;
+}
+.style-neobrutalism .refresh-btn {
+  border-radius: 50%;
+}
+.style-neobrutalism .app-icon,
+.style-neobrutalism .app-icon-fallback,
+.style-neobrutalism .fav-icon,
+.style-neobrutalism .fav-icon-fallback,
+.style-neobrutalism .folder-tile {
+  border-radius: 8px;
+  background: var(--nb-surface);
+}
+.style-neobrutalism .add-app-icon {
+  background: var(--nb-surface);
+  border: 3px dashed var(--nb-ink);
+  border-radius: 8px;
+}
+.style-neobrutalism .fav-item,
+.style-neobrutalism .fav-icon {
+  border-radius: 6px;
+}
+.style-neobrutalism .dot {
+  background: var(--nb-ink);
+  box-shadow: 2px 2px 0 0 var(--nb-accent-border);
+}
+.style-neobrutalism .dot.active {
+  background: var(--accent-color);
+}
+.style-neobrutalism .context-menu-item:hover {
+  background: var(--hover-bg);
+  color: var(--nb-ink) !important;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism #folder-box {
+  background: var(--nb-surface) !important;
+  border: var(--nb-border) solid var(--nb-ink) !important;
+  border-radius: 10px;
+  box-shadow: 6px 6px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .toast {
+  background: var(--nb-ink);
+  color: var(--nb-surface);
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 0 var(--nb-accent-border);
+}
+
+/* =====================================================================
+   CONTROL CENTER  (controlcenter.html)
+   ===================================================================== */
+.style-neobrutalism .cc-panel {
+  background: var(--nb-bg) !important;
+  border: var(--nb-border) solid var(--nb-ink) !important;
+  border-radius: 8px;
+  box-shadow: 5px 5px 0 0 rgb(var(--nb-shadow));
+  color: var(--nb-ink);
+}
+.style-neobrutalism .cc-box,
+.style-neobrutalism .cc-slider-box,
+.style-neobrutalism .cc-now-playing {
+  background: var(--nb-surface);
+  border: var(--nb-border) solid var(--nb-ink);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .cc-icon {
+  border-radius: 50%;
+}
+.style-neobrutalism .cc-icon.active {
+  background: var(--accent-color);
+}
+.style-neobrutalism .cc-icon.active.dnd-color {
+  background: #5856d6;
+}
+.style-neobrutalism .error-text {
+  color: var(--nb-ink);
+  font-weight: 700;
+}
+
+/* =====================================================================
+   NOTIFICATION CENTER  (notificationcenter.html)
+   ===================================================================== */
+.style-neobrutalism #panel {
+  border-left: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .panel-header {
+  border-bottom: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .widget-card {
+  border-radius: 8px;
+}
+.style-neobrutalism .edit-btn,
+.style-neobrutalism .cal-nav button,
+.style-neobrutalism .widget-edit-actions button {
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 4px;
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .edit-btn:hover,
+.style-neobrutalism .cal-nav button:hover,
+.style-neobrutalism .widget-edit-actions button:hover {
+  background: var(--hover-bg);
+}
+.style-neobrutalism .edit-done-btn {
+  background: var(--accent-color);
+  border: 2px solid var(--nb-ink);
+  border-radius: 4px;
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+  color: var(--nb-ink);
+}
+.style-neobrutalism .cal-day.today {
+  background: var(--accent-color);
+  color: var(--nb-ink);
+}
+.style-neobrutalism .edit-overlay {
+  background: var(--nb-bg);
+  border: var(--nb-border) solid var(--nb-ink);
+  box-shadow: 4px 4px 0 0 rgb(var(--nb-shadow));
+}
+
+/* =====================================================================
+   WIDGETS  (theme.css surfaces + access panel)
+   ===================================================================== */
+.style-neobrutalism .glass-container {
+  border-radius: var(--radius-md);
+}
+.style-neobrutalism .widget-box.mode-view {
+  border-radius: var(--radius-md);
+}
+.style-neobrutalism .widget-box.mode-edit {
+  background: var(--nb-surface) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.style-neobrutalism .widget-settings-popover {
+  background: var(--nb-surface);
+  border-radius: var(--radius-md);
+  color: var(--nb-ink);
+}
+.style-neobrutalism .popover-header {
+  border-bottom: 2px solid var(--nb-ink);
+}
+.style-neobrutalism .popover-row input[type="text"],
+.style-neobrutalism .popover-row select {
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 4px;
+  color: var(--nb-ink);
+}
+.style-neobrutalism .edit-btn-icon {
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  color: var(--nb-ink);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .edit-btn-icon:hover {
+  background: var(--hover-bg);
+}
+.style-neobrutalism .widget-edit-controls {
+  background: var(--nb-ink);
+}
+.style-neobrutalism .panel-container {
+  background: var(--nb-bg);
+  border-left: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .widget-type-card {
+  background: var(--nb-surface);
+  border: var(--nb-border) solid var(--nb-ink);
+  border-radius: var(--radius-md);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .widget-type-card:hover {
+  background: var(--hover-bg);
+}
+.style-neobrutalism .toggle-edit-btn {
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 4px;
+  color: var(--nb-ink);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .close-btn {
+  color: var(--nb-ink);
+}
+.style-neobrutalism .add-btn {
+  background: var(--accent-color);
+  border: 2px solid var(--nb-ink);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+  color: var(--nb-ink);
+}
+.style-neobrutalism .live-preview-wrapper {
+  background: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 6px;
+}
+
+/* =====================================================================
+   SETTINGS WINDOW CHROME  (settings.html)
+   ===================================================================== */
+.style-neobrutalism .sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .content-area {
+  background-color: var(--panel-bg);
+}
+.style-neobrutalism .sidebar-item:hover {
+  background-color: var(--hover-bg);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism .sidebar-item.active {
+  background-color: var(--selected-bg);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism h2 {
+  border-bottom: var(--nb-border) solid var(--nb-ink);
+}
+.style-neobrutalism .setting-row {
+  border-bottom: 2px solid var(--nb-ink);
+}
+.style-neobrutalism button {
+  background-color: var(--nb-surface);
+  border: 2px solid var(--nb-ink);
+  border-radius: 4px;
+  color: var(--text-color);
+  box-shadow: 3px 3px 0 0 rgb(var(--nb-shadow));
+}
+.style-neobrutalism button:hover {
+  background-color: var(--hover-bg);
+}
+.style-neobrutalism .slider-container input[type="range"] {
+  accent-color: var(--accent-color);
+}
+.style-neobrutalism #sidebar-preview-flyout,
+.style-neobrutalism #theme-preview-flyout {
+  background: var(--nb-surface);
+  border: var(--nb-border) solid var(--nb-ink);
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 0 rgb(var(--nb-shadow));
+  color: var(--text-color);
+}
+
+/* =====================================================================
+   MINI PREVIEW  (Settings → Appearance gallery cards)
+   ===================================================================== */
+.style-neobrutalism .mini-dock {
+  background: var(--nb-bg);
+  border: 2px solid var(--nb-ink);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 0 rgb(var(--nb-shadow));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+}
+.style-neobrutalism .mini-dock-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--nb-surface);
+}
+.style-neobrutalism .mini-dock-icon.active {
+  background: var(--accent-color);
+  box-shadow: 2px 2px 0 0 rgb(var(--nb-shadow)) !important;
+}
+.style-neobrutalism .mini-dock-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--nb-ink);
+}

@@ -1,0 +1,588 @@
+/* =====================================================================
+   STYLE MODE — GLASSMORPHISM / AERO  (Windows Vista Aero)
+   ---------------------------------------------------------------------
+   Technique:
+   • Heavier, more saturated blur than Liquid Glass: blur(18px) + saturate
+     150%, with a characteristic cool light blue/teal tint.
+   • Glossy top highlight: linear-gradient overlay of rgba(255,255,255,
+     0.4) at the top fading to transparent ~40% down the surface (the
+     classic Aero "glossy" look).
+   • Sharper, more defined edge border (1.5px, higher opacity) than the
+     modern iOS style.
+   • Less aggressively rounded corners (8-12px), period-accurate Aero.
+   ===================================================================== */
+
+/* ---------- Root variables (light) ---------- */
+.style-glassmorphism-aero {
+  --glass-blur: 18px;
+  --glass-opacity: 0.78;
+  --corner-radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+
+  --shadow-resting: 0 2px 6px rgba(0, 20, 40, 0.18), 0 8px 22px rgba(0, 20, 40, 0.16);
+  --shadow-raised: 0 4px 12px rgba(0, 20, 40, 0.2), 0 16px 36px rgba(0, 20, 40, 0.2);
+  --shadow-floating: 0 6px 16px rgba(0, 20, 40, 0.24), 0 26px 60px rgba(0, 20, 40, 0.26);
+  --shadow-sm: var(--shadow-resting);
+  --shadow-lg: var(--shadow-floating);
+
+  --font-weight: 500;
+  --border-width: 1.5px;
+
+  --aero-surface-a: rgba(238, 248, 255, 0.62);
+  --aero-surface-b: rgba(214, 234, 250, 0.48);
+  --aero-alt-a: rgba(255, 255, 255, 0.42);
+  --aero-alt-b: rgba(190, 225, 245, 0.28);
+  --aero-border: rgba(255, 255, 255, 0.85);
+  --aero-border-shadow: rgba(120, 180, 220, 0.45);
+  --aero-gloss: rgba(255, 255, 255, 0.4);
+
+  --text-strong: #1c2733;
+  --text-soft: rgba(28, 39, 51, 0.68);
+  --text-color: #1c2733;
+  --text-muted: #5b6a78;
+  --border-color: rgba(120, 180, 220, 0.35);
+  --glass-bg: rgba(220, 240, 252, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --text-main: #1c2733;
+  --card-bg: rgba(230, 244, 254, 0.45);
+  --card-hover: rgba(240, 250, 255, 0.6);
+  --bg-color: #cfe2f0;
+  --panel-bg: #dcecfa;
+  --sidebar-bg: #c7dcec;
+  --sidebar-border: rgba(255, 255, 255, 0.6);
+  --hover-bg: rgba(80, 140, 190, 0.12);
+  --selected-bg: rgba(0, 122, 255, 0.18);
+  --accent-soft: rgba(0, 122, 255, 0.14);
+}
+
+/* ---------- Root variables (dark) ---------- */
+.style-glassmorphism-aero.dark-theme {
+  --aero-surface-a: rgba(24, 42, 58, 0.66);
+  --aero-surface-b: rgba(16, 30, 44, 0.54);
+  --aero-alt-a: rgba(60, 95, 125, 0.3);
+  --aero-alt-b: rgba(40, 70, 95, 0.22);
+  --aero-border: rgba(150, 200, 240, 0.45);
+  --aero-border-shadow: rgba(40, 90, 130, 0.5);
+  --aero-gloss: rgba(255, 255, 255, 0.16);
+
+  --text-strong: #e6f1fa;
+  --text-soft: rgba(230, 241, 250, 0.68);
+  --text-color: #e6f1fa;
+  --text-muted: #8fa8ba;
+  --border-color: rgba(120, 180, 220, 0.3);
+  --glass-bg: rgba(22, 38, 54, 0.56);
+  --glass-border: rgba(160, 210, 250, 0.3);
+  --text-main: #e6f1fa;
+  --card-bg: rgba(40, 70, 95, 0.4);
+  --card-hover: rgba(60, 95, 125, 0.5);
+  --bg-color: #12202e;
+  --panel-bg: #16283a;
+  --sidebar-bg: #0f1c28;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --selected-bg: rgba(0, 122, 255, 0.3);
+}
+
+/* ---------- Intensity ---------- */
+.style-glassmorphism-aero.style-intensity-subtle {
+  --glass-blur: 12px;
+  --glass-opacity: 0.85;
+  --aero-gloss: rgba(255, 255, 255, 0.3);
+  --aero-surface-a: rgba(244, 250, 255, 0.72);
+  --aero-surface-b: rgba(226, 242, 252, 0.58);
+}
+.style-glassmorphism-aero.style-intensity-subtle.dark-theme {
+  --aero-surface-a: rgba(32, 52, 70, 0.76);
+  --aero-surface-b: rgba(22, 38, 54, 0.64);
+  --aero-gloss: rgba(255, 255, 255, 0.12);
+}
+.style-glassmorphism-aero.style-intensity-bold {
+  --glass-blur: 26px;
+  --glass-opacity: 0.7;
+  --aero-gloss: rgba(255, 255, 255, 0.5);
+  --aero-surface-a: rgba(232, 244, 255, 0.55);
+  --aero-surface-b: rgba(200, 226, 246, 0.4);
+  --aero-border: rgba(255, 255, 255, 0.95);
+  --aero-border-shadow: rgba(90, 160, 210, 0.6);
+}
+.style-glassmorphism-aero.style-intensity-bold.dark-theme {
+  --aero-surface-a: rgba(20, 36, 50, 0.58);
+  --aero-surface-b: rgba(12, 24, 36, 0.46);
+  --aero-gloss: rgba(255, 255, 255, 0.2);
+  --aero-border: rgba(170, 215, 250, 0.55);
+}
+
+/* ---------- Low RAM fallback ---------- */
+.style-glassmorphism-aero.low-ram-mode {
+  --glass-blur: 10px;
+}
+.style-glassmorphism-aero.low-ram-mode .menu-bar::before,
+.style-glassmorphism-aero.low-ram-mode .dock-container::before,
+.style-glassmorphism-aero.low-ram-mode .dropdown-menu::before,
+.style-glassmorphism-aero.low-ram-mode .context-menu::before,
+.style-glassmorphism-aero.low-ram-mode .cc-panel::before,
+.style-glassmorphism-aero.low-ram-mode #panel::before,
+.style-glassmorphism-aero.low-ram-mode .spotlight-results::before,
+.style-glassmorphism-aero.low-ram-mode .favorites-sidebar::before,
+.style-glassmorphism-aero.low-ram-mode .glass-container::before,
+.style-glassmorphism-aero.low-ram-mode .widget-box.mode-view::before,
+.style-glassmorphism-aero.low-ram-mode .widget-settings-popover::before,
+.style-glassmorphism-aero.low-ram-mode .panel-container::before {
+  background: none !important;
+}
+
+/* =====================================================================
+   AERO SURFACE — tinted blur + glossy top highlight + defined border
+   ===================================================================== */
+.style-glassmorphism-aero .dock-container,
+.style-glassmorphism-aero .dropdown-menu,
+.style-glassmorphism-aero .context-menu,
+.style-glassmorphism-aero .cc-panel,
+.style-glassmorphism-aero #panel,
+.style-glassmorphism-aero .spotlight-results,
+.style-glassmorphism-aero .favorites-sidebar,
+.style-glassmorphism-aero .glass-container,
+.style-glassmorphism-aero .widget-box.mode-view,
+.style-glassmorphism-aero .widget-settings-popover,
+.style-glassmorphism-aero .panel-container,
+.style-glassmorphism-aero .cc-dropdown,
+.style-glassmorphism-aero .tooltip {
+  position: relative;
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b));
+  border: var(--border-width) solid var(--aero-border);
+  border-bottom-color: var(--aero-border-shadow);
+  border-right-color: var(--aero-border-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    var(--shadow-resting);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+}
+
+/* Glossy top highlight (fades to transparent by ~40% down) */
+.style-glassmorphism-aero .menu-bar::before,
+.style-glassmorphism-aero .dock-container::before,
+.style-glassmorphism-aero .dropdown-menu::before,
+.style-glassmorphism-aero .context-menu::before,
+.style-glassmorphism-aero .cc-panel::before,
+.style-glassmorphism-aero #panel::before,
+.style-glassmorphism-aero .spotlight-results::before,
+.style-glassmorphism-aero .favorites-sidebar::before,
+.style-glassmorphism-aero .glass-container::before,
+.style-glassmorphism-aero .widget-box.mode-view::before,
+.style-glassmorphism-aero .widget-settings-popover::before,
+.style-glassmorphism-aero .panel-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(var(--aero-gloss) 0%, rgba(255, 255, 255, 0) 40%);
+}
+
+/* =====================================================================
+   MENU BAR  (index.html)
+   ===================================================================== */
+.style-glassmorphism-aero .menu-bar {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b));
+  border-bottom: var(--border-width) solid var(--aero-border-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 4px rgba(0, 30, 60, 0.12);
+  opacity: 1 !important;
+}
+.style-glassmorphism-aero .menu-item {
+  border-radius: 6px;
+  font-weight: var(--font-weight);
+}
+.style-glassmorphism-aero .menu-item:hover {
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.style-glassmorphism-aero .menu-item.active {
+  background: rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .menu-item svg,
+.style-glassmorphism-aero .menu-item img {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.style-glassmorphism-aero .menu-item:hover svg,
+.style-glassmorphism-aero .menu-item:hover img {
+  transform: scale(1.07);
+}
+.style-glassmorphism-aero .dropdown-item {
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .dropdown-item:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, #fff), var(--accent-color)) !important;
+  color: #fff;
+}
+.style-glassmorphism-aero .dropdown-divider {
+  background: rgba(90, 140, 180, 0.25);
+}
+.style-glassmorphism-aero .dropdown-header {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.style-glassmorphism-aero .cc-box,
+.style-glassmorphism-aero .cc-box-wide {
+  background: linear-gradient(var(--aero-alt-a), var(--aero-alt-b));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .cc-net-icon,
+.style-glassmorphism-aero .cc-focus-icon {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.style-glassmorphism-aero .cc-net-icon.active,
+.style-glassmorphism-aero .cc-focus-icon.active {
+  background: var(--accent-color);
+}
+.style-glassmorphism-aero .spotlight-container {
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .spotlight-container:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.style-glassmorphism-aero .spotlight-results {
+  border-radius: var(--corner-radius);
+}
+.style-glassmorphism-aero .spotlight-result-item:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, #fff), var(--accent-color));
+  color: #fff;
+}
+.style-glassmorphism-aero .toast-message {
+  background: color-mix(in srgb, var(--accent-color) 78%, #fff);
+  border-radius: 10px;
+  box-shadow: var(--shadow-resting);
+}
+
+/* =====================================================================
+   DOCK  (dock/index.html)
+   ===================================================================== */
+.style-glassmorphism-aero .dock-container {
+  border-radius: var(--corner-radius);
+}
+.style-glassmorphism-aero .dock-icon {
+  border-radius: calc(var(--corner-radius) * 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.25), 0 3px 8px rgba(0, 30, 60, 0.18);
+}
+.style-glassmorphism-aero .dock-item:hover .dock-icon {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 14px rgba(0, 30, 60, 0.24);
+}
+.style-glassmorphism-aero .divider {
+  background: linear-gradient(180deg, transparent, rgba(90, 140, 180, 0.4) 50%, transparent);
+}
+.style-glassmorphism-aero .dot-indicator-sub {
+  background: rgba(60, 100, 140, 0.7);
+}
+.style-glassmorphism-aero.dark-theme .dot-indicator-sub {
+  background: rgba(200, 230, 250, 0.75);
+}
+.style-glassmorphism-aero .badge {
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 6px rgba(0, 30, 60, 0.3);
+}
+.style-glassmorphism-aero .menu-item-custom {
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .menu-item-custom:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, #fff), var(--accent-color)) !important;
+  color: #fff;
+}
+.style-glassmorphism-aero .menu-divider-custom {
+  background: rgba(90, 140, 180, 0.25);
+}
+.style-glassmorphism-aero.dark-theme .menu-divider-custom {
+  background: rgba(160, 210, 250, 0.25);
+}
+
+/* Collapsed pill */
+.style-glassmorphism-aero .dock-container.collapsed {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b)) !important;
+  border: var(--border-width) solid var(--aero-border-shadow) !important;
+  box-shadow: 0 -4px 12px rgba(0, 30, 60, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+}
+.style-glassmorphism-aero .menu-bar.collapsed {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b)) !important;
+}
+
+/* =====================================================================
+   DRAWER  (dock/drawer.html)
+   ===================================================================== */
+.style-glassmorphism-aero .favorites-sidebar {
+  border-right: var(--border-width) solid var(--aero-border-shadow);
+}
+.style-glassmorphism-aero .search-bar,
+.style-glassmorphism-aero .refresh-btn {
+  background: linear-gradient(var(--aero-alt-a), var(--aero-alt-b));
+  border: 1px solid var(--aero-border);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .search-bar:focus {
+  border-color: var(--accent-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 0 1px var(--accent-color);
+}
+.style-glassmorphism-aero .app-icon,
+.style-glassmorphism-aero .app-icon-fallback,
+.style-glassmorphism-aero .fav-icon,
+.style-glassmorphism-aero .fav-icon-fallback,
+.style-glassmorphism-aero .folder-tile {
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 30, 60, 0.18);
+}
+.style-glassmorphism-aero .add-app-icon {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px dashed rgba(120, 170, 210, 0.6);
+  border-radius: 12px;
+}
+.style-glassmorphism-aero .fav-item,
+.style-glassmorphism-aero .fav-icon {
+  border-radius: 10px;
+}
+.style-glassmorphism-aero .dot {
+  background: rgba(90, 140, 180, 0.45);
+}
+.style-glassmorphism-aero .dot.active {
+  background: #ffffff;
+}
+.style-glassmorphism-aero .toast {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b));
+  border: 1px solid var(--aero-border-shadow);
+  border-radius: 18px;
+  box-shadow: var(--shadow-resting);
+}
+.style-glassmorphism-aero .context-menu-item:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, #fff), var(--accent-color));
+}
+.style-glassmorphism-aero #folder-box {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b)) !important;
+  border: var(--border-width) solid var(--aero-border-shadow) !important;
+  border-radius: 18px;
+}
+
+/* =====================================================================
+   CONTROL CENTER  (controlcenter.html)
+   ===================================================================== */
+.style-glassmorphism-aero .cc-panel {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b)) !important;
+  border: var(--border-width) solid var(--aero-border) !important;
+  border-bottom-color: var(--aero-border-shadow) !important;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--shadow-raised);
+}
+.style-glassmorphism-aero .cc-box,
+.style-glassmorphism-aero .cc-slider-box,
+.style-glassmorphism-aero .cc-now-playing {
+  background: var(--aero-alt-a);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .cc-icon {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.style-glassmorphism-aero .cc-icon.active {
+  background: var(--accent-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 6px color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+.style-glassmorphism-aero .cc-icon.active.dnd-color {
+  background: #5856d6;
+}
+.style-glassmorphism-aero .error-text {
+  color: #ff453a;
+}
+
+/* =====================================================================
+   NOTIFICATION CENTER  (notificationcenter.html)
+   ===================================================================== */
+.style-glassmorphism-aero #panel {
+  border-left: var(--border-width) solid var(--aero-border-shadow);
+}
+.style-glassmorphism-aero .panel-header {
+  border-bottom: 1px solid rgba(90, 140, 180, 0.3);
+}
+.style-glassmorphism-aero .widget-card {
+  background: linear-gradient(var(--aero-alt-a), var(--aero-alt-b));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 8px rgba(0, 30, 60, 0.08);
+}
+.style-glassmorphism-aero .edit-btn,
+.style-glassmorphism-aero .cal-nav button,
+.style-glassmorphism-aero .widget-edit-actions button {
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .edit-btn:hover,
+.style-glassmorphism-aero .cal-nav button:hover,
+.style-glassmorphism-aero .widget-edit-actions button:hover {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.style-glassmorphism-aero .edit-done-btn {
+  background: var(--accent-color);
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .cal-day.today {
+  background: var(--accent-color);
+}
+.style-glassmorphism-aero .edit-overlay {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b));
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+/* =====================================================================
+   WIDGETS  (theme.css surfaces + access panel)
+   ===================================================================== */
+.style-glassmorphism-aero .glass-container {
+  border-radius: var(--radius-md);
+}
+.style-glassmorphism-aero .widget-box.mode-view {
+  border-radius: var(--radius-md);
+}
+.style-glassmorphism-aero .widget-box.mode-edit {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b)) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.style-glassmorphism-aero .widget-settings-popover {
+  background: linear-gradient(rgba(30, 52, 72, 0.97), rgba(20, 38, 54, 0.94));
+  border: 1px solid rgba(160, 210, 250, 0.4);
+  border-radius: var(--radius-md);
+  color: #e6f1fa;
+}
+.style-glassmorphism-aero .popover-header {
+  border-bottom: 1px solid rgba(160, 210, 250, 0.25);
+}
+.style-glassmorphism-aero .edit-btn-icon {
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .widget-edit-controls {
+  background: rgba(0, 30, 60, 0.4);
+}
+.style-glassmorphism-aero .panel-container {
+  background: linear-gradient(rgba(24, 40, 56, 0.9), rgba(16, 30, 44, 0.88));
+  border-left: var(--border-width) solid var(--aero-border-shadow);
+}
+.style-glassmorphism-aero .widget-type-card {
+  background: rgba(120, 170, 210, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: var(--radius-md);
+}
+.style-glassmorphism-aero .widget-type-card:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.style-glassmorphism-aero .toggle-edit-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+}
+.style-glassmorphism-aero .toggle-edit-btn.active,
+.style-glassmorphism-aero .add-btn {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+.style-glassmorphism-aero .live-preview-wrapper {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+
+/* =====================================================================
+   SETTINGS WINDOW CHROME  (settings.html)
+   ===================================================================== */
+.style-glassmorphism-aero .sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+}
+.style-glassmorphism-aero.dark-theme .sidebar {
+  border-right-color: rgba(255, 255, 255, 0.1);
+}
+.style-glassmorphism-aero .content-area {
+  background-color: var(--panel-bg);
+}
+.style-glassmorphism-aero .sidebar-item:hover {
+  background-color: var(--hover-bg);
+}
+.style-glassmorphism-aero .sidebar-item.active {
+  background-color: var(--selected-bg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.style-glassmorphism-aero h2 {
+  border-bottom-color: rgba(90, 140, 180, 0.3);
+}
+.style-glassmorphism-aero .setting-row {
+  border-bottom-color: rgba(90, 140, 180, 0.22);
+}
+.style-glassmorphism-aero button {
+  background-color: var(--panel-bg);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 6px;
+  color: var(--text-color);
+}
+.style-glassmorphism-aero button:hover {
+  background-color: var(--hover-bg);
+}
+.style-glassmorphism-aero button:active {
+  box-shadow: inset 0 2px 6px rgba(0, 30, 60, 0.25);
+}
+.style-glassmorphism-aero #sidebar-preview-flyout,
+.style-glassmorphism-aero #theme-preview-flyout {
+  background: var(--panel-bg);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 10px;
+  box-shadow: var(--shadow-raised);
+}
+
+/* =====================================================================
+   MINI PREVIEW  (Settings → Appearance gallery cards)
+   ===================================================================== */
+.style-glassmorphism-aero .mini-dock {
+  background: linear-gradient(var(--aero-surface-a), var(--aero-surface-b));
+  border: 1.5px solid var(--aero-border);
+  border-bottom-color: var(--aero-border-shadow);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), var(--shadow-resting);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  position: relative;
+}
+.style-glassmorphism-aero .mini-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(var(--aero-gloss) 0%, rgba(255, 255, 255, 0) 40%);
+  pointer-events: none;
+}
+.style-glassmorphism-aero .mini-dock-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 80%, #fff), var(--accent-color));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 5px rgba(0, 30, 60, 0.2);
+}
+.style-glassmorphism-aero .mini-dock-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(60, 100, 140, 0.7);
+}

@@ -48,6 +48,8 @@
       "*.json",
       "src/**/*",
       "dock/**/*",
+      "styles/**/*",
+      "shared/**/*",
       "!dock/icons-cache/**/*",
       "!get_*.js",
       "!list_inputs.js",

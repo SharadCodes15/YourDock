@@ -2,6 +2,22 @@
  * Settings Schema & Migration Utilities for Independent Hiding Controllers
  */
 
+// --- Style Mode ----------------------------------------------------------
+// The 6 preset rendering styles + the implicit "custom" option that preserves
+// the full manual color/glass/corner-radius controls.
+const STYLE_MODE_VALUES = ['liquidGlass', 'neumorphism', 'glassmorphismAero', 'neobrutalism', 'claymorphism', 'fluentAcrylic', 'custom'];
+const STYLE_INTENSITY_VALUES = ['subtle', 'standard', 'bold'];
+
+function sanitizeStyleMode(input) {
+  if (!input) return 'custom';
+  return STYLE_MODE_VALUES.includes(input) ? input : 'custom';
+}
+
+function sanitizeStyleIntensity(input) {
+  if (!input) return 'standard';
+  return STYLE_INTENSITY_VALUES.includes(input) ? input : 'standard';
+}
+
 const DEFAULT_DOCK_HIDE_SETTINGS = {
   enabled: true,
   triggerMode: 'always', // 'always' | 'fullscreen-only'
@@ -104,6 +120,12 @@ function migrateSettings(settings = {}) {
     updated.hasCompletedOnboarding = false;
   }
 
+  if (!updated.appearance) updated.appearance = {};
+  if (updated.appearance.styleMode === undefined) updated.appearance.styleMode = 'custom';
+  if (updated.appearance.styleIntensity === undefined) updated.appearance.styleIntensity = 'standard';
+  updated.appearance.styleMode = sanitizeStyleMode(updated.appearance.styleMode);
+  updated.appearance.styleIntensity = sanitizeStyleIntensity(updated.appearance.styleIntensity);
+
   return updated;
 }
 
@@ -112,6 +134,10 @@ module.exports = {
   DEFAULT_MENUBAR_HIDE_SETTINGS,
   HOTSPOT_WIDTH_MAP,
   REVEAL_DELAY_MAP,
+  STYLE_MODE_VALUES,
+  STYLE_INTENSITY_VALUES,
+  sanitizeStyleMode,
+  sanitizeStyleIntensity,
   resolveHotspotPixels,
   resolveRevealDelayMs,
   sanitizeHideSettings,

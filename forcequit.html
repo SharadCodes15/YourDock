@@ -187,6 +187,7 @@
       font-size: 12px;
     }
   </style>
+  <link rel="stylesheet" href="shared/theme.css">
 </head>
 <body>
   <div class="header-title">Force Quit Applications</div>
@@ -232,6 +233,22 @@
       }
       document.documentElement.style.setProperty('--selected-bg', `rgba(${r}, ${g}, ${b}, ${themeData.theme === 'dark' ? '0.25' : '0.15'})`);
       document.documentElement.style.setProperty('--selected-text', themeData.accentColor);
+
+      // Style Mode — swap root style classes live (rendering layer only)
+      if (document.body) {
+        ['style-liquid-glass','style-neumorphism','style-glassmorphism-aero','style-neobrutalism','style-claymorphism','style-fluent-acrylic'].forEach(c => document.body.classList.remove(c));
+        if (themeData.styleClass) document.body.classList.add(themeData.styleClass);
+        ['style-intensity-subtle','style-intensity-standard','style-intensity-bold'].forEach(c => document.body.classList.remove(c));
+        if (themeData.intensityClass) document.body.classList.add(themeData.intensityClass);
+        if (themeData.lowRamMode) document.body.classList.add('low-ram-mode');
+        else document.body.classList.remove('low-ram-mode');
+      }
+      if (themeData.accentByStyle) {
+        const styleAccentMap = { liquidGlass:'--accent-liquid-glass', neumorphism:'--accent-neumorphism', glassmorphismAero:'--accent-glassmorphism-aero', neobrutalism:'--accent-neobrutalism', claymorphism:'--accent-claymorphism', fluentAcrylic:'--accent-fluent-acrylic', custom:'--accent-custom' };
+        Object.keys(themeData.accentByStyle).forEach(k => {
+          if (styleAccentMap[k]) document.documentElement.style.setProperty(styleAccentMap[k], themeData.accentByStyle[k]);
+        });
+      }
     }
 
     if (window.electronAPI && window.electronAPI.onThemeChanged) {

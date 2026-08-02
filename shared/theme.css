@@ -1,0 +1,59 @@
+/*
+ * SHARED THEME ENTRY POINT — Style Mode architecture
+ *
+ * This file is the single <link> every window loads. It aggregates the six
+ * self-contained Style Mode modules. Each module is scoped to a root class
+ * (e.g. `style-liquid-glass`) that is applied to <body> in real windows and
+ * to individual preview cards in Settings → Appearance → Style Mode.
+ *
+ * The class-switching architecture works like this:
+ *   - main.js resolveThemeConfig() reads settings.appearance.styleMode and
+ *     broadcasts `styleClass` (e.g. "style-liquid-glass") + `intensityClass`
+ *     (e.g. "style-intensity-bold") + lowRamMode to every window.
+ *   - Every window's applyThemeConfig() swaps those classes on <body> live,
+ *     exactly like it already swaps `dark-theme` / `reduce-motion`.
+ *   - Each module below overrides the SAME set of existing CSS custom
+ *     properties (--glass-blur, --corner-radius, --shadow-*, --border-*,
+ *     --glass-opacity, ...) plus targeted component selectors. No component
+ *     HTML or JS logic is touched.
+ *
+ * Selectors intentionally do NOT use a `body` prefix so that the same rules
+ * also style the live mini-previews in the Settings gallery (each card carries
+ * its own style class).
+ */
+
+@import url('../styles/liquidGlass.css');
+@import url('../styles/neumorphism.css');
+@import url('../styles/glassmorphismAero.css');
+@import url('../styles/neobrutalism.css');
+@import url('../styles/claymorphism.css');
+@import url('../styles/fluentAcrylic.css');
+
+/*
+ * FAVORITES SIDEBAR STABILITY
+ * The left favorites rail in the Launchpad keeps its default material in every
+ * Style Mode. These rules run after all six modules and restore the drawer's
+ * base look regardless of the active style class (Neumorphism, etc.).
+ * Compound selectors keep specificity equal to the style modules' rules so the
+ * later source order wins the cascade.
+ */
+.favorites-sidebar.favorites-sidebar {
+  background: rgba(0, 0, 0, var(--glass-opacity, 0.25));
+  backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 40px)) saturate(180%) brightness(1.05);
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  box-shadow: none;
+}
+.favorites-sidebar.favorites-sidebar::before,
+.favorites-sidebar.favorites-sidebar::after {
+  content: none !important;
+}
+.fav-item.fav-item,
+.fav-icon.fav-icon,
+.fav-icon-fallback.fav-icon-fallback {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}

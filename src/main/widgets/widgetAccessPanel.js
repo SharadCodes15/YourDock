@@ -88,9 +88,14 @@ function isAccessPanelOpen() {
   return panelWindow !== null && !panelWindow.isDestroyed() && panelWindow.isVisible();
 }
 
+function getAccessPanelWindow() {
+  return (panelWindow && !panelWindow.isDestroyed()) ? panelWindow : null;
+}
+
 module.exports = {
   openAccessPanel,
   closeAccessPanel,
   toggleAccessPanel,
-  isAccessPanelOpen
+  isAccessPanelOpen,
+  getAccessPanelWindow
 };

@@ -1,0 +1,593 @@
+/* =====================================================================
+   STYLE MODE — NEUMORPHISM  (soft UI)
+   ---------------------------------------------------------------------
+   Technique:
+   • Opaque surfaces — the one style that explicitly disables backdrop-
+     filter. Background and surfaces share the SAME base color.
+   • Extruded (raised) elements: dual soft box-shadow — light top-left,
+     dark bottom-right, generous blur, no hard edges.
+   • Pressed/inset elements (active toggles, pressed buttons): shadows
+     INVERT to inset rather than changing color — the signature detail.
+   • Muted low-contrast palette: accent saturation/lightness is clamped
+     by main.js (--accent-neumorphism) into a neumorphic range.
+   • No hard 1px borders anywhere — only soft rounded corners (18-24px).
+   ===================================================================== */
+
+/* ---------- Root variables (light) ---------- */
+.style-neumorphism {
+  --glass-blur: 0px;
+  --glass-opacity: 1;
+  --corner-radius: 20px;
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+
+  --neu-shadow-out: -6px -6px 12px rgba(255, 255, 255, 0.7), 6px 6px 12px rgba(0, 0, 0, 0.15);
+  --neu-shadow-out-sm: -4px -4px 8px rgba(255, 255, 255, 0.65), 4px 4px 8px rgba(0, 0, 0, 0.12);
+  --neu-shadow-in: inset 4px 4px 8px rgba(0, 0, 0, 0.18), inset -4px -4px 8px rgba(255, 255, 255, 0.65);
+  --neu-shadow-in-sm: inset 3px 3px 6px rgba(0, 0, 0, 0.16), inset -3px -3px 6px rgba(255, 255, 255, 0.6);
+
+  --shadow-resting: var(--neu-shadow-out);
+  --shadow-raised: var(--neu-shadow-out);
+  --shadow-floating: var(--neu-shadow-out);
+  --shadow-sm: var(--neu-shadow-out-sm);
+  --shadow-lg: var(--neu-shadow-out);
+
+  --font-weight: 500;
+
+  --surface: #dfe2e8;
+  --surface-alt: #dfe2e8;
+  --surface-hover: #e4e7ec;
+  --surface-pressed: #d7dae0;
+
+  --text-strong: #4b4f58;
+  --text-soft: #7d828c;
+  --text-color: #4b4f58;
+  --text-muted: #7d828c;
+  --border-color: transparent;
+  --bg-color: #dfe2e8;
+  --panel-bg: #dfe2e8;
+  --sidebar-bg: #d9dce2;
+  --sidebar-border: rgba(255, 255, 255, 0.5);
+  --hover-bg: rgba(255, 255, 255, 0.25);
+  --selected-bg: rgba(0, 0, 0, 0.08);
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --glass-bg: rgba(223, 226, 232, 0.98);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --text-main: #4b4f58;
+  --card-bg: #dfe2e8;
+  --card-hover: #e4e7ec;
+
+  --accent-color: var(--accent-neumorphism, var(--accent-color));
+  --accent-color-translucent: color-mix(in srgb, var(--accent-neumorphism, #8a8f98) 14%, transparent);
+}
+
+/* ---------- Root variables (dark) ---------- */
+.style-neumorphism.dark-theme {
+  --neu-shadow-out: -6px -6px 12px rgba(255, 255, 255, 0.05), 6px 6px 12px rgba(0, 0, 0, 0.5);
+  --neu-shadow-out-sm: -4px -4px 8px rgba(255, 255, 255, 0.04), 4px 4px 8px rgba(0, 0, 0, 0.42);
+  --neu-shadow-in: inset 4px 4px 8px rgba(0, 0, 0, 0.55), inset -4px -4px 8px rgba(255, 255, 255, 0.05);
+  --neu-shadow-in-sm: inset 3px 3px 6px rgba(0, 0, 0, 0.5), inset -3px -3px 6px rgba(255, 255, 255, 0.04);
+
+  --surface: #3b3e44;
+  --surface-alt: #3b3e44;
+  --surface-hover: #40444b;
+  --surface-pressed: #36393f;
+
+  --text-strong: #e6e8ec;
+  --text-soft: #9aa0a8;
+  --text-color: #e6e8ec;
+  --text-muted: #9aa0a8;
+  --bg-color: #3b3e44;
+  --panel-bg: #3b3e44;
+  --sidebar-bg: #373a40;
+  --sidebar-border: rgba(0, 0, 0, 0.4);
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --selected-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(59, 62, 68, 0.98);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --text-main: #e6e8ec;
+  --card-bg: #3b3e44;
+  --card-hover: #40444b;
+}
+
+/* ---------- Intensity ---------- */
+.style-neumorphism.style-intensity-subtle {
+  --corner-radius: 18px;
+  --neu-shadow-out: -4px -4px 8px rgba(255, 255, 255, 0.6), 4px 4px 8px rgba(0, 0, 0, 0.12);
+  --neu-shadow-in: inset 3px 3px 6px rgba(0, 0, 0, 0.15), inset -3px -3px 6px rgba(255, 255, 255, 0.55);
+}
+.style-neumorphism.style-intensity-subtle.dark-theme {
+  --neu-shadow-out: -4px -4px 8px rgba(255, 255, 255, 0.04), 4px 4px 8px rgba(0, 0, 0, 0.42);
+  --neu-shadow-in: inset 3px 3px 6px rgba(0, 0, 0, 0.46), inset -3px -3px 6px rgba(255, 255, 255, 0.04);
+}
+.style-neumorphism.style-intensity-bold {
+  --corner-radius: 24px;
+  --neu-shadow-out: -8px -8px 16px rgba(255, 255, 255, 0.8), 8px 8px 16px rgba(0, 0, 0, 0.18);
+  --neu-shadow-in: inset 5px 5px 10px rgba(0, 0, 0, 0.22), inset -5px -5px 10px rgba(255, 255, 255, 0.7);
+}
+.style-neumorphism.style-intensity-bold.dark-theme {
+  --neu-shadow-out: -8px -8px 16px rgba(255, 255, 255, 0.06), 8px 8px 16px rgba(0, 0, 0, 0.6);
+  --neu-shadow-in: inset 5px 5px 10px rgba(0, 0, 0, 0.65), inset -5px -5px 10px rgba(255, 255, 255, 0.06);
+}
+
+/* =====================================================================
+   OPAQUE SURFACE PRIMITIVE — shared by every panel
+   ===================================================================== */
+.style-neumorphism .dock-container,
+.style-neumorphism .dropdown-menu,
+.style-neumorphism .context-menu,
+.style-neumorphism .cc-panel,
+.style-neumorphism #panel,
+.style-neumorphism .spotlight-results,
+.style-neumorphism .favorites-sidebar,
+.style-neumorphism .search-bar,
+.style-neumorphism .refresh-btn,
+.style-neumorphism .glass-container,
+.style-neumorphism .widget-box.mode-view,
+.style-neumorphism .widget-settings-popover,
+.style-neumorphism .panel-container,
+.style-neumorphism .toast,
+.style-neumorphism .tooltip,
+.style-neumorphism .widget-card,
+.style-neumorphism .cc-box,
+.style-neumorphism .cc-slider-box,
+.style-neumorphism .cc-now-playing,
+.style-neumorphism .cc-dropdown {
+  background: var(--surface);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--neu-shadow-out);
+}
+
+/* ---------- Pressed / inset ---------- */
+.style-neumorphism .menu-item.active,
+.style-neumorphism .dropdown-item:active,
+.style-neumorphism .context-menu-item:active,
+.style-neumorphism .menu-item-custom:active,
+.style-neumorphism .cc-icon.active,
+.style-neumorphism .switch input:checked + .slider,
+.style-neumorphism .cc-net-icon.active,
+.style-neumorphism .cc-focus-icon.active,
+.style-neumorphism .toggle-edit-btn.active,
+.style-neumorphism .cal-day.today,
+.style-neumorphism button:active,
+.style-neumorphism .fav-item:active,
+.style-neumorphism .refresh-btn:active,
+.style-neumorphism .search-bar:focus {
+  box-shadow: var(--neu-shadow-in) !important;
+}
+
+/* =====================================================================
+   MENU BAR  (index.html)
+   ===================================================================== */
+.style-neumorphism .menu-bar {
+  background: var(--surface);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 4px 10px rgba(0, 0, 0, 0.06);
+  opacity: 1 !important;
+}
+.style-neumorphism.dark-theme .menu-bar {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.style-neumorphism .menu-item {
+  border-radius: 10px;
+  font-weight: var(--font-weight);
+}
+.style-neumorphism .menu-item:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .menu-item.active {
+  background: var(--surface-pressed);
+}
+.style-neumorphism .dropdown-item {
+  border-radius: 10px;
+}
+.style-neumorphism .dropdown-item:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--neu-shadow-in-sm);
+  color: inherit !important;
+}
+.style-neumorphism .dropdown-divider,
+.style-neumorphism .menu-divider-custom {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-neumorphism.dark-theme .dropdown-divider,
+.style-neumorphism.dark-theme .menu-divider-custom {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.style-neumorphism .dropdown-header {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.style-neumorphism .cc-box,
+.style-neumorphism .cc-box-wide {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .cc-net-icon,
+.style-neumorphism .cc-focus-icon {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .cc-net-icon.active,
+.style-neumorphism .cc-focus-icon.active {
+  background: var(--accent-color);
+  box-shadow: var(--neu-shadow-in) !important;
+}
+.style-neumorphism .spotlight-container {
+  border-radius: 10px;
+}
+.style-neumorphism .spotlight-container:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .spotlight-result-item:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .toast-message {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--neu-shadow-out);
+  color: var(--text-strong);
+}
+
+/* =====================================================================
+   DOCK  (dock/index.html)
+   ===================================================================== */
+.style-neumorphism .dock-container {
+  border-radius: var(--corner-radius);
+}
+.style-neumorphism .dock-icon {
+  border-radius: calc(var(--corner-radius) * 0.7);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .dock-item:hover .dock-icon {
+  box-shadow: var(--neu-shadow-out);
+}
+.style-neumorphism .dock-item.active .dock-icon {
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .divider {
+  background: rgba(0, 0, 0, 0.12);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.4);
+}
+.style-neumorphism.dark-theme .divider {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.4);
+}
+.style-neumorphism .dot-indicator-sub {
+  background: var(--text-soft);
+}
+.style-neumorphism .badge {
+  border: 2px solid var(--surface);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .menu-item-custom {
+  border-radius: 10px;
+}
+.style-neumorphism .menu-item-custom:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong) !important;
+}
+.style-neumorphism .menu-item-custom:active {
+  background: var(--surface-pressed);
+}
+.style-neumorphism .tooltip {
+  border-radius: 12px;
+  color: var(--text-strong);
+}
+
+/* Collapsed pill */
+.style-neumorphism .dock-container.collapsed {
+  background: var(--surface) !important;
+  border: none !important;
+  box-shadow: var(--neu-shadow-out) !important;
+}
+.style-neumorphism .menu-bar.collapsed {
+  background: var(--surface) !important;
+}
+
+/* =====================================================================
+   DRAWER  (dock/drawer.html)
+   ===================================================================== */
+.style-neumorphism .favorites-sidebar {
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+.style-neumorphism.dark-theme .favorites-sidebar {
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+.style-neumorphism .search-bar {
+  border-radius: 18px;
+  color: var(--text-strong);
+}
+.style-neumorphism .search-bar:focus {
+  box-shadow: var(--neu-shadow-in) !important;
+}
+.style-neumorphism .refresh-btn {
+  border-radius: 50%;
+}
+.style-neumorphism .app-icon,
+.style-neumorphism .app-icon-fallback,
+.style-neumorphism .fav-icon,
+.style-neumorphism .fav-icon-fallback,
+.style-neumorphism .folder-tile {
+  border-radius: 18px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .add-app-icon {
+  background: var(--surface);
+  border: 2px dashed rgba(0, 0, 0, 0.2) !important;
+  border-radius: 18px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism.dark-theme .add-app-icon {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+.style-neumorphism .fav-item,
+.style-neumorphism .fav-icon {
+  border-radius: 14px;
+}
+.style-neumorphism .dot {
+  background: rgba(0, 0, 0, 0.18);
+}
+.style-neumorphism .dot.active {
+  background: var(--text-strong);
+}
+.style-neumorphism .context-menu-item:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--neu-shadow-in-sm);
+  color: var(--text-strong) !important;
+}
+.style-neumorphism #folder-box {
+  background: var(--surface) !important;
+  border-radius: 26px;
+  box-shadow: var(--neu-shadow-out);
+}
+.style-neumorphism .toast {
+  border-radius: 22px;
+  color: var(--text-strong);
+}
+
+/* =====================================================================
+   CONTROL CENTER  (controlcenter.html)
+   ===================================================================== */
+.style-neumorphism .cc-panel {
+  background: var(--surface) !important;
+  border-radius: var(--corner-radius);
+  box-shadow: var(--neu-shadow-out);
+  color: var(--text-strong);
+}
+.style-neumorphism .cc-box,
+.style-neumorphism .cc-slider-box,
+.style-neumorphism .cc-now-playing {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .cc-icon {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .cc-icon.active {
+  background: var(--accent-color) !important;
+}
+.style-neumorphism .cc-icon.active.dnd-color {
+  background: color-mix(in srgb, var(--accent-color) 55%, #5856d6) !important;
+}
+.style-neumorphism .error-text {
+  color: color-mix(in srgb, var(--accent-color) 60%, #ff453a);
+}
+
+/* =====================================================================
+   NOTIFICATION CENTER  (notificationcenter.html)
+   ===================================================================== */
+.style-neumorphism #panel {
+  border-left: none;
+}
+.style-neumorphism .panel-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.style-neumorphism.dark-theme .panel-header {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.style-neumorphism .widget-card {
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .edit-btn,
+.style-neumorphism .cal-nav button,
+.style-neumorphism .widget-edit-actions button {
+  background: var(--surface);
+  border: none;
+  border-radius: 9px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .edit-btn:hover,
+.style-neumorphism .cal-nav button:hover,
+.style-neumorphism .widget-edit-actions button:hover {
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .edit-done-btn {
+  background: var(--accent-color);
+  border: none;
+  border-radius: 9px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .edit-overlay {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out);
+}
+
+/* =====================================================================
+   WIDGETS  (theme.css surfaces + access panel)
+   ===================================================================== */
+.style-neumorphism .glass-container {
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out);
+}
+.style-neumorphism .widget-box.mode-view {
+  border-radius: var(--radius-md);
+}
+.style-neumorphism .widget-box.mode-edit {
+  background: var(--surface) !important;
+  box-shadow: var(--neu-shadow-out) !important;
+}
+.style-neumorphism .widget-settings-popover {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  color: var(--text-strong);
+}
+.style-neumorphism .popover-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+.style-neumorphism .popover-row input[type="text"],
+.style-neumorphism .popover-row select {
+  background: var(--surface);
+  border: none;
+  color: var(--text-strong);
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .edit-btn-icon {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out-sm);
+  color: var(--text-strong);
+}
+.style-neumorphism .edit-btn-icon:hover {
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .widget-edit-controls {
+  background: var(--surface-hover);
+}
+.style-neumorphism .panel-container {
+  background: var(--surface);
+}
+.style-neumorphism .widget-type-card {
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .widget-type-card:hover {
+  box-shadow: var(--neu-shadow-out);
+}
+.style-neumorphism .toggle-edit-btn {
+  background: var(--surface);
+  border: none;
+  border-radius: 9px;
+  box-shadow: var(--neu-shadow-out-sm);
+  color: var(--text-strong);
+}
+.style-neumorphism .close-btn {
+  color: var(--text-soft);
+}
+.style-neumorphism .add-btn {
+  background: var(--accent-color);
+  border-radius: 10px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .live-preview-wrapper {
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow: var(--neu-shadow-in-sm);
+}
+
+/* =====================================================================
+   SETTINGS WINDOW CHROME  (settings.html)
+   ===================================================================== */
+.style-neumorphism .sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+}
+.style-neumorphism.dark-theme .sidebar {
+  border-right-color: rgba(0, 0, 0, 0.4);
+}
+.style-neumorphism .content-area {
+  background-color: var(--panel-bg);
+}
+.style-neumorphism .sidebar-item:hover {
+  background-color: var(--hover-bg);
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .sidebar-item.active {
+  background-color: var(--selected-bg);
+  box-shadow: var(--neu-shadow-in);
+}
+.style-neumorphism h2 {
+  border-bottom-color: rgba(0, 0, 0, 0.12);
+}
+.style-neumorphism.dark-theme h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.style-neumorphism .setting-row {
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+.style-neumorphism.dark-theme .setting-row {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+.style-neumorphism button {
+  background-color: var(--surface);
+  border: none;
+  color: var(--text-color);
+  border-radius: 10px;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism button:hover {
+  background-color: var(--surface-hover);
+}
+.style-neumorphism button:active {
+  box-shadow: var(--neu-shadow-in) !important;
+}
+.style-neumorphism .slider-container input[type="range"] {
+  accent-color: var(--accent-color);
+}
+.style-neumorphism #sidebar-preview-flyout,
+.style-neumorphism #theme-preview-flyout {
+  background: var(--surface);
+  box-shadow: var(--neu-shadow-out);
+  color: var(--text-color);
+}
+
+/* =====================================================================
+   MINI PREVIEW  (Settings → Appearance gallery cards)
+   ===================================================================== */
+.style-neumorphism .mini-dock {
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: var(--neu-shadow-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+}
+.style-neumorphism .mini-dock-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: var(--surface-alt);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+.style-neumorphism .mini-dock-icon.active {
+  background: var(--accent-color);
+  box-shadow: var(--neu-shadow-in-sm);
+}
+.style-neumorphism .mini-dock-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-soft);
+}
