@@ -175,6 +175,12 @@ function createMenuBarHideController(options = {}) {
       const display = (screen && typeof screen.getDisplayNearestPoint === 'function' ? screen.getDisplayNearestPoint(cursor) : null) || (screen && typeof screen.getPrimaryDisplay === 'function' ? screen.getPrimaryDisplay() : { bounds: { x: 0, y: 0, width: 1920, height: 1080 } });
       const widthPx = resolveHotspotPixels(settings.hotspotWidth);
 
+      // In click mode the pill is revealed by clicking the button, never by hovering
+      if (settings.revealMode === 'click') {
+        consecutiveHotspotHits = 0;
+        return;
+      }
+
       if (isCursorInHotspot(cursor, display.bounds, widthPx)) {
         consecutiveHotspotHits++;
         const requiredHits = Math.max(1, Math.round(resolveRevealDelayMs(settings.revealDelayMs) / 100));

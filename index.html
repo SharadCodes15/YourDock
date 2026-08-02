@@ -67,6 +67,41 @@
       pointer-events: none;
     }
 
+    /* Collapsed pill as a clickable button (reveal mode = "click") */
+    .pill-indicator {
+      display: none;
+    }
+
+    body.pill-click-mode .menu-bar.collapsed {
+      transform: translateY(-14px) !important;
+      cursor: pointer;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, background 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    body.pill-click-mode .menu-bar.collapsed .pill-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 10px;
+    }
+
+    body.pill-click-mode .menu-bar.collapsed:hover {
+      background: rgba(0, 0, 0, 0.78) !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    body.pill-click-mode .menu-bar.collapsed:active {
+      background: rgba(0, 0, 0, 0.86) !important;
+      transform: translateY(-12px) !important;
+    }
+
     /* Group Sections */
     .menu-left, .menu-right {
       display: flex;
@@ -869,6 +904,12 @@
 <body>
   <div id="toast-message" class="toast-message" style="display: none;">No active app to send this to</div>
   <div class="menu-bar" id="menu-bar">
+    <!-- Collapsed pill indicator (click mode): only visible while the menu bar is a button -->
+    <div class="pill-indicator">
+      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l4 4 4-4"/>
+      </svg>
+    </div>
     <!-- Left Section: Apple, Active App, menus -->
     <div class="menu-left">
       <!-- Apple Menu -->
@@ -1153,6 +1194,7 @@
     // State management
     let activeDropdown = null;
     let isSpotlightExpanded = false;
+    let hoverTimeout = null;
 
     // Track active interactions to toggle mouse ignore state
     // Normal state is pass-through except when mouse is hovering over interactive elements.
@@ -1166,9 +1208,11 @@
 
       // Check if mouse is hovering over any interactive items
       const target = e ? e.target : null;
+      const menuBarEl = document.getElementById('menu-bar');
       const isOverInteractive = target && (
         target.closest('.interactive') !== null ||
-        target.closest('.dropdown-menu') !== null
+        target.closest('.dropdown-menu') !== null ||
+        (menuBarEl && menuBarEl.classList.contains('collapsed') && target.closest('#menu-bar') !== null)
       );
 
       window.electronAPI.setIgnoreMouse(!isOverInteractive);
@@ -1189,8 +1233,8 @@
     // Dropdown Logic
     let menuSessionActive = false;
 
-    function openDropdown(menuItem) {
-      closeAllDropdowns();
+    async function openDropdown(menuItem) {
+      await closeAllDropdowns();
       
       menuItem.classList.add('active');
       activeDropdown = menuItem;
@@ -1209,119 +1253,144 @@
 
       // Inform Main Process to resize the window so dropdown is visible
       window.electronAPI.setIgnoreMouse(false); // Double check it is false
-      ipcRendererSend('set-window-height', heightNeeded);
+      if (window.electronAPI && window.electronAPI.setWindowHeight) {
+        await window.electronAPI.setWindowHeight(heightNeeded);
+      }
     }
 
-    function closeAllDropdowns() {
+    async function closeAllDropdowns() {
       if (activeDropdown) {
         activeDropdown.classList.remove('active');
         activeDropdown = null;
       }
       menuSessionActive = false;
       // Set window size back to menu bar height (28px)
-      ipcRendererSend('set-window-height', 28);
+      if (window.electronAPI && window.electronAPI.setWindowHeight) {
+        await window.electronAPI.setWindowHeight(28);
+      }
       
       // Let standard hover checks determine ignoring
       window.electronAPI.setIgnoreMouse(true);
-    }
-
-    // Helper for direct IPC since preload script exposes electronAPI
-    function ipcRendererSend(channel, data) {
-      // We can use standard ipcRenderer via preload, wait we exposed ipcRenderer methods,
-      // let's check what we exposed in preload.js:
-      // contextBridge.exposeInMainWorld('electronAPI', {
-      //   onActiveAppChanged: (callback) => ipcRenderer.on('active-app-changed', (_event, value) => callback(value)),
-      //   setIgnoreMouse: (ignore) => ipcRenderer.send('set-ignore-mouse', ignore)
-      // });
-      // Oops! We need a way to send window height. Let's make sure we handle it!
-      // Wait, we forgot to expose `setWindowHeight` in preload.js!
-      // Let's modify main.js or preload.js to handle this.
-      // Ah! We can easily edit preload.js to expose `setWindowHeight` and modify main.js to receive it.
-      // Or we can just call it via our exposed electronAPI once we edit preload.js!
-      // Let's call `window.electronAPI.setWindowHeight(data)` in our JS, and we will update preload.js!
-      if (window.electronAPI && window.electronAPI.setWindowHeight) {
-        window.electronAPI.setWindowHeight(data);
-      }
     }
 
     function onHoverSwitch(item) {
       if (!menuSessionActive) return;
       if (activeDropdown === item) return;
 
-      if (window.electronAPI && window.electronAPI.closeOtherWindows) {
-        window.electronAPI.closeOtherWindows();
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = null;
       }
 
-      if (item.id === 'menu-cc') {
-        closeAllDropdowns();
-        menuSessionActive = true;
-        const rect = item.getBoundingClientRect();
-        window.electronAPI.toggleControlCenter({
-          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-          width: rect.width, height: rect.height
-        });
-      } else if (item.id === 'spotlight-container') {
-        closeAllDropdowns();
-        menuSessionActive = true;
-        window.electronAPI.toggleSpotlight();
-      } else if (item.id === 'menu-notification') {
-        closeAllDropdowns();
-        menuSessionActive = true;
-        const rect = item.getBoundingClientRect();
-        window.electronAPI.toggleNotificationCenter({
-          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-          width: rect.width, height: rect.height
-        });
-      } else if (item.id === 'menu-widgets' || item.id === 'menu-settings') {
-        // Do nothing on hover for widgets/settings
+      const isPopover = ['menu-cc', 'spotlight-container', 'menu-notification'].includes(item.id);
+      if (isPopover) {
+        hoverTimeout = setTimeout(async () => {
+          if (window.electronAPI && window.electronAPI.closeOtherWindows) {
+            await window.electronAPI.closeOtherWindows();
+          }
+          await closeAllDropdowns();
+          menuSessionActive = true;
+          const rect = item.getBoundingClientRect();
+
+          if (item.id === 'menu-cc') {
+            await window.electronAPI.toggleControlCenter({
+              left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              width: rect.width, height: rect.height
+            });
+          } else if (item.id === 'spotlight-container') {
+            await window.electronAPI.toggleSpotlight();
+          } else if (item.id === 'menu-notification') {
+            await window.electronAPI.toggleNotificationCenter({
+              left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              width: rect.width, height: rect.height
+            });
+          }
+        }, 120); // 120ms dwell time delay for popovers
       } else {
+        if (window.electronAPI && window.electronAPI.closeOtherWindows) {
+          window.electronAPI.closeOtherWindows();
+        }
         openDropdown(item);
       }
+    }
+
+    // Click debouncer & in-flight guard to prevent re-entry / rapid overlapping clicks
+    const lastClickTimestamps = new Map();
+    const DEBOUNCE_WINDOW_MS = 150;
+
+    function handleDebouncedClick(key, callback) {
+      const now = Date.now();
+      const last = lastClickTimestamps.get(key) || 0;
+      if (now - last < DEBOUNCE_WINDOW_MS) {
+        return; // Ignore rapid duplicate click
+      }
+      lastClickTimestamps.set(key, now);
+      callback();
     }
 
     // Menu Item click triggers
     const menuItems = document.querySelectorAll('.menu-item.interactive');
     menuItems.forEach(item => {
-      if (item.id === 'menu-widgets') {
-        item.addEventListener('click', (e) => {
+      item.addEventListener('click', async (e) => {
+        // If clicking inside a dropdown menu (e.g. interacting with toggles, sliders, lists),
+        // do not trigger opening/closing of the parent menu-item.
+        if (e.target.closest('.dropdown-menu')) {
+          return;
+        }
+
+        if (item.id === 'menu-widgets') {
           e.stopPropagation();
-          closeAllDropdowns();
+          await closeAllDropdowns();
           if (window.electronAPI && window.electronAPI.toggleWidgetAccessPanel) {
-            window.electronAPI.toggleWidgetAccessPanel();
+            await window.electronAPI.toggleWidgetAccessPanel();
           }
-        });
-        return;
-      }
+          return;
+        }
 
-      if (item.id === 'menu-settings') {
-        item.addEventListener('click', (e) => {
+        if (item.id === 'menu-settings') {
           e.stopPropagation();
-          closeAllDropdowns();
-          window.electronAPI.openSettings();
-        });
-        return;
-      }
+          await closeAllDropdowns();
+          if (window.electronAPI && window.electronAPI.openSettings) {
+            await window.electronAPI.openSettings();
+          }
+          return;
+        }
 
-      if (item.id === 'menu-notification') {
-        item.addEventListener('click', (e) => {
+        if (item.id === 'menu-notification') {
           e.stopPropagation();
-          closeAllDropdowns();
+          await closeAllDropdowns();
           menuSessionActive = true;
           const rect = document.getElementById('menu-notification').getBoundingClientRect();
-          window.electronAPI.toggleNotificationCenter({
-            left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-            width: rect.width, height: rect.height
-          });
-        });
-        return;
-      }
+          if (window.electronAPI && window.electronAPI.toggleNotificationCenter) {
+            await window.electronAPI.toggleNotificationCenter({
+              left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              width: rect.width, height: rect.height
+            });
+          }
+          return;
+        }
 
-      item.addEventListener('click', (e) => {
         e.stopPropagation();
         if (activeDropdown === item) {
-          closeAllDropdowns();
+          await closeAllDropdowns();
         } else {
-          openDropdown(item);
+          await openDropdown(item);
+        }
+      });
+    });
+
+    // Dropdown Item click actions (close dropdown and open settings if applicable)
+    document.querySelectorAll('.dropdown-menu .dropdown-item').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        if (el.classList.contains('no-hover') || el.closest('.dropdown-item-toggle')) {
+          return;
+        }
+        e.stopPropagation();
+        await closeAllDropdowns();
+        if (el.textContent.includes('Settings...')) {
+          if (window.electronAPI && window.electronAPI.openSettings) {
+            await window.electronAPI.openSettings();
+          }
         }
       });
     });
@@ -1338,20 +1407,24 @@
     document.querySelectorAll('.screenshot-action').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        menuSessionActive = false;
-        closeAllDropdowns();
-        const mode = el.getAttribute('data-mode');
-        window.electronAPI.takeScreenshot(mode);
+        handleDebouncedClick(`screenshot-${el.getAttribute('data-mode')}`, async () => {
+          menuSessionActive = false;
+          await closeAllDropdowns();
+          const mode = el.getAttribute('data-mode');
+          if (window.electronAPI && window.electronAPI.takeScreenshot) {
+            await window.electronAPI.takeScreenshot(mode);
+          }
+        });
       });
     });
 
     // Close on clicking the backdrop/outside
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
       if (!e.target.closest('.menu-item')) {
         menuSessionActive = false;
-        closeAllDropdowns();
+        await closeAllDropdowns();
         if (window.electronAPI && window.electronAPI.closeOtherWindows) {
-          window.electronAPI.closeOtherWindows();
+          await window.electronAPI.closeOtherWindows();
         }
       }
     });
@@ -1421,12 +1494,22 @@
       applyMenuItemsSettings(settings.menuItems);
 
       // 3. Hiding Mode class and Pill Width variables
-      if (settings.hiding.mode === 'fully-hide') {
-        document.body.classList.add('mode-fully-hide');
-      } else {
-        document.body.classList.remove('mode-fully-hide');
-      }
       document.documentElement.style.setProperty('--pill-width', `${settings.hiding.pillWidth || 180}px`);
+
+      // 4. Reveal interaction for the collapsed Menu Bar pill (click vs hover).
+      // Click mode always shows a clickable pill button, so it overrides fully-hide styling.
+      const revealMode = settings.menuBarHideSettings && settings.menuBarHideSettings.revealMode;
+      if (revealMode === 'click') {
+        document.body.classList.add('pill-click-mode');
+        document.body.classList.remove('mode-fully-hide');
+      } else {
+        document.body.classList.remove('pill-click-mode');
+        if (settings.hiding.mode === 'fully-hide') {
+          document.body.classList.add('mode-fully-hide');
+        } else {
+          document.body.classList.remove('mode-fully-hide');
+        }
+      }
     }
 
     function applyAccentColor(color) {
@@ -1613,45 +1696,59 @@
     // Apple Menu Actions
     document.getElementById('apple-about').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.showAbout) window.electronAPI.showAbout();
+      handleDebouncedClick('apple-about', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.showAbout) window.electronAPI.showAbout();
+      });
     });
 
     document.getElementById('apple-preferences').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.openSettings) window.electronAPI.openSettings();
+      handleDebouncedClick('apple-preferences', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.openSettings) window.electronAPI.openSettings();
+      });
     });
 
     document.getElementById('apple-force-quit').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.showForceQuit) window.electronAPI.showForceQuit();
+      handleDebouncedClick('apple-force-quit', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.showForceQuit) window.electronAPI.showForceQuit();
+      });
     });
 
     document.getElementById('apple-sleep').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.appleAction) window.electronAPI.appleAction('sleep');
+      handleDebouncedClick('apple-sleep', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.appleAction) window.electronAPI.appleAction('sleep');
+      });
     });
 
     document.getElementById('apple-restart').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.appleAction) window.electronAPI.appleAction('restart');
+      handleDebouncedClick('apple-restart', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.appleAction) window.electronAPI.appleAction('restart');
+      });
     });
 
     document.getElementById('apple-shutdown').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      if (window.electronAPI.appleAction) window.electronAPI.appleAction('shutdown');
+      handleDebouncedClick('apple-shutdown', () => {
+        closeAllDropdowns();
+        if (window.electronAPI.appleAction) window.electronAPI.appleAction('shutdown');
+      });
     });
 
     // Apple Settings click
     document.getElementById('apple-settings').addEventListener('click', (e) => {
       e.stopPropagation();
-      closeAllDropdowns();
-      window.electronAPI.openSettings();
+      handleDebouncedClick('apple-settings', () => {
+        closeAllDropdowns();
+        window.electronAPI.openSettings();
+      });
     });
 
     // Initialize clock and poll every 30s
@@ -1861,6 +1958,20 @@
         menuBar.classList.remove('collapsed');
       }
     });
+
+    // Click on the collapsed pill reveals the Menu Bar
+    const menuBarEl = document.getElementById('menu-bar');
+    if (menuBarEl) {
+      menuBarEl.addEventListener('click', (e) => {
+        if (menuBarEl.classList.contains('collapsed')) {
+          if (e.target.closest('.dropdown-menu')) return;
+          e.preventDefault();
+          if (window.electronAPI && window.electronAPI.menuBarPillClick) {
+            window.electronAPI.menuBarPillClick();
+          }
+        }
+      });
+    }
   </script>
   <script>
     (function() {

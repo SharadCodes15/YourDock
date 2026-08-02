@@ -15,7 +15,9 @@ const DEFAULT_MENUBAR_HIDE_SETTINGS = {
   triggerMode: 'always', // 'always' | 'fullscreen-only'
   hotspotWidth: 'medium', // 'narrow' | 'medium' | 'wide'
   revealDelayMs: 'instant', // 'instant' | 'short' | 'normal'
-  hideDelayMs: 400
+  hideDelayMs: 400,
+  keepMenuOpenOnLeave: true,
+  revealMode: 'hover' // 'hover' | 'click' — how the collapsed pill button reveals the menu bar
 };
 
 const HOTSPOT_WIDTH_MAP = {
@@ -46,6 +48,8 @@ function sanitizeHideSettings(input, defaults) {
   if (!['always', 'fullscreen-only'].includes(result.triggerMode)) result.triggerMode = defaults.triggerMode;
   if (!['narrow', 'medium', 'wide'].includes(result.hotspotWidth)) result.hotspotWidth = defaults.hotspotWidth;
   if (!['instant', 'short', 'normal'].includes(result.revealDelayMs)) result.revealDelayMs = defaults.revealDelayMs;
+  if (typeof result.keepMenuOpenOnLeave !== 'boolean') result.keepMenuOpenOnLeave = defaults.keepMenuOpenOnLeave;
+  if (!['hover', 'click'].includes(result.revealMode)) result.revealMode = defaults.revealMode;
   
   let delay = Number(result.hideDelayMs);
   if (isNaN(delay)) delay = defaults.hideDelayMs;
@@ -89,7 +93,8 @@ function migrateSettings(settings = {}) {
       triggerMode: DEFAULT_MENUBAR_HIDE_SETTINGS.triggerMode,
       hotspotWidth: DEFAULT_MENUBAR_HIDE_SETTINGS.hotspotWidth,
       revealDelayMs: DEFAULT_MENUBAR_HIDE_SETTINGS.revealDelayMs,
-      hideDelayMs: legacyHiding.delay !== undefined ? legacyHiding.delay : DEFAULT_MENUBAR_HIDE_SETTINGS.hideDelayMs
+      hideDelayMs: legacyHiding.delay !== undefined ? legacyHiding.delay : DEFAULT_MENUBAR_HIDE_SETTINGS.hideDelayMs,
+      keepMenuOpenOnLeave: DEFAULT_MENUBAR_HIDE_SETTINGS.keepMenuOpenOnLeave
     }, DEFAULT_MENUBAR_HIDE_SETTINGS);
   } else {
     updated.menuBarHideSettings = sanitizeHideSettings(updated.menuBarHideSettings, DEFAULT_MENUBAR_HIDE_SETTINGS);

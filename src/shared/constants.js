@@ -23,6 +23,7 @@ const VALID_IPC_CHANNELS = new Set([
   'save-hide-settings',
   'test-dock-hide',
   'test-menubar-hide',
+  'menu-bar-pill-click',
   'export-settings',
   'import-settings',
   'export-theme',

@@ -1049,6 +1049,31 @@
           </select>
         </div>
 
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Keep Menus Open on Leave</div>
+            <div class="setting-desc">Keep dropdown menus open when mouse leaves the Menu Bar.</div>
+          </div>
+          <input type="checkbox" id="menubar-keep-open-on-leave" checked>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Menu Bar Reveal Interaction</div>
+            <div class="setting-desc">How the collapsed Menu Bar button reveals. "Hover" reveals when the cursor touches the top edge; "Click" shows a button you click to reveal.</div>
+          </div>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="menubar-reveal" id="menubar-reveal-hover" value="hover" checked>
+              <span>Hover</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="menubar-reveal" id="menubar-reveal-click" value="click">
+              <span>Click</span>
+            </label>
+          </div>
+        </div>
+
         <div id="hiding-options">
           <div class="setting-row">
             <div>
@@ -1101,6 +1126,18 @@
               <span class="slider-value" id="hide-pill-width-val">180px</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Manual Testing Actions -->
+      <div class="section-title" style="margin-top: 25px;">Manual Hiding Actions</div>
+      <div style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+          Manually toggle the hide/reveal states for the Menu Bar and the Dock immediately.
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="hide-toggle-menubar" style="padding: 5px 12px; font-size: 11px; cursor: pointer;">Toggle Menu Bar State</button>
+          <button id="hide-toggle-dock" style="padding: 5px 12px; font-size: 11px; cursor: pointer;">Toggle Dock State</button>
         </div>
       </div>
 
@@ -1579,7 +1616,7 @@
         currentSettings.dockHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
       }
       if (!currentSettings.menuBarHideSettings) {
-        currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+        currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400, keepMenuOpenOnLeave: true, revealMode: 'hover' };
       }
       if (!currentSettings.hiding) {
         currentSettings.hiding = { enabled: true, mode: 'collapsed', sensitivity: 100, delay: 400, pillWidth: 180, menuBarIsland: false };
@@ -1598,6 +1635,11 @@
       document.getElementById('menubar-hotspot-width').value = currentSettings.menuBarHideSettings.hotspotWidth || 'medium';
       document.getElementById('menubar-reveal-delay').value = currentSettings.menuBarHideSettings.revealDelayMs || 'instant';
       document.getElementById('menubar-hide-delay').value = String(currentSettings.menuBarHideSettings.hideDelayMs || 400);
+      document.getElementById('menubar-keep-open-on-leave').checked = currentSettings.menuBarHideSettings.keepMenuOpenOnLeave !== false;
+
+      const menubarRevealMode = currentSettings.menuBarHideSettings.revealMode || 'hover';
+      const menubarRevealRadio = document.getElementById(`menubar-reveal-${menubarRevealMode}`);
+      if (menubarRevealRadio) menubarRevealRadio.checked = true;
 
       // Master & Legacy Bindings
       document.getElementById('hide-master').checked = currentSettings.hiding.enabled;
@@ -2110,6 +2152,44 @@
       triggerSave();
     });
 
+    document.getElementById('menubar-keep-open-on-leave').addEventListener('change', (e) => {
+      if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+      currentSettings.menuBarHideSettings.keepMenuOpenOnLeave = e.target.checked;
+      flashControl(e.target);
+      window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+      triggerSave();
+    });
+
+    document.querySelectorAll('input[name="menubar-reveal"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (!currentSettings.menuBarHideSettings) currentSettings.menuBarHideSettings = {};
+        currentSettings.menuBarHideSettings.revealMode = e.target.value;
+        flashControl(e.target);
+        window.settingsAPI.saveHideSettings({ target: 'menuBar', hideSettings: currentSettings.menuBarHideSettings });
+        triggerSave();
+      });
+    });
+
+    const toggleMenubarBtn = document.getElementById('hide-toggle-menubar');
+    if (toggleMenubarBtn) {
+      toggleMenubarBtn.addEventListener('click', (e) => {
+        flashControl(e.target);
+        if (window.settingsAPI && window.settingsAPI.testMenuBarHide) {
+          window.settingsAPI.testMenuBarHide();
+        }
+      });
+    }
+
+    const toggleDockBtn = document.getElementById('hide-toggle-dock');
+    if (toggleDockBtn) {
+      toggleDockBtn.addEventListener('click', (e) => {
+        flashControl(e.target);
+        if (window.settingsAPI && window.settingsAPI.testDockHide) {
+          window.settingsAPI.testDockHide();
+        }
+      });
+    }
+
     // Master & Legacy Hiding Event Handlers
     document.getElementById('hide-master').addEventListener('change', (e) => {
       if (!currentSettings.hiding) currentSettings.hiding = {};
@@ -2184,7 +2264,7 @@
     document.getElementById('hide-reset').addEventListener('click', (e) => {
       flashControl(e.target);
       currentSettings.dockHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
-      currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400 };
+      currentSettings.menuBarHideSettings = { enabled: true, triggerMode: 'always', hotspotWidth: 'medium', revealDelayMs: 'instant', hideDelayMs: 400, keepMenuOpenOnLeave: true, revealMode: 'hover' };
       currentSettings.hiding = { enabled: true, mode: "collapsed", sensitivity: 100, delay: 400, pillWidth: 180, menuBarIsland: false };
       
       document.getElementById('dock-hide-enabled').checked = true;
@@ -2198,6 +2278,8 @@
       document.getElementById('menubar-hotspot-width').value = 'medium';
       document.getElementById('menubar-reveal-delay').value = 'instant';
       document.getElementById('menubar-hide-delay').value = '400';
+      document.getElementById('menubar-keep-open-on-leave').checked = true;
+      document.getElementById('menubar-reveal-hover').checked = true;
 
       document.getElementById('hide-master').checked = true;
       const hideIslandRadio = document.getElementById('hide-mode-island');
@@ -3244,7 +3326,6 @@
       }
     };
 
-    const sidebarItems = document.querySelectorAll('.sidebar-item');
     const sidebarFlyout = document.getElementById('sidebar-preview-flyout');
     let sidebarTimeout = null;
 

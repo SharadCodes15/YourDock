@@ -141,7 +141,7 @@ function initHidingControllers() {
   if (!menuBarHideCtrl) {
     menuBarHideCtrl = createMenuBarHideController({
       getWindow: () => menuBarWin,
-      isMenuBarIsland: () => (settings.hiding && settings.hiding.menuBarIsland),
+      isMenuBarIsland: () => isMenuBarPillMode(),
       isFocusedAppFullscreen: () => activeAppOnScreen,
       isChildUIOpen: () => isAnyOverlayOpen()
     });
@@ -648,9 +648,16 @@ function checkControlCenterCursor() {
 }
 
 // Menu bar collapsed state helper — supports dynamic island (CSS pill) or fully-hide (window shown/hidden)
+// The pill is always shown when Dynamic Island is on, OR when the user chose "Click to reveal"
+// (a fully-hidden window would have nothing to click).
+function isMenuBarPillMode() {
+  return !!(settings.hiding && settings.hiding.menuBarIsland) ||
+    (settings.menuBarHideSettings && settings.menuBarHideSettings.revealMode === 'click');
+}
+
 function setMenuBarCollapsed(collapsed) {
   if (!menuBarWin || menuBarWin.isDestroyed()) return;
-  if (settings.hiding && settings.hiding.menuBarIsland) {
+  if (isMenuBarPillMode()) {
     if (!menuBarWin.isVisible()) menuBarWin.show();
     menuBarWin.webContents.send('set-collapse-state', collapsed);
   } else {
@@ -709,30 +716,35 @@ function pollMenuBarHover() {
   const revealDelayMs = resolveRevealDelayMs(mbSettings.revealDelayMs);
   const requiredHits = Math.max(1, Math.round(revealDelayMs / 100));
   const hideDelayMs = mbSettings.hideDelayMs !== undefined ? mbSettings.hideDelayMs : (settings.hiding && settings.hiding.delay !== undefined ? settings.hiding.delay : 400);
+  const revealMode = mbSettings.revealMode || 'hover';
 
   if (menuBarState === 'collapsed') {
-    // 1. Hotspot Expand Detection
-    const halfHotspot = Math.round(hotspotWidthPx / 2);
-    const inHotspot = (
-      cursorPoint.x >= centerX - halfHotspot &&
-      cursorPoint.x <= centerX + halfHotspot &&
-      cursorPoint.y >= displayBounds.y &&
-      cursorPoint.y <= displayBounds.y + 8
-    );
-
-    if (inHotspot) {
-      consecutiveHotspotPolls++;
-      if (consecutiveHotspotPolls >= requiredHits) {
-        menuBarState = 'expanded';
-        consecutiveHotspotPolls = 0;
-        if (leaveTimeout) {
-          clearTimeout(leaveTimeout);
-          leaveTimeout = null;
-        }
-        setMenuBarCollapsed(false);
-      }
-    } else {
+    // 1. Hotspot Expand Detection (only in hover mode; click mode waits for the pill button click)
+    if (revealMode === 'click') {
       consecutiveHotspotPolls = 0;
+    } else {
+      const halfHotspot = Math.round(hotspotWidthPx / 2);
+      const inHotspot = (
+        cursorPoint.x >= centerX - halfHotspot &&
+        cursorPoint.x <= centerX + halfHotspot &&
+        cursorPoint.y >= displayBounds.y &&
+        cursorPoint.y <= displayBounds.y + 10
+      );
+
+      if (inHotspot) {
+        consecutiveHotspotPolls++;
+        if (consecutiveHotspotPolls >= requiredHits) {
+          menuBarState = 'expanded';
+          consecutiveHotspotPolls = 0;
+          if (leaveTimeout) {
+            clearTimeout(leaveTimeout);
+            leaveTimeout = null;
+          }
+          setMenuBarCollapsed(false);
+        }
+      } else {
+        consecutiveHotspotPolls = 0;
+      }
     }
   } else {
     // 2. Leave-Bounds Detection (check full menu bar bounds)
@@ -780,7 +792,21 @@ function isAnyOverlayOpen() {
   const ccOpen = ccWin && !ccWin.isDestroyed() && ccWin.isVisible();
   const spotlightOpen = spotlightWin && !spotlightWin.isDestroyed() && spotlightWin.isVisible();
   const drawerOpen = drawerWin && !drawerWin.isDestroyed() && isDrawerOpen;
-  return isDockContextMenuOpen || ccOpen || spotlightOpen || drawerOpen;
+
+  let isMenuBarDropdownOpen = false;
+  if (menuBarWin && !menuBarWin.isDestroyed()) {
+    try {
+      const bounds = menuBarWin.getBounds();
+      if (bounds.height > 28) {
+        const keepOpen = !settings.menuBarHideSettings || settings.menuBarHideSettings.keepMenuOpenOnLeave !== false;
+        if (keepOpen) {
+          isMenuBarDropdownOpen = true;
+        }
+      }
+    } catch (err) {}
+  }
+
+  return isDockContextMenuOpen || ccOpen || spotlightOpen || drawerOpen || isMenuBarDropdownOpen;
 }
 
 function getDockThickness() {
@@ -1509,7 +1535,7 @@ ipcMain.handle('window-action', async (event, action) => {
   return focusForwarder.performWindowAction(action);
 });
 
-ipcMain.on('apple-action', async (event, action) => {
+ipcMain.handle('apple-action', async (event, action) => {
   try {
     if (action === 'sleep') {
       exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0', (err, stdout, stderr) => {
@@ -1549,14 +1575,17 @@ ipcMain.on('apple-action', async (event, action) => {
   } catch (err) {
     dialog.showErrorBox('System Action Error', `An error occurred: ${err.message}`);
   }
+  return { success: true };
 });
 
-ipcMain.on('show-about', () => {
+ipcMain.handle('show-about', async () => {
   showAboutWindow();
+  return { success: true };
 });
 
-ipcMain.on('show-force-quit', () => {
+ipcMain.handle('show-force-quit', async () => {
   showForceQuitWindow();
+  return { success: true };
 });
 
 function createAboutWindow() {
@@ -1797,8 +1826,9 @@ function applySettings() {
     setMenuBarCollapsed(false);
   }
   if (menuBarWin && !menuBarWin.isDestroyed()) {
-    if (settings.hiding && settings.hiding.menuBarIsland) {
+    if (isMenuBarPillMode()) {
       if (!menuBarWin.isVisible()) menuBarWin.show();
+      menuBarWin.webContents.send('set-collapse-state', menuBarState === 'collapsed');
     } else {
       menuBarWin.webContents.send('set-collapse-state', false);
     }
@@ -2637,7 +2667,7 @@ ipcMain.on('set-ignore-mouse', (event, ignore) => {
 });
 
 // IPC handler to dynamically resize window height for dropdown rendering (Menu Bar)
-ipcMain.on('set-window-height', (event, height) => {
+ipcMain.handle('set-window-height', async (event, height) => {
   if (menuBarWin) {
     const bounds = menuBarWin.getBounds();
     menuBarWin.setBounds({
@@ -2646,7 +2676,9 @@ ipcMain.on('set-window-height', (event, height) => {
       width: bounds.width,
       height: height
     });
+    return new Promise(resolve => setTimeout(resolve, 30));
   }
+  return { success: false };
 });
 
 // IPC handler to dynamically resize dock width and keep it centered at the bottom (Dock)
@@ -2946,8 +2978,9 @@ ipcMain.on('save-dock-hiding-mode', async (event, mode) => {
 });
 
 // Settings IPC Handlers
-ipcMain.on('open-settings', () => {
+ipcMain.handle('open-settings', () => {
   showSettingsWindow();
+  return { success: true };
 });
 
 ipcMain.handle('get-settings', () => {
@@ -2979,6 +3012,41 @@ ipcMain.on('save-hide-settings', async (event, payload) => {
   applySettings();
 });
 
+ipcMain.on('test-dock-hide', () => {
+  if (dockHideCtrl) {
+    const currentState = dockHideCtrl.stateMachine.getState();
+    if (currentState === 'VISIBLE') {
+      dockHideCtrl.stateMachine.hide('manual-test');
+    } else {
+      dockHideCtrl.stateMachine.show('manual-test');
+    }
+  }
+});
+
+ipcMain.on('test-menubar-hide', () => {
+  if (menuBarHideCtrl) {
+    const currentState = menuBarHideCtrl.stateMachine.getState();
+    if (currentState === 'VISIBLE') {
+      menuBarHideCtrl.stateMachine.hide('manual-test');
+    } else {
+      menuBarHideCtrl.stateMachine.show('manual-test');
+    }
+  }
+});
+
+// Click on the collapsed Menu Bar pill button → reveal the menu bar
+ipcMain.on('menu-bar-pill-click', () => {
+  if (!menuBarWin || menuBarWin.isDestroyed()) return;
+  if (menuBarState === 'collapsed') {
+    menuBarState = 'expanded';
+    if (leaveTimeout) {
+      clearTimeout(leaveTimeout);
+      leaveTimeout = null;
+    }
+    setMenuBarCollapsed(false);
+  }
+});
+
 let originalAppearance = null;
 
 ipcMain.on('preview-theme', (event, tempAppearance) => {
@@ -3000,7 +3068,7 @@ ipcMain.on('preview-theme', (event, tempAppearance) => {
   }
 });
 
-ipcMain.on('close-other-windows', () => {
+ipcMain.handle('close-other-windows', async () => {
   if (ccWin && !ccWin.isDestroyed() && ccWin.isVisible()) {
     ccWin.hide();
   }
@@ -3010,6 +3078,7 @@ ipcMain.on('close-other-windows', () => {
   if (notificationWin && !notificationWin.isDestroyed() && notificationWin.isVisible()) {
     notificationWin.hide();
   }
+  return { success: true };
 });
 
 ipcMain.on('save-settings', async (event, newSettings) => {
@@ -3978,6 +4047,45 @@ ipcMain.on('quit-app', async (event, appId) => {
   }
 });
 
+async function startNormalApp() {
+  if (menuBarWin) return; // already started
+
+  // Check stale taskbar-hidden flag from previous crash
+  if (settings.general && settings.general.taskbarReplacementEnabled) {
+    console.warn('[Startup] Stale taskbarReplacementEnabled=true found from previous session. Restoring taskbar.');
+    taskbarReplacement.restoreTaskbarSafe();
+    settings.general.taskbarReplacementEnabled = false;
+    await saveSettings();
+  }
+
+  // Write restore script on startup regardless
+  try {
+    taskbarReplacement.writeRestoreScript(app.getPath('userData'));
+    const desktopPath = path.join(app.getPath('home'), 'Desktop');
+    if (fs.existsSync(desktopPath)) {
+      taskbarReplacement.writeRestoreScript(desktopPath);
+    }
+  } catch (err) {
+    console.error('[Startup] Failed to write restore script:', err);
+  }
+  createAboutWindow();
+  createForceQuitWindow();
+  createTray();
+  if (settings.general && settings.general.checkForUpdatesAutomatically !== false) {
+    debugLog("[Update Check] Stub: Automatically checking for updates...");
+  }
+  createMenuBarWindow();
+  createDockWindow();
+
+  createSettingsWindow();
+  createDrawerWindow();
+  registerGlobalShortcuts();
+  startMasterTimer();
+
+  // Surface crash notification toast if an unseen crash was recorded in previous session
+  crashReporter.checkAndSurfaceUnseenCrashToast();
+}
+
 // Single instance enforcement for the integrated app
 const additionalData = { myKey: 'macos-top-bar-and-dock' };
 const isPrimaryInstance = app.requestSingleInstanceLock(additionalData);
@@ -3996,51 +4104,6 @@ if (!isPrimaryInstance) {
       dockWin.focus();
     }
   });
-
-  async function startNormalApp() {
-    if (menuBarWin) return; // already started
-
-    // Check stale taskbar-hidden flag from previous crash
-    if (settings.general && settings.general.taskbarReplacementEnabled) {
-      console.warn('[Startup] Stale taskbarReplacementEnabled=true found from previous session. Restoring taskbar.');
-      taskbarReplacement.restoreTaskbarSafe();
-      settings.general.taskbarReplacementEnabled = false;
-      await saveSettings();
-    }
-
-    // Write restore script on startup regardless
-    try {
-      taskbarReplacement.writeRestoreScript(app.getPath('userData'));
-      const desktopPath = path.join(app.getPath('home'), 'Desktop');
-      if (fs.existsSync(desktopPath)) {
-        taskbarReplacement.writeRestoreScript(desktopPath);
-      }
-    } catch (err) {
-      console.error('[Startup] Failed to write restore script:', err);
-    }
-    createAboutWindow();
-    createForceQuitWindow();
-    createTray();
-    if (settings.general && settings.general.checkForUpdatesAutomatically !== false) {
-      debugLog("[Update Check] Stub: Automatically checking for updates...");
-    }
-    createMenuBarWindow();
-    createDockWindow();
-
-    createSettingsWindow();
-    createDrawerWindow();
-    registerGlobalShortcuts();
-    startMasterTimer();
-
-    try {
-      require('./src/main/widgets').initWidgetsSubsystem();
-    } catch (err) {
-      console.error('[Widgets] Failed to initialize widgets subsystem:', err);
-    }
-
-    // Surface crash notification toast if an unseen crash was recorded in previous session
-    crashReporter.checkAndSurfaceUnseenCrashToast();
-  }
 
   app.whenReady().then(async () => {
     console.log('[startup] app ready');
@@ -4064,6 +4127,13 @@ if (!isPrimaryInstance) {
     ensureIconsFolder();
 
     runStartupIntegrityChecks(app.getPath('userData'));
+
+    // Initialize Widgets IPC subsystem so handlers are active before health check runs
+    try {
+      require('./src/main/widgets').initWidgetsSubsystem();
+    } catch (err) {
+      console.error('[Widgets] Failed to initialize widgets subsystem:', err);
+    }
 
     // 1. Startup Health Check sequence (must run before window creation, complete in <1s)
     const startupHealth = healthCheck.runStartupHealthCheck({
@@ -4445,7 +4515,7 @@ async function pollSystemData() {
 function startSystemDataPolling() {}
 
 // IPC Handlers Registration
-ipcMain.on('toggle-control-center', (event, rect) => {
+ipcMain.handle('toggle-control-center', async (event, rect) => {
   if (!ccWin) {
     createControlCenterWindow();
     ccWin.once('ready-to-show', () => {
@@ -4468,6 +4538,7 @@ ipcMain.on('toggle-control-center', (event, rect) => {
       ccWin.focus();
     }
   }
+  return { success: true };
 });
 
 ipcMain.on('close-cc-window', () => {
@@ -4828,8 +4899,9 @@ function toggleSpotlight() {
   }
 }
 
-ipcMain.on('toggle-spotlight', () => {
+ipcMain.handle('toggle-spotlight', async () => {
   toggleSpotlight();
+  return { success: true };
 });
 
 ipcMain.on('close-spotlight', () => {
@@ -4837,8 +4909,9 @@ ipcMain.on('close-spotlight', () => {
 });
 
 // Notification Center IPC
-ipcMain.on('toggle-notification-center', (event, rect) => {
+ipcMain.handle('toggle-notification-center', async (event, rect) => {
   showNotificationCenter(rect);
+  return { success: true };
 });
 
 ipcMain.on('close-notification-center', () => {
@@ -4846,8 +4919,9 @@ ipcMain.on('close-notification-center', () => {
 });
 
 // Screenshot IPC
-ipcMain.on('take-screenshot', (event, mode) => {
+ipcMain.handle('take-screenshot', async (event, mode) => {
   handleScreenshot(mode);
+  return { success: true };
 });
 
 ipcMain.on('close-toast', (event) => {

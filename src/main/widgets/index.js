@@ -74,6 +74,12 @@ function initWidgetsSubsystem() {
     };
   });
 
+  ipcMain.handle('save-widgets', (_event, widgets) => {
+    storeInstance.saveWidgets(widgets);
+    onStateChange();
+    return { success: true };
+  });
+
   ipcMain.handle('add-widget', (_event, { type, initialPos }) => {
     const newWidget = storeInstance.addWidget(type, initialPos);
     registryInstance.registerInstance(newWidget.type, newWidget.id);

@@ -55,5 +55,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   getCrashReports: () => ipcRenderer.invoke('get-crash-reports'),
   clearCrashReports: () => ipcRenderer.invoke('clear-crash-reports'),
   runHealthCheck: () => ipcRenderer.invoke('run-health-check'),
-  replayOnboarding: () => ipcRenderer.invoke('replay-onboarding')
+  replayOnboarding: () => ipcRenderer.invoke('replay-onboarding'),
+  testDockHide: () => ipcRenderer.send('test-dock-hide'),
+  testMenuBarHide: () => ipcRenderer.send('test-menubar-hide')
 });
