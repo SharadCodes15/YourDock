@@ -95,6 +95,10 @@ function migrateSettings(settings = {}) {
     updated.menuBarHideSettings = sanitizeHideSettings(updated.menuBarHideSettings, DEFAULT_MENUBAR_HIDE_SETTINGS);
   }
 
+  if (updated.hasCompletedOnboarding === undefined) {
+    updated.hasCompletedOnboarding = false;
+  }
+
   return updated;
 }
 

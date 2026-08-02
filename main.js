@@ -21,6 +21,8 @@ const {
 const taskbarReplacement = require('./taskbarReplacement');
 const { createWatchdog } = require('./watchdog');
 const windowManager = require('./windowManager');
+const crashReporter = require('./crashReporter');
+const healthCheck = require('./healthCheck');
 
 // [FIX] Debug flag — set to true to enable verbose console.log statements; false keeps production quiet
 const DEBUG = false;
@@ -47,6 +49,13 @@ function logErrorToFile(error, isFatal = false) {
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   logErrorToFile(error, true);
+  try {
+    crashReporter.logCrashReport({
+      errorType: 'UncaughtException',
+      error: error,
+      processWindow: 'main'
+    });
+  } catch (e) {}
   taskbarReplacement.restoreTaskbarSafe();
   dialog.showErrorBox(
     'Fatal Uncaught Exception',
@@ -57,6 +66,13 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   logErrorToFile(reason, false);
+  try {
+    crashReporter.logCrashReport({
+      errorType: 'UnhandledRejection',
+      error: reason,
+      processWindow: 'main'
+    });
+  } catch (e) {}
   taskbarReplacement.restoreTaskbarSafe();
 });
 
@@ -1660,6 +1676,60 @@ function createWelcomeWindow() {
   welcomeWin.on('closed', () => {
     welcomeWin = null;
   });
+}
+
+function attachWindowCrashHandler(win, windowName) {
+  if (!win || !win.webContents) return;
+  win.webContents.on('render-process-gone', (event, details) => {
+    console.error(`Render process gone in window "${windowName}":`, details);
+    try {
+      crashReporter.logCrashReport({
+        errorType: 'RenderProcessGone',
+        error: new Error(`Process gone (reason: ${details.reason}, exitCode: ${details.exitCode})`),
+        processWindow: windowName,
+        stateSnapshot: { reason: details.reason, exitCode: details.exitCode }
+      });
+    } catch (e) {}
+  });
+}
+
+let onboardingWin = null;
+
+function createOnboardingWindow() {
+  if (onboardingWin && !onboardingWin.isDestroyed()) {
+    onboardingWin.focus();
+    return onboardingWin;
+  }
+
+  onboardingWin = new BrowserWindow({
+    width: 480,
+    height: 560,
+    frame: false,
+    resizable: false,
+    center: true,
+    show: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'onboarding-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  onboardingWin.loadFile(path.join(__dirname, 'onboarding.html'));
+
+  onboardingWin.once('ready-to-show', () => {
+    onboardingWin.show();
+    onboardingWin.focus();
+  });
+
+  attachWindowCrashHandler(onboardingWin, 'onboarding');
+
+  onboardingWin.on('closed', () => {
+    onboardingWin = null;
+  });
+
+  return onboardingWin;
 }
 
 function showForceQuitWindow() {
@@ -3420,6 +3490,118 @@ ipcMain.handle('refresh-apps', async () => {
   }
 });
 
+ipcMain.handle('onboarding-scan-apps', async () => {
+  try {
+    await scanAndPopulateApps();
+    let count = 0;
+    if (fs.existsSync(appsJsonPath)) {
+      const raw = await fs.promises.readFile(appsJsonPath, 'utf8');
+      const data = JSON.parse(raw);
+      count = (data.apps || []).length;
+    }
+    return { success: true, count };
+  } catch (err) {
+    console.error('Onboarding scan apps failed:', err);
+    return { success: false, count: 0 };
+  }
+});
+
+ipcMain.handle('complete-onboarding', async (event, { skipped } = {}) => {
+  try {
+    settings.hasCompletedOnboarding = true;
+    await saveSettings();
+    if (onboardingWin && !onboardingWin.isDestroyed()) {
+      onboardingWin.close();
+    }
+    if (!menuBarWin) {
+      await startNormalApp();
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('Error completing onboarding:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('replay-onboarding', async () => {
+  createOnboardingWindow();
+  return { success: true };
+});
+
+ipcMain.handle('get-crash-reports', async () => {
+  return crashReporter.getCrashReports();
+});
+
+ipcMain.handle('clear-crash-reports', async () => {
+  return crashReporter.clearCrashReports();
+});
+
+ipcMain.handle('run-health-check', async () => {
+  return healthCheck.runStartupHealthCheck({
+    userDataPath: app.getPath('userData'),
+    ipcMain,
+    settings
+  });
+});
+
+ipcMain.handle('selectCustomApp', async () => {
+  try {
+    const res = await dialog.showOpenDialog({ properties: ['openFile'] });
+    return res.canceled ? null : (res.filePaths[0] || null);
+  } catch (e) {
+    return null;
+  }
+});
+
+ipcMain.on('set-dock-hover', (event, hovering) => {
+  debugLog('[dock] set-dock-hover:', hovering);
+});
+
+ipcMain.handle('read-raw-apps', async () => {
+  try {
+    if (fs.existsSync(appsJsonPath)) {
+      return await fs.promises.readFile(appsJsonPath, 'utf8');
+    }
+  } catch (e) {}
+  return '{}';
+});
+
+ipcMain.handle('write-raw-apps', async (event, content) => {
+  try {
+    await fs.promises.writeFile(appsJsonPath, content, 'utf8');
+    notifyAppsUpdated();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('get-battery-info', async () => {
+  return { hasBattery: false, percent: 100, isCharging: true };
+});
+
+ipcMain.handle('get-system-info', async () => {
+  return { platform: process.platform, arch: process.arch, nodeVersion: process.version };
+});
+
+ipcMain.handle('open-external-url', async (event, url) => {
+  try {
+    if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+      await shell.openExternal(url);
+      return { success: true };
+    }
+  } catch (e) {}
+  return { success: false };
+});
+
+ipcMain.handle('process-update', async () => {
+  return { success: true, updated: false };
+});
+
+ipcMain.handle('taskbar-restore', async () => {
+  return taskbarReplacement.restoreTaskbarSafe();
+});
+
 ipcMain.handle('override-app-icon', async (event, { appId, exePath }) => {
   const result = await dialog.showOpenDialog({
     title: 'Select Custom Icon',
@@ -3815,28 +3997,8 @@ if (!isPrimaryInstance) {
     }
   });
 
-  app.whenReady().then(async () => {
-    console.log('[startup] app ready');
-    const isFirstRun = !fs.existsSync(configPaths.settingsPath);
-    showWindowsOnStartup = true;
-    configPaths.initializePaths();
-    if (DEBUG) {
-      try {
-        process.getProcessMemoryInfo().then(info => {
-          debugLog(`Initial RAM usage: Private=${Math.round(info.private / 1024)} KB, ResidentSet=${Math.round(info.residentSet / 1024)} KB`);
-        }).catch(err => {
-          debugLog('Failed to get initial RAM usage:', err);
-        });
-      } catch (err) {
-        debugLog('Failed to call process.getProcessMemoryInfo:', err);
-      }
-    }
-
-    await loadConfig();
-    await loadSettings();
-    ensureIconsFolder();
-
-    runStartupIntegrityChecks(app.getPath('userData'));
+  async function startNormalApp() {
+    if (menuBarWin) return; // already started
 
     // Check stale taskbar-hidden flag from previous crash
     if (settings.general && settings.general.taskbarReplacementEnabled) {
@@ -3865,19 +4027,61 @@ if (!isPrimaryInstance) {
     createMenuBarWindow();
     createDockWindow();
 
-    if (isFirstRun) {
-      createWelcomeWindow();
-    } else {
-      createSettingsWindow();
-      createDrawerWindow();
-      registerGlobalShortcuts();
-      startMasterTimer();
-    }
+    createSettingsWindow();
+    createDrawerWindow();
+    registerGlobalShortcuts();
+    startMasterTimer();
 
     try {
       require('./src/main/widgets').initWidgetsSubsystem();
     } catch (err) {
       console.error('[Widgets] Failed to initialize widgets subsystem:', err);
+    }
+
+    // Surface crash notification toast if an unseen crash was recorded in previous session
+    crashReporter.checkAndSurfaceUnseenCrashToast();
+  }
+
+  app.whenReady().then(async () => {
+    console.log('[startup] app ready');
+    const settingsExistedBeforeInit = fs.existsSync(configPaths.settingsPath);
+    showWindowsOnStartup = true;
+    configPaths.initializePaths();
+    if (DEBUG) {
+      try {
+        process.getProcessMemoryInfo().then(info => {
+          debugLog(`Initial RAM usage: Private=${Math.round(info.private / 1024)} KB, ResidentSet=${Math.round(info.residentSet / 1024)} KB`);
+        }).catch(err => {
+          debugLog('Failed to get initial RAM usage:', err);
+        });
+      } catch (err) {
+        debugLog('Failed to call process.getProcessMemoryInfo:', err);
+      }
+    }
+
+    await loadConfig();
+    await loadSettings();
+    ensureIconsFolder();
+
+    runStartupIntegrityChecks(app.getPath('userData'));
+
+    // 1. Startup Health Check sequence (must run before window creation, complete in <1s)
+    const startupHealth = healthCheck.runStartupHealthCheck({
+      userDataPath: app.getPath('userData'),
+      ipcMain,
+      settings
+    });
+    if (DEBUG || !startupHealth.success) {
+      console.log('[StartupHealthCheck] Diagnostic result:', startupHealth);
+    }
+
+    // 2. First-run check: missing settings.json or missing/falsy hasCompletedOnboarding flag
+    const isFirstRun = !settingsExistedBeforeInit || !settings || !settings.hasCompletedOnboarding;
+
+    if (isFirstRun) {
+      createOnboardingWindow();
+    } else {
+      await startNormalApp();
     }
 
     try {

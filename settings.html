@@ -539,6 +539,10 @@
       </svg>
       <span>Performance</span>
     </div>
+    <div class="sidebar-item" data-panel="security">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>Security</span>
+    </div>
     <div class="sidebar-item" data-panel="systemshell">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M8 10l4 4 4-4" stroke-width="2"/></svg>
       <span>System Shell</span>
@@ -1231,6 +1235,7 @@
       </div>
 
       <div class="setting-row" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px; display: flex; justify-content: center; gap: 12px;">
+        <button id="perf-run-health-check" class="btn-primary" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white; background: #007aff;">Run Health Check Now</button>
         <button id="perf-clear-cache" class="btn-danger" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white; background: #8e8e93;">Clear Icon Cache</button>
         <button id="perf-view-logs" class="btn-primary" style="padding: 8px 16px; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; color: white;">View Error Log</button>
       </div>
@@ -1276,6 +1281,38 @@
         <button id="experimental-json-save" class="btn-primary" style="padding: 6px 14px;">Save</button>
         <button id="experimental-json-refresh" style="padding: 6px 14px;">Refresh</button>
         <span id="experimental-json-status" style="font-size: 11px; color: var(--text-muted);"></span>
+      </div>
+    </div>
+
+    <!-- SECURITY PANEL -->
+    <div class="panel" id="panel-security">
+      <h2>Security & Diagnostics</h2>
+      <p style="color: var(--text-muted); font-size: 11px; margin-bottom: 15px;">Local-only security logs, diagnostic health checks, and crash reports.</p>
+
+      <!-- Health Check Section -->
+      <div style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="font-weight: 600; font-size: 13px;">Startup Health Check</div>
+          <button id="security-run-health-check" class="btn-primary" style="padding: 5px 12px; font-size: 11px;">Run Health Check Now</button>
+        </div>
+        <div id="health-check-notice" style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+          Diagnostic checks evaluate config file integrity, IPC channel handlers, native modules, and directory permissions.
+        </div>
+        <div id="health-check-results-box" style="margin-top: 10px; display: none; background: rgba(0,0,0,0.15); border-radius: 6px; padding: 10px; font-size: 11px; font-family: monospace;"></div>
+      </div>
+
+      <!-- Crash Reports Section -->
+      <div style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <div style="font-weight: 600; font-size: 13px;">Crash Reports (Local-Only)</div>
+          <button id="security-clear-crash-reports" style="padding: 4px 10px; font-size: 11px;">Clear All Reports</button>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
+          Structured crash history stored strictly on your local disk (capped at last 20 reports). No network transmission.
+        </div>
+        <div id="crash-reports-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;">
+          <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 12px;">No crash reports recorded.</div>
+        </div>
       </div>
     </div>
 
@@ -1348,10 +1385,11 @@
       </div>
 
       <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px; text-align: center;">
-        <div class="setting-label" style="margin-bottom: 8px;">Backup & Restore</div>
-        <div style="display: flex; gap: 8px; justify-content: center;">
+        <div class="setting-label" style="margin-bottom: 8px;">Backup & Onboarding</div>
+        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
           <button id="about-export" class="btn-primary" style="padding: 6px 14px;">Export Settings...</button>
           <button id="about-import" style="padding: 6px 14px;">Import Settings...</button>
+          <button id="about-replay-onboarding" style="padding: 6px 14px;">Replay Onboarding</button>
         </div>
       </div>
 
@@ -3428,6 +3466,138 @@
         window.settingsAPI.previewTheme(null);
       }
     );
+
+    // Replay Onboarding
+    const replayBtn = document.getElementById('about-replay-onboarding');
+    if (replayBtn) {
+      replayBtn.addEventListener('click', async () => {
+        if (window.settingsAPI && window.settingsAPI.replayOnboarding) {
+          await window.settingsAPI.replayOnboarding();
+        }
+      });
+    }
+
+    // Health Check Logic
+    async function executeHealthCheck() {
+      const resultsBox = document.getElementById('health-check-results-box');
+      const noticeBox = document.getElementById('health-check-notice');
+      if (resultsBox) {
+        resultsBox.style.display = 'block';
+        resultsBox.textContent = 'Running diagnostic checks...';
+      }
+      try {
+        if (window.settingsAPI && window.settingsAPI.runHealthCheck) {
+          const res = await window.settingsAPI.runHealthCheck();
+          if (resultsBox) {
+            let output = `Health Check Result: ${res.success ? 'PASSED ✓' : 'FAILED ✗'} (${res.durationMs}ms)\n`;
+            output += `Timestamp: ${res.timestamp}\n\n`;
+            res.checks.forEach(c => {
+              output += `[${c.status.toUpperCase()}] ${c.name}: ${c.details}\n`;
+            });
+            resultsBox.textContent = output;
+          }
+          if (noticeBox) {
+            if (res.success) {
+              noticeBox.style.color = '#34c759';
+              noticeBox.textContent = '✓ All startup diagnostic checks passed with zero issues.';
+            } else {
+              noticeBox.style.color = '#ff3b30';
+              noticeBox.textContent = `⚠️ Startup check found an issue: ${res.issues.join(' | ')}`;
+            }
+          }
+        }
+      } catch (err) {
+        if (resultsBox) resultsBox.textContent = `Health check failed: ${err.message}`;
+      }
+    }
+
+    const secHealthBtn = document.getElementById('security-run-health-check');
+    if (secHealthBtn) secHealthBtn.addEventListener('click', executeHealthCheck);
+
+    const perfHealthBtn = document.getElementById('perf-run-health-check');
+    if (perfHealthBtn) perfHealthBtn.addEventListener('click', () => {
+      executeHealthCheck();
+      const secTab = document.querySelector('.sidebar-item[data-panel="security"]');
+      if (secTab) secTab.click();
+    });
+
+    // Crash Reports Logic
+    async function loadCrashReports() {
+      const container = document.getElementById('crash-reports-list');
+      if (!container) return;
+      try {
+        if (window.settingsAPI && window.settingsAPI.getCrashReports) {
+          const reports = await window.settingsAPI.getCrashReports();
+          if (!reports || reports.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 12px;">No crash reports recorded.</div>';
+            return;
+          }
+          container.innerHTML = '';
+          reports.forEach(r => {
+            const item = document.createElement('div');
+            item.style.cssText = 'background: rgba(0,0,0,0.1); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 11px;';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;';
+            header.innerHTML = `
+              <div>
+                <span style="font-weight: 600; color: #ff3b30;">${r.errorType}</span>
+                <span style="color: var(--text-muted); margin-left: 8px;">(${r.processWindow})</span>
+                <span style="color: var(--text-muted); margin-left: 8px;">${new Date(r.timestamp).toLocaleString()}</span>
+              </div>
+              <div style="font-size: 10px; color: var(--accent-color);">Click to expand ▼</div>
+            `;
+
+            const details = document.createElement('div');
+            details.style.cssText = 'display: none; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px; font-family: monospace; font-size: 10px; line-height: 1.4; white-space: pre-wrap; word-break: break-all;';
+            details.innerHTML = `
+<div><strong>Message:</strong> ${r.message}</div>
+<div><strong>App Version:</strong> ${r.appVersion || '1.0.0'}</div>
+<div><strong>Stack Trace:</strong>\n${r.stack}</div>
+<div style="margin-top: 8px; text-align: right;">
+  <button class="btn-copy-crash" style="padding: 4px 8px; font-size: 10px; cursor: pointer;">Copy to Clipboard</button>
+</div>
+            `;
+
+            header.addEventListener('click', () => {
+              const isHidden = details.style.display === 'none';
+              details.style.display = isHidden ? 'block' : 'none';
+              header.querySelector('div:last-child').textContent = isHidden ? 'Click to collapse ▲' : 'Click to expand ▼';
+            });
+
+            const copyBtn = details.querySelector('.btn-copy-crash');
+            copyBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const textToCopy = `Crash Report ID: ${r.id}\nTimestamp: ${r.timestamp}\nType: ${r.errorType}\nProcess: ${r.processWindow}\nApp Version: ${r.appVersion}\nMessage: ${r.message}\nStack:\n${r.stack}`;
+              navigator.clipboard.writeText(textToCopy);
+              copyBtn.textContent = 'Copied!';
+              setTimeout(() => { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
+            });
+
+            item.appendChild(header);
+            item.appendChild(details);
+            container.appendChild(item);
+          });
+        }
+      } catch (err) {
+        container.innerHTML = `<div style="color: red; font-size: 11px;">Failed to load crash reports: ${err.message}</div>`;
+      }
+    }
+
+    const clearReportsBtn = document.getElementById('security-clear-crash-reports');
+    if (clearReportsBtn) {
+      clearReportsBtn.addEventListener('click', async () => {
+        if (window.settingsAPI && window.settingsAPI.clearCrashReports) {
+          await window.settingsAPI.clearCrashReports();
+          loadCrashReports();
+        }
+      });
+    }
+
+    const securityTab = document.querySelector('.sidebar-item[data-panel="security"]');
+    if (securityTab) {
+      securityTab.addEventListener('click', loadCrashReports);
+    }
 
     // Init
     loadSettings();

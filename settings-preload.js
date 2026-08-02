@@ -51,5 +51,9 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   taskbarShow: () => ipcRenderer.invoke('taskbar-show'),
   taskbarWriteRestoreScript: () => ipcRenderer.invoke('taskbar-write-restore-script'),
   forceResetUI: () => ipcRenderer.invoke('force-reset-ui'),
-  previewTheme: (tempAppearance) => ipcRenderer.send('preview-theme', tempAppearance)
+  previewTheme: (tempAppearance) => ipcRenderer.send('preview-theme', tempAppearance),
+  getCrashReports: () => ipcRenderer.invoke('get-crash-reports'),
+  clearCrashReports: () => ipcRenderer.invoke('clear-crash-reports'),
+  runHealthCheck: () => ipcRenderer.invoke('run-health-check'),
+  replayOnboarding: () => ipcRenderer.invoke('replay-onboarding')
 });

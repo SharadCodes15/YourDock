@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to YourDock</title>
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #181824 0%, #101018 100%);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --accent-color: #007aff;
+      --accent-hover: #0056b3;
+      --text-color: #f0f0f5;
+      --text-muted: #a0a0b0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      width: 480px;
+      height: 560px;
+      overflow: hidden;
+      background: var(--bg-gradient);
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      -webkit-app-region: drag;
+    }
+
+    /* Window Drag Header */
+    .header {
+      height: 48px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      -webkit-app-region: drag;
+    }
+
+    .brand {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .skip-btn {
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: none;
+      transition: color 0.2s;
+      -webkit-app-region: no-drag;
+    }
+
+    .skip-btn:hover {
+      color: #ff3b30;
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+
+    .step-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 30px 28px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(20px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .step-panel.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .step-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #ffffff, #d0d0e0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .step-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    /* Step 1: Welcome */
+    .hero-graphic {
+      width: 100%;
+      height: 160px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed var(--card-border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      gap: 12px;
+    }
+
+    .hero-icon {
+      font-size: 48px;
+    }
+
+    .hero-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Step 2: Scanner */
+    .scan-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .scan-result {
+      font-size: 14px;
+      font-weight: 600;
+      color: #34c759;
+      display: none;
+    }
+
+    /* Step 3: Theme Cards */
+    .themes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .theme-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .theme-card:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .theme-card.selected {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 12px rgba(0, 122, 255, 0.3);
+      background: rgba(0, 122, 255, 0.08);
+    }
+
+    .theme-preview-box {
+      height: 44px;
+      border-radius: 6px;
+      display: flex;
+      align-items: flex-end;
+      padding: 6px;
+    }
+
+    .theme-preview-dock {
+      width: 100%;
+      height: 12px;
+      border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .theme-name {
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* Step 4: Tour List */
+    .tour-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tour-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 12px 14px;
+      border-radius: 10px;
+    }
+
+    .tour-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .tour-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .tour-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .tour-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Footer Controls */
+    .footer {
+      height: 64px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--card-border);
+      -webkit-app-region: no-drag;
+    }
+
+    .dots-indicator {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .dot.active {
+      width: 20px;
+      border-radius: 4px;
+      background: var(--accent-color);
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    button.btn {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+
+    button.btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-color);
+    }
+
+    button.btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    button.btn-primary {
+      background: var(--accent-color);
+      color: white;
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">🍎 YourDock Setup</div>
+    <a class="skip-btn" id="skip-link">Skip Setup</a>
+  </div>
+
+  <!-- Content Area -->
+  <div class="content-area">
+
+    <!-- Step 1: Welcome -->
+    <div class="step-panel active" id="step-1">
+      <div class="hero-graphic">
+        <div class="hero-icon">🖥️</div>
+        <div class="hero-sub">macOS Menu Bar & Dock for Windows</div>
+      </div>
+      <div class="step-title">Welcome to YourDock</div>
+      <div class="step-desc">
+        Enjoy a seamless macOS Big Sur-style experience with an interactive top Menu Bar, auto-hiding bottom Dock, custom widgets, and system controls.
+      </div>
+      <div style="margin-top: auto; text-align: center;">
+        <button class="btn btn-primary" id="btn-step1-start" style="width: 100%; padding: 10px;">Get Started</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Scan Apps -->
+    <div class="step-panel" id="step-2">
+      <div class="step-title">Let's find your apps</div>
+      <div class="step-desc">
+        Scan your Start Menu shortcuts to automatically populate the App Drawer and Dock with all installed software.
+      </div>
+
+      <div class="scan-box">
+        <div style="font-size: 32px;">🔍</div>
+        <div style="font-size: 13px; color: var(--text-muted);" id="scan-status-text">Click "Scan Now" to discover your installed applications.</div>
+        <div class="spinner" id="scan-spinner"></div>
+        <div class="scan-result" id="scan-result-text"></div>
+        <button class="btn btn-primary" id="btn-scan-now" style="margin-top: 8px;">Scan Now</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Theme Picker -->
+    <div class="step-panel" id="step-3">
+      <div class="step-title">Choose your theme</div>
+      <div class="step-desc">
+        Select a visual style. You can switch or customize themes anytime from Settings.
+      </div>
+
+      <div class="themes-grid">
+        <div class="theme-card selected" data-theme="Classic Light">
+          <div class="theme-preview-box" style="background: #e8e8e8;">
+            <div class="theme-preview-dock" style="background: rgba(255,255,255,0.8); border: 1px solid #dcdcdc;"></div>
+          </div>
+          <div class="theme-name" style="color: #111;">Classic Light</div>
+        </div>
+
+        <div class="theme-card" data-theme="Midnight">
+          <div class="theme-preview-box" style="background: #1c1c2e;">
+            <div class="theme-preview-dock" style="background: rgba(94, 92, 230, 0.3); border: 1px solid #5e5ce6;"></div>
+          </div>
+          <div class="theme-name">Midnight</div>
+        </div>
+
+        <div class="theme-card" data-theme="High Contrast">
+          <div class="theme-preview-box" style="background: #ffffff;">
+            <div class="theme-preview-dock" style="background: #000000;"></div>
+          </div>
+          <div class="theme-name" style="color: #111;">High Contrast</div>
+        </div>
+
+        <div class="theme-card" data-theme="Pastel">
+          <div class="theme-preview-box" style="background: #fdf2f8;">
+            <div class="theme-preview-dock" style="background: #a78bfa;"></div>
+          </div>
+          <div class="theme-name" style="color: #111;">Pastel</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Quick Tour -->
+    <div class="step-panel" id="step-4">
+      <div class="step-title">Quick Tour</div>
+      <div class="step-desc">
+        Here are a few handy tips to get you started smoothly:
+      </div>
+
+      <div class="tour-list">
+        <div class="tour-item">
+          <div class="tour-icon">🖥️</div>
+          <div class="tour-text">
+            <div class="tour-title">Auto-Hiding Dock</div>
+            <div class="tour-desc">Move your cursor to the bottom screen edge to reveal the Dock.</div>
+          </div>
+        </div>
+
+        <div class="tour-item">
+          <div class="tour-icon">⌨️</div>
+          <div class="tour-text">
+            <div class="tour-title">App Drawer Hotkey</div>
+            <div class="tour-desc">Press Win+Alt+D anytime to toggle the launchpad grid.</div>
+          </div>
+        </div>
+
+        <div class="tour-item">
+          <div class="tour-icon">⚙️</div>
+          <div class="tour-text">
+            <div class="tour-title">Settings & Customization</div>
+            <div class="tour-desc">Click the gear icon in the Menu Bar to customize hotkeys & themes.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="dots-indicator">
+      <div class="dot active" data-step="1"></div>
+      <div class="dot" data-step="2"></div>
+      <div class="dot" data-step="3"></div>
+      <div class="dot" data-step="4"></div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" id="btn-back" disabled>Back</button>
+      <button class="btn btn-primary" id="btn-next">Next</button>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    let selectedTheme = 'Classic Light';
+
+    const stepPanels = document.querySelectorAll('.step-panel');
+    const dots = document.querySelectorAll('.dot');
+    const btnBack = document.getElementById('btn-back');
+    const btnNext = document.getElementById('btn-next');
+    const skipLink = document.getElementById('skip-link');
+
+    function goToStep(step) {
+      if (step < 1 || step > 4) return;
+      currentStep = step;
+
+      stepPanels.forEach((panel, idx) => {
+        if (idx + 1 === currentStep) {
+          panel.classList.add('active');
+        } else {
+          panel.classList.remove('active');
+        }
+      });
+
+      dots.forEach((dot, idx) => {
+        if (idx + 1 === currentStep) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+
+      btnBack.disabled = currentStep === 1;
+      if (currentStep === 4) {
+        btnNext.textContent = 'Finish';
+      } else {
+        btnNext.textContent = 'Next';
+      }
+    }
+
+    btnBack.addEventListener('click', () => {
+      goToStep(currentStep - 1);
+    });
+
+    btnNext.addEventListener('click', async () => {
+      if (currentStep < 4) {
+        goToStep(currentStep + 1);
+      } else {
+        // Finish wizard
+        if (window.onboardingAPI && window.onboardingAPI.completeOnboarding) {
+          await window.onboardingAPI.completeOnboarding(false);
+        }
+      }
+    });
+
+    document.getElementById('btn-step1-start').addEventListener('click', () => {
+      goToStep(2);
+    });
+
+    skipLink.addEventListener('click', async () => {
+      if (window.onboardingAPI && window.onboardingAPI.completeOnboarding) {
+        await window.onboardingAPI.completeOnboarding(true);
+      }
+    });
+
+    // Step 2: App Scanner Logic
+    const btnScan = document.getElementById('btn-scan-now');
+    const scanSpinner = document.getElementById('scan-spinner');
+    const scanStatusText = document.getElementById('scan-status-text');
+    const scanResultText = document.getElementById('scan-result-text');
+
+    btnScan.addEventListener('click', async () => {
+      btnScan.disabled = true;
+      scanSpinner.style.display = 'block';
+      scanStatusText.textContent = 'Scanning Start Menu shortcuts...';
+      scanResultText.style.display = 'none';
+
+      try {
+        if (window.onboardingAPI && window.onboardingAPI.scanApps) {
+          const res = await window.onboardingAPI.scanApps();
+          scanSpinner.style.display = 'none';
+          btnScan.disabled = false;
+          if (res && res.success) {
+            scanStatusText.textContent = 'Scan completed successfully!';
+            scanResultText.textContent = `Found ${res.count || 0} installed apps!`;
+            scanResultText.style.display = 'block';
+          } else {
+            scanStatusText.textContent = 'Scan finished with default set.';
+          }
+        }
+      } catch (err) {
+        scanSpinner.style.display = 'none';
+        btnScan.disabled = false;
+        scanStatusText.textContent = 'Scan completed.';
+      }
+    });
+
+    // Step 3: Theme Selector
+    const themeCards = document.querySelectorAll('.theme-card');
+    themeCards.forEach(card => {
+      card.addEventListener('click', async () => {
+        themeCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedTheme = card.getAttribute('data-theme');
+        if (window.onboardingAPI && window.onboardingAPI.applyBuiltinTheme) {
+          try {
+            await window.onboardingAPI.applyBuiltinTheme(selectedTheme);
+          } catch (e) {}
+        }
+      });
+    });
+  </script>
+</body>
+</html>

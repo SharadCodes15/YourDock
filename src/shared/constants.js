@@ -138,7 +138,13 @@ const VALID_IPC_CHANNELS = new Set([
   'taskbar-write-restore-script',
   'force-reset-ui',
   'user-interaction',
-  'modal-state'
+  'modal-state',
+  'onboarding-scan-apps',
+  'complete-onboarding',
+  'replay-onboarding',
+  'get-crash-reports',
+  'clear-crash-reports',
+  'run-health-check'
 ]);
 
 function containsDangerousKeys(obj) {
