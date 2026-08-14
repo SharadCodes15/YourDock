@@ -4247,6 +4247,7 @@ if (!isPrimaryInstance) {
   });
 
   app.whenReady().then(async () => {
+    try {
     console.log('[startup] app ready');
     const settingsExistedBeforeInit = fs.existsSync(configPaths.settingsPath);
     showWindowsOnStartup = true;
@@ -4335,6 +4336,35 @@ if (!isPrimaryInstance) {
         createDockWindow();
       }
     });
+
+    } catch (startupErr) {
+      // [FIX] Surface startup errors visibly instead of silently falling back to Electron's default screen
+      console.error('[startup] FATAL: Window creation failed:', startupErr);
+      logErrorToFile(startupErr, true);
+      try {
+        crashReporter.logCrashReport({
+          errorType: 'StartupCrash',
+          error: startupErr,
+          processWindow: 'main'
+        });
+      } catch (e) {}
+      dialog.showErrorBox(
+        'Startup Failed',
+        `The application failed to create its windows.\n\nError: ${startupErr.message || startupErr}\n\nDetails have been logged to logs/error.log.\nThe app will now quit.`
+      );
+      app.quit();
+    }
+  }).catch((fatalErr) => {
+    // [FIX] Catch-all for any unhandled rejection in the startup promise chain
+    console.error('[startup] FATAL unhandled rejection in app.whenReady():', fatalErr);
+    try { logErrorToFile(fatalErr, true); } catch (e) {}
+    try {
+      dialog.showErrorBox(
+        'Startup Failed (Unhandled)',
+        `A fatal error occurred before windows could be created.\n\nError: ${fatalErr.message || fatalErr}\n\nThe app will now quit.`
+      );
+    } catch (e) {}
+    app.quit();
   });
 }
 
