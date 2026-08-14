@@ -35,6 +35,7 @@ function createHostWindow(store, registry, onStateChangeCallback) {
     width: width,
     height: height,
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
     show: false,
     hasShadow: false,

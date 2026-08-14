@@ -2875,84 +2875,151 @@
       alert('All shortcuts have been cleared.');
     });
 
+    let activeKeyCaptureId = null;
+
+    const RESERVED_SHORTCUTS = new Set([
+      'Ctrl+Alt+Delete', 'CommandOrControl+Alt+Delete',
+      'Super+L', 'Win+L', 'Meta+L',
+      'Super+D', 'Win+D', 'Meta+D',
+      'Super+E', 'Win+E', 'Meta+E',
+      'Super+R', 'Win+R', 'Meta+R',
+      'Super+I', 'Win+I', 'Meta+I',
+      'Super+P', 'Win+P', 'Meta+P',
+      'Super+X', 'Win+X', 'Meta+X',
+      'Super+Tab', 'Win+Tab', 'Meta+Tab',
+      'Alt+Tab', 'Alt+F4',
+      'Ctrl+Alt+Tab', 'CommandOrControl+Alt+Tab',
+      'Ctrl+Shift+Esc', 'CommandOrControl+Shift+Esc',
+      'CommandOrControl+Shift+Alt+T', 'Ctrl+Shift+Alt+T',
+      'CommandOrControl+Shift+Alt+R', 'Ctrl+Shift+Alt+R'
+    ]);
+
     function startShortcutCapture(inputId, settingKey) {
       stopShortcutCapture();
 
       activeKeyCaptureId = { inputId, settingKey };
       const input = document.getElementById(inputId);
-      input.value = 'Recording... Press keys';
+      input.value = 'Press key combination...';
       input.style.borderColor = 'var(--accent-color)';
       
       const errorDiv = document.getElementById(`${inputId}-error`);
       if (errorDiv) errorDiv.style.display = 'none';
-      window.addEventListener('keydown', captureKeys);
+
+      window.addEventListener('keydown', captureKeysKeyDown);
+      window.addEventListener('keyup', captureKeysKeyUp);
     }
 
     function stopShortcutCapture() {
       if (activeKeyCaptureId) {
         const input = document.getElementById(activeKeyCaptureId.inputId);
-        input.style.borderColor = '';
-        if (input.value === 'Recording... Press keys') {
-          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+        if (input) {
+          input.style.borderColor = '';
+          if (input.value.startsWith('Press key') || input.value.endsWith('+ ...')) {
+            input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+          }
         }
-        window.removeEventListener('keydown', captureKeys);
+        window.removeEventListener('keydown', captureKeysKeyDown);
+        window.removeEventListener('keyup', captureKeysKeyUp);
         activeKeyCaptureId = null;
       }
     }
 
-    async function captureKeys(e) {
+    function getHeldModifiers(e) {
+      const mods = [];
+      if (e.ctrlKey) mods.push('Ctrl');
+      if (e.altKey) mods.push('Alt');
+      if (e.shiftKey) mods.push('Shift');
+      if (e.metaKey) mods.push('Win');
+      return mods;
+    }
+
+    function captureKeysKeyUp(e) {
+      if (!activeKeyCaptureId) return;
+      const mods = getHeldModifiers(e);
+      const input = document.getElementById(activeKeyCaptureId.inputId);
+      if (input) {
+        if (mods.length > 0) {
+          input.value = mods.join(' + ') + ' + ...';
+        } else {
+          input.value = 'Press key combination...';
+        }
+      }
+    }
+
+    async function captureKeysKeyDown(e) {
+      if (!activeKeyCaptureId) return;
       e.preventDefault();
       e.stopPropagation();
 
-      const keys = [];
-      if (e.ctrlKey) keys.push('Ctrl');
-      if (e.metaKey) keys.push('Super');
-      if (e.altKey) keys.push('Alt');
-      if (e.shiftKey) keys.push('Shift');
-
       const key = e.key;
       const isModifier = ['Control', 'Meta', 'Alt', 'Shift'].includes(key);
+      const mods = getHeldModifiers(e);
 
-      if (!isModifier) {
-        let electronKey = key;
-        if (key === ' ') electronKey = 'Space';
-        else if (key === 'ArrowUp') electronKey = 'Up';
-        else if (key === 'ArrowDown') electronKey = 'Down';
-        else if (key === 'ArrowLeft') electronKey = 'Left';
-        else if (key === 'ArrowRight') electronKey = 'Right';
-        else if (key.length === 1) electronKey = key.toUpperCase();
+      if (key === 'Escape' && mods.length === 0) {
+        stopShortcutCapture();
+        return;
+      }
 
-        keys.push(electronKey);
-        const shortcutStr = keys.join('+');
+      const input = document.getElementById(activeKeyCaptureId.inputId);
+      const errorLabel = document.getElementById(`${activeKeyCaptureId.inputId}-error`);
 
-        const input = document.getElementById(activeKeyCaptureId.inputId);
-        input.value = shortcutStr;
+      if (isModifier) {
+        if (input) {
+          input.value = (mods.length > 0 ? mods.join(' + ') : key) + ' + ...';
+        }
+        return;
+      }
 
-        // Check conflicts before registering
-        const conflictCheck = await window.settingsAPI.checkShortcutConflict(shortcutStr);
-        const errorLabel = document.getElementById(`${activeKeyCaptureId.inputId}-error`);
+      let electronKey = key;
+      if (key === ' ') electronKey = 'Space';
+      else if (key === 'ArrowUp') electronKey = 'Up';
+      else if (key === 'ArrowDown') electronKey = 'Down';
+      else if (key === 'ArrowLeft') electronKey = 'Left';
+      else if (key === 'ArrowRight') electronKey = 'Right';
+      else if (key.length === 1) electronKey = key.toUpperCase();
 
-        if (conflictCheck.conflict) {
+      const electronMods = mods.map(m => m === 'Ctrl' ? 'CommandOrControl' : (m === 'Win' ? 'Super' : m));
+      const shortcutStr = [...electronMods, electronKey].join('+');
+      const displayStr = [...mods, electronKey].join(' + ');
+
+      if (input) input.value = displayStr;
+
+      if (RESERVED_SHORTCUTS.has(shortcutStr) || RESERVED_SHORTCUTS.has([...mods, electronKey].join('+'))) {
+        if (errorLabel) {
+          errorLabel.textContent = `"${displayStr}" is a system-reserved shortcut and cannot be assigned.`;
+          errorLabel.style.display = 'block';
+        }
+        input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+        stopShortcutCapture();
+        return;
+      }
+
+      const conflictCheck = await window.settingsAPI.checkShortcutConflict(shortcutStr);
+
+      if (conflictCheck.conflict) {
+        if (errorLabel) {
           errorLabel.textContent = conflictCheck.error || 'Already assigned to another action.';
           errorLabel.style.display = 'block';
-          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
-          stopShortcutCapture();
-          return;
         }
-
-        const res = await window.settingsAPI.registerShortcut(activeKeyCaptureId.settingKey, shortcutStr);
-
-        if (res.success) {
-          currentSettings.shortcuts[activeKeyCaptureId.settingKey] = shortcutStr;
-          if (errorLabel) errorLabel.style.display = 'none';
-        } else {
-          errorLabel.textContent = res.error || 'Conflict detected.';
-          errorLabel.style.display = 'block';
-          input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
-        }
-
+        input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
         stopShortcutCapture();
+        return;
       }
+
+      const res = await window.settingsAPI.registerShortcut(activeKeyCaptureId.settingKey, shortcutStr);
+
+      if (res.success) {
+        currentSettings.shortcuts[activeKeyCaptureId.settingKey] = shortcutStr;
+        if (errorLabel) errorLabel.style.display = 'none';
+      } else {
+        if (errorLabel) {
+          errorLabel.textContent = res.error || 'Failed to register shortcut.';
+          errorLabel.style.display = 'block';
+        }
+        input.value = currentSettings.shortcuts[activeKeyCaptureId.settingKey] || '';
+      }
+
+      stopShortcutCapture();
     }
 
     async function clearShortcut(inputId, settingKey) {

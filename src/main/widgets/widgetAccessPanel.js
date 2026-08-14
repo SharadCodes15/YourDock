@@ -18,6 +18,7 @@ function createAccessPanelWindow(store, onToggleCallback) {
     x: screenWidth - panelWidth,
     y: 0,
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
     show: false,
     alwaysOnTop: true,

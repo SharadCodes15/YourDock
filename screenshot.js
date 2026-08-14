@@ -78,6 +78,7 @@ async function captureSelectedArea(settings) {
       x: totalBounds.x, y: totalBounds.y,
       width: totalBounds.width, height: totalBounds.height,
       frame: false, transparent: true,
+      backgroundColor: '#00000000',
       alwaysOnTop: true, skipTaskbar: true,
       resizable: false, show: false,
       hasShadow: false,
@@ -180,6 +181,7 @@ function createToastWindow(filePath, settings) {
   let toastWin = new BrowserWindow({
     width: 260, height: 60,
     frame: false, transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true, skipTaskbar: true,
     resizable: false, show: false,
     hasShadow: true,

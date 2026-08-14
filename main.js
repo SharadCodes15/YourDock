@@ -531,7 +531,7 @@ async function loadConfig() {
       config = JSON.parse(rawData);
       let needsSave = false;
       if (config.autoHide === undefined) {
-        config.autoHide = true;
+        config.autoHide = false;
         needsSave = true;
       }
       if (config.hideMode === undefined) {
@@ -545,14 +545,14 @@ async function loadConfig() {
       // Fallback defaults
       config = {
         pinned: ["finder", "launchpad", "safari", "mail", "appstore", "preferences"],
-        autoHide: true,
+        autoHide: false,
         hideMode: 'collapsed'
       };
       await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
     }
     const mode = getDockHidingMode();
     dockAutoHide = (mode !== 'none');
-    dockState = dockAutoHide ? 'collapsed' : 'expanded'; // Set initial state correctly
+    dockState = 'expanded'; // Always start expanded on launch so Dock is visible
   } catch (err) {
     console.error('Error loading config:', err);
   }
@@ -1131,6 +1131,7 @@ function createNotificationCenterWindow() {
     y: dy,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -1210,6 +1211,7 @@ function createSettingsWindow() {
     resizable: true,
     alwaysOnTop: false,
     show: false,
+    backgroundColor: '#0f172a',
     title: 'Menu Bar Settings',
     webPreferences: {
       preload: path.join(__dirname, 'settings-preload.js'),
@@ -1737,6 +1739,7 @@ function createAboutWindow() {
     frame: true,
     resizable: false,
     show: false,
+    backgroundColor: '#0f172a',
     title: 'About This Mac',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1784,6 +1787,7 @@ function createForceQuitWindow() {
     frame: true,
     resizable: false,
     show: false,
+    backgroundColor: '#0f172a',
     title: 'Force Quit Applications',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1817,6 +1821,7 @@ function createWelcomeWindow() {
     frame: true,
     resizable: false,
     show: false,
+    backgroundColor: '#0f172a',
     title: 'Welcome to macOS Dock & Menu Bar',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -1878,6 +1883,7 @@ function createOnboardingWindow() {
     resizable: false,
     center: true,
     show: false,
+    backgroundColor: '#0f172a',
     hasShadow: true,
     webPreferences: {
       preload: path.join(__dirname, 'onboarding-preload.js'),
@@ -2034,6 +2040,7 @@ function createDrawerWindow() {
     fullscreen: true,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
@@ -2388,7 +2395,8 @@ function createMenuBarWindow() {
       height: 28,
       x: displayX,
       y: displayY,
-      show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
+      show: false,
+      backgroundColor: '#00000000',
       frame: false,
       transparent: true,
       alwaysOnTop: true,
@@ -2434,19 +2442,19 @@ function createMenuBarWindow() {
     console.log('[window] menuBar did-fail-load', errorCode, errorDescription);
   });
 
-  menuBarWin.webContents.on('did-finish-load', () => {
+  menuBarWin.once('ready-to-show', () => {
     if (!menuBarWin || menuBarWin.isDestroyed()) return;
-    setTimeout(() => {
-      if (!menuBarWin || menuBarWin.isDestroyed()) return;
+    const startMinimized = settings.general && settings.general.startMinimizedToTray;
+    if (shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized })) {
       console.log('[window] menuBar bounds before show', menuBarWin.getBounds());
       menuBarWin.show();
       menuBarWin.focus();
       console.log('[window] menuBar visible', menuBarWin.isVisible(), 'bounds', menuBarWin.getBounds());
-      applySettings();
-      if (menuBarState === 'collapsed') {
-        setMenuBarCollapsed(true);
-      }
-    }, 80);
+    }
+    applySettings();
+    if (menuBarState === 'collapsed') {
+      setMenuBarCollapsed(true);
+    }
   });
 
   menuBarWin.on('close', (e) => {
@@ -2485,7 +2493,8 @@ function createDockWindow() {
       height: baseBounds.height,
       x: dockX,
       y: dockY,
-      show: shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized }),
+      show: false,
+      backgroundColor: '#00000000',
       frame: false,
       transparent: true,
       alwaysOnTop: true,
@@ -2523,23 +2532,18 @@ function createDockWindow() {
     console.log('[window] dock did-fail-load', errorCode, errorDescription);
   });
 
-  dockWin.webContents.on('did-finish-load', () => {
+  dockWin.once('ready-to-show', () => {
     if (!dockWin || dockWin.isDestroyed()) return;
-    setTimeout(() => {
-      if (!dockWin || dockWin.isDestroyed()) return;
+    const startMinimized = settings.general && settings.general.startMinimizedToTray;
+    if (shouldShowWindowsAtStartup({ showWindowsOnStartup, startMinimized })) {
       console.log('[window] dock bounds before show', dockWin.getBounds());
       dockWin.show();
       dockWin.focus();
       console.log('[window] dock visible', dockWin.isVisible(), 'bounds', dockWin.getBounds());
-      if (dockAutoHide && dockState === 'collapsed') {
-        dockWin.webContents.send('set-collapse-state', true);
-        stopProcessPolling();
-      } else {
-        dockState = 'expanded';
-        dockWin.webContents.send('set-collapse-state', false);
-        startProcessPolling();
-      }
-    }, 80);
+    }
+    dockState = 'expanded';
+    dockWin.webContents.send('set-collapse-state', false);
+    startProcessPolling();
   });
 
   dockWin.on('close', (e) => {
@@ -3294,14 +3298,27 @@ ipcMain.handle('register-shortcut', async (event, { type, shortcut }) => {
   }
 });
 
+function normalizeAccelerator(acc) {
+  if (!acc) return '';
+  return acc.split('+')
+    .map(part => {
+      const p = part.trim();
+      if (p === 'Ctrl' || p === 'Control') return 'CommandOrControl';
+      if (p === 'Win' || p === 'Meta') return 'Super';
+      return p;
+    })
+    .join('+');
+}
+
 ipcMain.handle('check-shortcut-conflict', async (event, shortcut) => {
   if (!shortcut) return { conflict: false };
-  if (globalShortcut.isRegistered(shortcut)) {
-    return { conflict: true, error: 'Shortcut already in use by another app.' };
+  const normalized = normalizeAccelerator(shortcut);
+  if (globalShortcut.isRegistered(normalized) || globalShortcut.isRegistered(shortcut)) {
+    return { conflict: true, error: 'Shortcut already in use by another app or system action.' };
   }
   if (settings.shortcuts) {
     for (const [otherType, otherShortcut] of Object.entries(settings.shortcuts)) {
-      if (otherShortcut === shortcut) {
+      if (otherShortcut && normalizeAccelerator(otherShortcut) === normalized) {
         return { conflict: true, error: `Already assigned to ${formatShortcutAction(otherType)}` };
       }
     }
@@ -4368,6 +4385,24 @@ if (!isPrimaryInstance) {
   });
 }
 
+function destroyAllWindows() {
+  const windows = [
+    menuBarWin, dockWin, notificationWin, settingsWin, aboutWin,
+    forceQuitWin, welcomeWin, onboardingWin, drawerWin, ccWin, spotlightWin
+  ];
+  for (const win of windows) {
+    if (win && !win.isDestroyed()) {
+      try { win.destroy(); } catch (e) {}
+    }
+  }
+  try {
+    const widgets = require('./src/main/widgets');
+    if (widgets && typeof widgets.destroyWidgetsSubsystem === 'function') {
+      widgets.destroyWidgetsSubsystem();
+    }
+  } catch (e) {}
+}
+
 app.isQuitting = false;
 app.on('before-quit', () => {
   console.log('[shutdown] before-quit');
@@ -4377,6 +4412,7 @@ app.on('before-quit', () => {
   stopCursorPolling();
   stopDockCursorPolling();
   globalShortcut.unregisterAll();
+  destroyAllWindows();
 });
 
 app.on('window-all-closed', () => {
@@ -4489,6 +4525,7 @@ function createControlCenterWindow() {
     height: 350,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -5022,6 +5059,7 @@ function createSpotlightWindow() {
     y: y,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -5051,6 +5089,21 @@ function createSpotlightWindow() {
 function toggleSpotlight() {
   if (!spotlightWin) {
     createSpotlightWindow();
+    spotlightWin.once('ready-to-show', () => {
+      if (spotlightWin && !spotlightWin.isDestroyed()) {
+        const targetDisplay = getTargetDisplay();
+        const { x: dx, y: dy, width: screenWidth, height: screenHeight } = targetDisplay.bounds;
+        const winWidth = 600;
+        const winHeight = 400;
+        const x = dx + Math.round((screenWidth - winWidth) / 2);
+        const y = dy + Math.round((screenHeight - winHeight) / 3);
+        spotlightWin.setBounds({ x, y, width: winWidth, height: winHeight });
+        spotlightWin.show();
+        spotlightWin.focus();
+        spotlightWin.webContents.send('focus-input');
+      }
+    });
+    return;
   }
   
   if (spotlightWin.isVisible()) {

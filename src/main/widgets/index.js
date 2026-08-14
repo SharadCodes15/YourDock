@@ -214,6 +214,11 @@ function initWidgetsSubsystem() {
   });
 }
 
+function destroyWidgetsSubsystem() {
+  destroyHostWindow();
+  closeAccessPanel(storeInstance, () => {});
+}
+
 function getRegistry() {
   return registryInstance;
 }
@@ -224,6 +229,7 @@ function getStore() {
 
 module.exports = {
   initWidgetsSubsystem,
+  destroyWidgetsSubsystem,
   getRegistry,
   getStore
 };

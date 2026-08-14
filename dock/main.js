@@ -76,6 +76,8 @@ function createWindow() {
     y: y,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
+    show: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -92,6 +94,10 @@ function createWindow() {
   });
 
   win.loadFile('index.html');
+
+  win.once('ready-to-show', () => {
+    win.show();
+  });
 
   // macOS Vibrancy
   if (process.platform === 'darwin') {
